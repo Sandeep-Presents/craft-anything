@@ -281,42 +281,62 @@ pub fn problems(file: &syn::File, policy: Policy) -> Vec<(usize, String)> {
     finder.found
 }
 
-/// Track explicit module declarations so an out-of-line test module has the same exemption as
-/// an inline one. A file also used by production stays in scope. Unreferenced files are checked
-/// conservatively; macro-generated modules and cross-crate inclusion aren't inferred.
-pub fn test_files(files: &[(PathBuf, syn::File)]) -> std::collections::BTreeSet<PathBuf> {
-    fn modules(items: &[syn::Item], dir: &Path, attr_dir: &Path, test: bool, out: &mut Vec<(PathBuf, bool)>) {
-        for item in items {
-            let syn::Item::Mod(module) = item else { continue };
-            let test = test || test_only(&module.attrs);
-            let name = module.ident.to_string();
-            if let Some((_, items)) = &module.content {
-                modules(items, &dir.join(&name), &attr_dir.join(&name), test, out);
-            } else {
-                let custom = module.attrs.iter().find_map(|a| {
-                    if !a.path().is_ident("path") {
-                        return None;
+/// Resolve only module-level conventional files and literal `#[path]` declarations. Missing files
+/// may belong to an inactive cfg; the compiler decides that. Other inspection errors fail.
+fn modules(items: &[syn::Item], dir: &Path, attr_dir: &Path, test: bool, out: &mut Vec<(PathBuf, bool)>) -> Result<(), String> {
+    for item in items {
+        let syn::Item::Mod(module) = item else { continue };
+        let test = test || test_only(&module.attrs);
+        let name = module.ident.to_string();
+        if let Some((_, items)) = &module.content {
+            modules(items, &dir.join(&name), &attr_dir.join(&name), test, out)?;
+        } else {
+            let custom = module.attrs.iter().find_map(|a| {
+                if !a.path().is_ident("path") {
+                    return None;
+                }
+                let Meta::NameValue(value) = &a.meta else { return None };
+                let syn::Expr::Lit(value) = &value.value else { return None };
+                let syn::Lit::Str(value) = &value.lit else { return None };
+                Some(attr_dir.join(value.value()))
+            });
+            let candidates = custom.map_or_else(|| vec![dir.join(format!("{name}.rs")), dir.join(name).join("mod.rs")], |path| vec![path]);
+            for path in candidates {
+                match path.canonicalize() {
+                    Ok(path) => {
+                        out.push((path, test));
+                        break;
                     }
-                    let Meta::NameValue(value) = &a.meta else { return None };
-                    let syn::Expr::Lit(value) = &value.value else { return None };
-                    let syn::Lit::Str(value) = &value.lit else { return None };
-                    Some(attr_dir.join(value.value()))
-                });
-                let path = custom.unwrap_or_else(|| {
-                    let flat = dir.join(format!("{name}.rs"));
-                    if flat.is_file() { flat } else { dir.join(name).join("mod.rs") }
-                });
-                if let Ok(path) = path.canonicalize() {
-                    out.push((path, test));
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(format!("cannot inspect module {}: {e}", path.display())),
                 }
             }
         }
     }
+    Ok(())
+}
+
+fn references(path: &Path, file: &syn::File) -> Result<Vec<(PathBuf, bool)>, String> {
+    let parent = path.parent().unwrap_or(Path::new(""));
+    let dir = if path.file_stem().is_some_and(|n| n == "lib" || n == "main" || n == "mod") {
+        parent.to_path_buf()
+    } else {
+        parent.join(path.file_stem().unwrap_or_default())
+    };
+    let mut refs = Vec::new();
+    modules(&file.items, &dir, parent, false, &mut refs)?;
+    Ok(refs)
+}
+
+/// Track explicit module declarations so an out-of-line test module has the same exemption as
+/// an inline one. A file also used by production stays in scope. Unreferenced files are checked
+/// conservatively; macro-generated modules and cross-crate imports aren't inferred.
+pub fn test_files(files: &[(PathBuf, syn::File)]) -> Result<std::collections::BTreeSet<PathBuf>, String> {
     let mut incoming: BTreeMap<PathBuf, Vec<(PathBuf, bool)>> = BTreeMap::new();
     let mut tests = std::collections::BTreeSet::new();
     let mut roots = std::collections::BTreeSet::new();
     for (path, file) in files {
-        let path = path.canonicalize().unwrap_or_else(|_| path.clone());
+        let path = path.canonicalize().map_err(|e| format!("cannot inspect {}: {e}", path.display()))?;
         if test_only(&file.attrs) {
             tests.insert(path.clone());
         }
@@ -330,14 +350,7 @@ pub fn test_files(files: &[(PathBuf, syn::File)]) -> std::collections::BTreeSet<
         if entry || bin {
             roots.insert(path.clone());
         }
-        let dir = if path.file_stem().is_some_and(|n| n == "lib" || n == "main" || n == "mod") {
-            parent.to_path_buf()
-        } else {
-            parent.join(path.file_stem().unwrap_or_default())
-        };
-        let mut refs = Vec::new();
-        modules(&file.items, &dir, parent, false, &mut refs);
-        for (target, test) in refs {
+        for (target, test) in references(&path, file)? {
             incoming.entry(target).or_default().push((path.clone(), test));
         }
     }
@@ -349,11 +362,28 @@ pub fn test_files(files: &[(PathBuf, syn::File)]) -> std::collections::BTreeSet<
             }
         }
         if tests.len() == before {
-            return tests;
+            return Ok(tests);
         }
     }
 }
 
-pub fn read_all(paths: Vec<PathBuf>) -> Result<Vec<(PathBuf, syn::File)>, String> {
-    paths.into_iter().map(|path| read(&path).map(|file| (path, file))).collect()
+/// Include explicit module files even beneath otherwise-exempt directories. Canonical paths
+/// bound discovery to the workspace and stop cyclic or shared module references repeating.
+pub fn read_all(mut paths: Vec<PathBuf>, root: &Path) -> Result<Vec<(PathBuf, syn::File)>, String> {
+    let workspace = root.canonicalize().map_err(|e| format!("cannot inspect workspace {}: {e}", root.display()))?;
+    let mut seen = std::collections::BTreeSet::new();
+    let mut files = Vec::new();
+    while let Some(path) = paths.pop() {
+        let canonical = path.canonicalize().map_err(|e| format!("cannot inspect source {}: {e}", path.display()))?;
+        let relative =
+            canonical.strip_prefix(&workspace).map_err(|_| format!("source {} is outside the workspace; source policies cannot inspect it", path.display()))?;
+        if !seen.insert(canonical.clone()) {
+            continue;
+        }
+        let path = root.join(relative);
+        let file = read(&path)?;
+        paths.extend(references(&canonical, &file)?.into_iter().map(|(path, _)| path));
+        files.push((path, file));
+    }
+    Ok(files)
 }

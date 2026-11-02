@@ -205,7 +205,7 @@ pub fn check(root: &Path) -> bool {
                 continue;
             }
         };
-        let files = match super::source_policy::read_all(files) {
+        let files = match super::source_policy::read_all(files, root) {
             Ok(files) => files,
             Err(e) => {
                 eprintln!("locks: {e}");
@@ -213,7 +213,14 @@ pub fn check(root: &Path) -> bool {
                 continue;
             }
         };
-        let tests = super::source_policy::test_files(&files);
+        let tests = match super::source_policy::test_files(&files) {
+            Ok(tests) => tests,
+            Err(e) => {
+                eprintln!("locks: {e}");
+                bad += 1;
+                continue;
+            }
+        };
         for (file, syntax) in files {
             if file.canonicalize().is_ok_and(|p| tests.contains(&p)) {
                 continue;

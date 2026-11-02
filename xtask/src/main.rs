@@ -8,8 +8,8 @@ mod i18n_coverage;
 mod ico;
 mod locks;
 mod secrets;
-mod status;
 mod source_policy;
+mod status;
 
 /// Workspace crates and their layer. A crate may depend only on strictly lower layers
 /// (L0 format crates depend on nothing in the workspace).
@@ -248,7 +248,7 @@ fn process_calls_only_in_platform(root: &Path) -> bool {
 }
 
 /// R1.6: UI src paths may read files, but writes and launches belong behind tools.
-/// Explicit module paths outside this source root remain a documented follow-up.
+/// Explicit module files reachable from this source root are included too.
 fn ui_has_no_side_effects(root: &Path) -> bool {
     check_source_policy(
         root,
@@ -270,7 +270,7 @@ fn check_source_policy(root: &Path, dirs: &[&str], skip: &[&str], policy: source
                 continue;
             }
         };
-        let files = match source_policy::read_all(files) {
+        let files = match source_policy::read_all(files, root) {
             Ok(files) => files,
             Err(e) => {
                 eprintln!("layers: {e}");
@@ -278,7 +278,14 @@ fn check_source_policy(root: &Path, dirs: &[&str], skip: &[&str], policy: source
                 continue;
             }
         };
-        let tests = source_policy::test_files(&files);
+        let tests = match source_policy::test_files(&files) {
+            Ok(tests) => tests,
+            Err(e) => {
+                eprintln!("layers: {e}");
+                ok = false;
+                continue;
+            }
+        };
         for (file, syntax) in files {
             if !matches!(policy, source_policy::Policy::Session) && file.canonicalize().is_ok_and(|p| tests.contains(&p)) {
                 continue;
@@ -444,6 +451,7 @@ mod tests {
         let status = readme.split("\n## Status").nth(1).unwrap();
         let status = status.split("\n**Responsible use.**").next().unwrap().replace("\n> ", " ");
         assert!(!status.contains("**Next:** the first public release"), "{status}");
+    }
 }
 
 #[cfg(test)]
@@ -637,9 +645,7 @@ mod policy_tests {
             std::fs::create_dir_all(source.parent().unwrap()).unwrap();
             std::fs::write(&source, "fn f() { std::process::Command::new(\"app\"); std::fs::write(\"out\", b\"x\"); let _ = Session::default(); let n = e.session().a() + e.session().b(); }").unwrap();
             assert!(!process_calls_only_in_platform(d.path()), "{relative}");
-            if !relative.starts_with("..") {
-                assert!(!ui_has_no_side_effects(d.path()), "{relative}");
-            }
+            assert!(!ui_has_no_side_effects(d.path()), "{relative}");
             assert!(!no_real_machine_sessions(d.path()), "{relative}");
             assert!(!locks::check(d.path()), "{relative}");
             std::fs::write(&source, "fn allowed() {}").unwrap();
@@ -689,6 +695,54 @@ mod policy_tests {
         assert!(locks::check(d.path()));
         std::fs::write(&source, "fn f() { std::process::Command::new(\"app\"); }").unwrap();
         assert!(!process_calls_only_in_platform(d.path()), "a linked Rust file is still checked");
+    }
+
+    #[test]
+    fn explicit_production_modules_override_directory_exemptions() {
+        let d = fixture("crates/ui-egui/src/lib.rs", "#[path = \"../tests/runtime.rs\"] mod runtime;");
+        let dir = d.path().join("crates/ui-egui/tests");
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("runtime.rs");
+        std::fs::write(&source, "fn f() { std::process::Command::new(\"app\"); std::fs::write(\"out\", b\"x\"); let n = e.session().a() + e.session().b(); }")
+            .unwrap();
+        assert!(!process_calls_only_in_platform(d.path()));
+        assert!(!ui_has_no_side_effects(d.path()));
+        assert!(!locks::check(d.path()));
+        std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "#[cfg(test)] #[path = \"../tests/runtime.rs\"] mod runtime;").unwrap();
+        assert!(process_calls_only_in_platform(d.path()));
+        assert!(ui_has_no_side_effects(d.path()));
+        assert!(locks::check(d.path()));
+        std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "fn allowed() {}").unwrap();
+        assert!(process_calls_only_in_platform(d.path()), "unreferenced integration tests stay exempt");
+        assert!(locks::check(d.path()));
+        std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "#[path = \"../tests/runtime.rs\"] mod runtime;").unwrap();
+        std::fs::write(&source, [0xff]).unwrap();
+        assert!(!process_calls_only_in_platform(d.path()));
+        assert!(!ui_has_no_side_effects(d.path()));
+        assert!(!no_real_machine_sessions(d.path()));
+        assert!(!locks::check(d.path()));
+    }
+
+    #[test]
+    fn referenced_source_discovery_stays_within_the_workspace() {
+        let outside = tempfile::tempdir().unwrap();
+        let source = outside.path().join("module.rs");
+        std::fs::write(&source, "fn allowed() {}").unwrap();
+        let d = fixture("crates/ui-egui/src/lib.rs", format!("#[path = {source:?}] mod external;"));
+        let files = source_policy::rust_files(&d.path().join("crates"), &[]).unwrap();
+        let error = source_policy::read_all(files, d.path()).err().expect("external sources are unavailable");
+        assert!(error.contains("outside the workspace"), "{error}");
+        assert!(!process_calls_only_in_platform(d.path()));
+        assert!(!ui_has_no_side_effects(d.path()));
+        assert!(!no_real_machine_sessions(d.path()));
+        assert!(!locks::check(d.path()));
+        // A missing file under an inactive cfg is legal; the compiler handles active missing
+        // modules rather than this syntax check guessing the full build configuration.
+        std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "#[cfg(any())] mod absent; fn allowed() {}").unwrap();
+        assert!(process_calls_only_in_platform(d.path()));
+        assert!(ui_has_no_side_effects(d.path()));
+        assert!(no_real_machine_sessions(d.path()));
+        assert!(locks::check(d.path()));
     }
 
     #[test]
