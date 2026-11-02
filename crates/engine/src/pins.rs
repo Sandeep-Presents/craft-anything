@@ -110,6 +110,10 @@ pub struct Pin {
     /// Older pins and launches through an external runtime keep the existing discovery path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub program: Option<PathBuf>,
+    /// Bytes that were meant to be shared (hard-linked) but had to be copied instead, because the
+    /// drive or file didn't allow hard links. Only meaningful for light pins.
+    #[serde(default)]
+    pub copied_shared_bytes: u64,
 }
 
 impl Pin {
@@ -406,9 +410,9 @@ pub fn create(ws: &Workspace, mode: PinMode, name: Option<&str>, godot: Option<&
         (None, Some(r)) => format!("{project} · round {r}"),
         (None, None) => format!("{project} · pin {id}"),
     };
-    let mut pin = Pin { version: PIN_VERSION, id, name, mode, created_ms: now_ms(), round, bytes: 0, shared_bytes: 0, program: recorded_program };
+    let mut pin = Pin { version: PIN_VERSION, id, name, mode, created_ms: now_ms(), round, bytes: 0, shared_bytes: 0, copied_shared_bytes: 0, program: recorded_program };
     let made = (|| {
-        (pin.bytes, pin.shared_bytes) = copy(ws, &program, &pin.app_dir(ws), mode, progress)?;
+        (pin.bytes, pin.shared_bytes, pin.copied_shared_bytes) = copy(ws, &program, &pin.app_dir(ws), mode, progress)?;
         pin.launch(ws, godot)?;
         save(ws, &pin)
     })();
@@ -424,10 +428,10 @@ pub fn create(ws: &Workspace, mode: PinMode, name: Option<&str>, godot: Option<&
 
 /// Make a pin's copy; what it took and what it shares. A file that can't be linked (a drive
 /// without hard links, a file with as many as it can have) is copied.
-fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut dyn FnMut(u64, u64) -> bool) -> Result<(u64, u64), ToolError> {
+fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut dyn FnMut(u64, u64) -> bool) -> Result<(u64, u64, u64), ToolError> {
     let files = Plan::new(ws, program).files(ws, to)?;
     let total = files.iter().fold(0u64, |n, f| n.saturating_add(f.len));
-    let (mut done, mut shared) = (0u64, 0u64);
+    let (mut done, mut shared, mut copied_shared) = (0u64, 0u64, 0u64);
     for f in &files {
         if !progress(done, total) {
             return Err(ToolError::new(ErrorCode::Cancelled, "Pinning was stopped; nothing was kept."));
@@ -437,6 +441,12 @@ fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut
         }
         if mode == PinMode::Light && f.shared && std::fs::hard_link(&f.from, &f.to).is_ok() {
             shared = shared.saturating_add(f.len);
+        } else if mode == PinMode::Light && f.shared {
+            std::fs::copy(&f.from, &f.to).map_err(|e| {
+                ToolError::io(f.from.display(), e)
+                    .with_remediation("Check there's room on the drive for the copy, or pin it as a light copy, which takes less.")
+            })?;
+            copied_shared = copied_shared.saturating_add(f.len);
         } else {
             std::fs::copy(&f.from, &f.to).map_err(|e| {
                 ToolError::io(f.from.display(), e)
@@ -446,7 +456,7 @@ fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut
         done = done.saturating_add(f.len);
     }
     progress(total, total);
-    Ok((total.saturating_sub(shared), shared))
+    Ok((total.saturating_sub(shared), shared, copied_shared))
 }
 
 /// Give a pin a new name.
