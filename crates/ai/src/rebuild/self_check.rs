@@ -78,11 +78,18 @@ pub fn summary(checks: &[CheckResult], good_enough: f64) -> String {
     let held = claims.iter().filter(|c| c.passed).count();
     let claims_part = if claims.is_empty() { String::new() } else { format!(", {held} of {} claims hold", claims.len()) };
     let good = checks.iter().filter(|c| c.good(good_enough)).count();
-    match checks.iter().find_map(|c| c.similarity) {
+    let mut text = match checks.iter().find_map(|c| c.similarity) {
         Some(s) => format!("about {s:.0}% like the original{claims_part}"),
         None if good == checks.len() => format!("all {} checks pass{claims_part}", checks.len()),
         None => format!("{good} of {} checks pass{claims_part}", checks.len()),
+    };
+    let unverified: usize = checks.iter().map(|c| c.unknowns.len()).sum();
+    match unverified {
+        0 => {}
+        1 => text.push_str("; 1 comparison remains unverified"),
+        n => text.push_str(&format!("; {n} comparisons remain unverified")),
     }
+    text
 }
 
 /// What the builder is told about its own check: each result with its likeness and the bar,
@@ -107,7 +114,10 @@ pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_e
     }
     let unknowns: Vec<&str> = checks.iter().flat_map(|c| &c.unknowns).map(String::as_str).collect();
     if !unknowns.is_empty() {
-        lines.push(format!("Not compared, so it can't pass yet: {}. Make those parts exist and render, then check again.", unknowns.join(", ")));
+        lines.push(format!(
+            "Not compared, so it can't pass yet: {}. Compare suitable reference inputs and observed results where possible; keep the rest unverified.",
+            unknowns.join(", ")
+        ));
     }
     if !open.is_empty() {
         let shown: Vec<String> = open.iter().take(8).map(|u| format!("{} ({})", u.question, u.id)).collect();
@@ -223,8 +233,11 @@ mod tests {
             unknowns: vec!["/about at 768 px couldn't be compared".into()],
             ..CheckResult::new(CheckResult::WEB_VISUAL, 0, true, "")
         };
-        let r = report(&[blind], 90.0, &[]);
+        let r = report(std::slice::from_ref(&blind), 90.0, &[]);
         assert!(r.contains("Not compared, so it can't pass yet: /about at 768 px") && r.contains("Not good enough yet"), "an unknown never passes: {r}");
+        assert_eq!(summary(std::slice::from_ref(&blind), 90.0), "about 95% like the original; 1 comparison remains unverified");
+        let unknowns = CheckResult { unknowns: vec!["first".into(), "second".into()], ..CheckResult::new("mechanics", 1, true, "readable") };
+        assert_eq!(summary(&[unknowns], 90.0), "0 of 1 checks pass; 2 comparisons remain unverified");
     }
 
     #[test]

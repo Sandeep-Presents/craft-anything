@@ -323,6 +323,11 @@ pub trait Check: Send + Sync {
     fn applies(&self, _cx: &CheckCx) -> bool {
         true
     }
+    /// Whether another builder turn can address this result. Missing measurement support stays
+    /// unverified, but asking the builder to change its code cannot provide the check's oracle.
+    fn can_refine(&self, _result: &CheckResult) -> bool {
+        true
+    }
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError>;
 }
 
@@ -336,6 +341,9 @@ impl<C: Check> Check for DeepOnly<C> {
     }
     fn applies(&self, cx: &CheckCx) -> bool {
         matches!(cx.ws.manifest.target, TargetRef::Local { .. }) && cx.deep() && self.0.applies(cx)
+    }
+    fn can_refine(&self, result: &CheckResult) -> bool {
+        self.0.can_refine(result)
     }
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
         self.0.run(cx)

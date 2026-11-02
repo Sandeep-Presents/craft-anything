@@ -1459,7 +1459,7 @@ impl TargetKind for SheetKind {
 }
 
 #[test]
-fn the_mechanics_sheet_is_required_and_held_against_the_code() {
+fn the_mechanics_sheet_is_required_without_claiming_effective_behavior() {
     let d = tempfile::tempdir().unwrap();
     let ws = Workspace::create(d.path(), "Arena", "Recreate this game", TargetRef::None).unwrap();
     let engine = Arc::new(Engine::new(craft_anything_engine::testing::session()));
@@ -1486,6 +1486,7 @@ fn the_mechanics_sheet_is_required_and_held_against_the_code() {
 
     let none = check(1);
     assert!(!none.passed && none.note.contains("no app/mechanics.json") && none.note.contains("\"version\": 1"), "{}", none.note);
+    assert!(MechanicsCheck.can_refine(&none) && kinds::DeepOnly(MechanicsCheck).can_refine(&none));
 
     std::fs::create_dir_all(ws.app_dir().join("src")).unwrap();
     std::fs::write(ws.mechanics_path(), "{ not json").unwrap();
@@ -1506,26 +1507,85 @@ fn the_mechanics_sheet_is_required_and_held_against_the_code() {
     assert!(ok.passed, "an estimate may stay out of the code: {}", ok.note);
     assert!(ok.note.contains("4 values (1 with a source, 2 estimated)"), "{}", ok.note);
     assert!(ok.note.contains("neither a source nor \"estimated\": crouch."), "{}", ok.note);
-    assert!(!ok.note.contains("aren't in the code"), "{}", ok.note);
-    let claimed: Vec<(&str, bool)> = ok.claims.iter().map(|c| (c.title.as_str(), c.passed)).collect();
-    assert_eq!(claimed, [("walk speed (4.5) is used in the code", true)], "estimates and words make no claim");
+    assert!(ok.claims.is_empty() && !ok.unknowns.is_empty() && !ok.good(0.0), "{ok:?}");
+    assert!(!MechanicsCheck.can_refine(&ok) && !kinds::DeepOnly(MechanicsCheck).can_refine(&ok));
 
-    // A number found in the original but not used in the code fails, and says what to do.
-    std::fs::write(
-        ws.mechanics_path(),
-        r#"{"version": 1, "values": [
-            {"name": "walk speed", "value": 4.5, "source": "function 0x140012a0"},
-            {"name": "grunt speed", "value": 290, "unit": "cm/s", "source": "pak: ENE_Spider_Grunt_Base"},
-            {"name": "guard health", "value": 270, "source": "pak: ENE_Spider_Grunt_Guard"}
-        ]}"#,
-    )
-    .unwrap();
-    let unused = check(4);
-    assert!(!unused.passed, "{}", unused.note);
-    assert!(unused.note.contains("2 numbers from the original aren't in the code as written: grunt speed (290), guard health (270)."), "{}", unused.note);
-    assert!(unused.note.contains("mark it \"estimated\""), "{}", unused.note);
-    let failed: Vec<&str> = unused.failed_claims().map(|c| c.title.as_str()).collect();
-    assert_eq!(failed, ["grunt speed (290) is used in the code", "guard health (270) is used in the code"]);
+    // Provenance remains in the sheet; a differently implemented or missing value isn't proof
+    // of a broken build, and a matching literal isn't proof of effective behavior.
+    std::fs::write(ws.app_dir().join("src/main.rs"), "fn speed() -> f64 { 9.0 / 2.0 }").unwrap();
+    let computed = check(4);
+    assert!(computed.passed && !computed.good(0.0), "{computed:?}");
+    assert!(computed.claims.is_empty() && computed.note.contains("unverified"));
+}
+
+#[test]
+fn mechanics_literals_never_verify_effective_behavior() {
+    for code in [
+        "// walk speed 4.5\nfn speed() -> f64 { 1.0 }",
+        "fn unused() -> f64 { 4.5 }\nfn speed() -> f64 { 1.0 }",
+        "const UNRELATED: f64 = 4.5;\nfn speed() -> f64 { 1.0 }",
+        "fn speed() -> f64 { 4.5 * 2.0 }",
+        "fn speed() -> f64 { 9.0 / 2.0 }",
+        "",
+    ] {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "Arena", "Recreate this game", TargetRef::None).unwrap();
+        std::fs::create_dir_all(ws.app_dir()).unwrap();
+        std::fs::write(ws.app_dir().join("main.rs"), code).unwrap();
+        if code.is_empty() {
+            std::fs::write(ws.app_dir().join("unrelated.json"), r#"{"release":4.5}"#).unwrap();
+        }
+        std::fs::write(ws.mechanics_path(), r#"{"version":1,"values":[{"name":"walk speed","value":4.5,"unit":"m/s","source":"reference measurement"}]}"#)
+            .unwrap();
+        let c = check_worker(&ws, false).run_checks(&ws, &SheetKind, 1).unwrap().remove(0);
+        assert!(c.passed, "a valid sheet is readable even with computed values: {code}: {c:?}");
+        assert!(!c.good(0.0), "source text does not verify behavior: {code}: {c:?}");
+        assert!(c.claims.is_empty(), "no behavior claim can be inferred: {c:?}");
+        assert!(!c.unknowns.is_empty(), "no oracle was run: {c:?}");
+        ws.manifest.checks.push(c.clone());
+        ws.save().unwrap();
+        let saved = Workspace::open(&ws.root).unwrap();
+        assert_eq!(saved.manifest.checks.last().unwrap().unknowns, c.unknowns);
+        let summary = self_check::summary(&[CheckResult::new("build", 1, true, "Build succeeded."), c], 90.0);
+        assert!(summary.contains("unverified"), "a usable build's final summary retains the gap: {summary}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_measured_self_test_does_not_stand_in_for_a_mechanics_comparison() {
+    use std::os::unix::fs::PermissionsExt;
+    for (calculation, expected) in [("$((9 * 10 / 2))", true), ("90 # unrelated 4.5", false)] {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Arena", "Recreate this game", TargetRef::None).unwrap();
+        std::fs::create_dir_all(ws.app_dir().join("target/debug")).unwrap();
+        std::fs::write(ws.app_dir().join("Cargo.toml"), "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n").unwrap();
+        std::fs::write(ws.mechanics_path(), r#"{"values":[{"name":"walk speed","value":4.5,"source":"controlled reference"}]}"#).unwrap();
+        let program = ws.app_dir().join("target/debug/fixture");
+        // This owned fixture measures integer tenths against a controlled 4.5 m/s reference.
+        // Its report still cannot establish a general binding between sheet entries and state.
+        let script = format!(
+            r#"#!/bin/sh
+tenths={calculation}
+passed=false
+if [ "$tenths" -eq 45 ]; then passed=true; fi
+printf '{{"version":1,"steps":[{{"step":"move","passed":%s}},{{"step":"act","passed":true}},{{"step":"hud","passed":true}}]}}' "$passed" > "$2"
+"#
+        );
+        std::fs::write(&program, script).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let checks = check_worker(&ws, false).run_checks(&ws, &LaterChecks(&GameKind, 2), 1).unwrap();
+        assert_eq!(checks[0].check, "game-self-test");
+        assert_eq!(checks[0].good(0.0), expected, "{checks:?}");
+        if expected {
+            assert_eq!(checks.len(), 2);
+            assert_eq!(checks[1].check, "mechanics");
+            assert!(checks[1].passed && !checks[1].good(0.0), "even a measured self-test doesn't compare every sheet value: {checks:?}");
+            assert!(checks[1].claims.is_empty() && !checks[1].unknowns.is_empty());
+        } else {
+            assert_eq!(checks.len(), 1, "a failed measured core-loop step stops later checks");
+        }
+    }
 }
 
 #[test]
@@ -1622,8 +1682,8 @@ mod picking_up_a_build {
         fn goal(&self) -> &'static str {
             "a thing"
         }
-        fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
-            vec![Box::new(FlakyCheck)]
+        fn checks(&self, ws: &Workspace) -> Vec<Box<dyn Check>> {
+            if ws.mechanics_path().is_file() { vec![Box::new(MechanicsCheck)] } else { vec![Box::new(FlakyCheck)] }
         }
     }
 
@@ -1750,6 +1810,23 @@ mod picking_up_a_build {
         assert!(finished.1.contains("craft-anything-cli"), "{finished:?}");
         assert_eq!(prompts_given(&b), 0, "the agent was asked anyway");
         assert!(!studied(&feed::load(&Workspace::open(&ws.root).unwrap())), "it studied first");
+    }
+
+    #[test]
+    fn a_usable_build_keeps_unverified_mechanics_in_its_ready_summary() {
+        let b = bench();
+        let mut ws = worked_on(&b);
+        ws.manifest.awaiting_check = true;
+        std::fs::write(ws.mechanics_path(), r#"{"values":[{"name":"walk speed","value":4.5,"source":"reference measurement"}]}"#).unwrap();
+        std::fs::write(ws.app_dir().join("main.rs"), "// 4.5\n").unwrap();
+        ws.save().unwrap();
+        let (ok, _) = try_it(&b, &ws);
+        assert!(ok, "unverified mechanics do not make a usable build fail");
+        assert_eq!(prompts_given(&b), 0, "a builder turn cannot supply the check's missing measurement oracle");
+        let saved = Workspace::open(&ws.root).unwrap();
+        assert_eq!(saved.manifest.status, Status::Ready);
+        assert!(saved.manifest.note.contains("unverified"), "{}", saved.manifest.note);
+        assert!(!saved.manifest.checks.last().unwrap().good(0.0));
     }
 
     #[test]
