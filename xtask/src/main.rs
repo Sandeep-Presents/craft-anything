@@ -247,7 +247,8 @@ fn process_calls_only_in_platform(root: &Path) -> bool {
     )
 }
 
-/// R1.6: production UI paths may read files, but writes and launches belong behind tools.
+/// R1.6: UI src paths may read files, but writes and launches belong behind tools.
+/// Explicit module paths outside this source root remain a documented follow-up.
 fn ui_has_no_side_effects(root: &Path) -> bool {
     check_source_policy(
         root,
@@ -625,6 +626,69 @@ mod policy_tests {
         assert!(!process_calls_only_in_platform(d.path()));
         std::fs::write(d.path().join("crates/sample/src/lib.rs"), "#[cfg(test)] #[path = \"../modules/platform/runtime.rs\"] mod runtime;").unwrap();
         assert!(process_calls_only_in_platform(d.path()));
+    }
+
+    #[test]
+    fn hidden_module_directories_stay_in_source_scope() {
+        for relative in [".internal/helper.rs", "../.internal/helper.rs"] {
+            let declaration = format!("#[path = {relative:?}] mod helper;");
+            let d = fixture("crates/ui-egui/src/lib.rs", &declaration);
+            let source = d.path().join("crates/ui-egui/src").join(relative);
+            std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+            std::fs::write(&source, "fn f() { std::process::Command::new(\"app\"); std::fs::write(\"out\", b\"x\"); let _ = Session::default(); let n = e.session().a() + e.session().b(); }").unwrap();
+            assert!(!process_calls_only_in_platform(d.path()), "{relative}");
+            if !relative.starts_with("..") {
+                assert!(!ui_has_no_side_effects(d.path()), "{relative}");
+            }
+            assert!(!no_real_machine_sessions(d.path()), "{relative}");
+            assert!(!locks::check(d.path()), "{relative}");
+            std::fs::write(&source, "fn allowed() {}").unwrap();
+            assert!(process_calls_only_in_platform(d.path()));
+            assert!(ui_has_no_side_effects(d.path()));
+            assert!(no_real_machine_sessions(d.path()));
+            assert!(locks::check(d.path()));
+            std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), format!("#[cfg(test)] {declaration}")).unwrap();
+            std::fs::write(
+                &source,
+                "fn f() { std::process::Command::new(\"test\"); std::fs::write(\"out\", b\"x\"); let n = e.session().a() + e.session().b(); }",
+            )
+            .unwrap();
+            assert!(process_calls_only_in_platform(d.path()));
+            assert!(ui_has_no_side_effects(d.path()));
+            assert!(locks::check(d.path()));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_source_directories_fail_visibly_and_file_links_are_scanned() {
+        use std::os::unix::fs::symlink;
+        let d = fixture("crates/ui-egui/src/lib.rs", "#[path = \"shared/helper.rs\"] mod helper;");
+        let shared = d.path().join("shared-source");
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::write(shared.join("helper.rs"), "fn f() { std::process::Command::new(\"app\"); }").unwrap();
+        symlink(&shared, d.path().join("crates/ui-egui/src/shared")).unwrap();
+        let error = source_policy::rust_files(&d.path().join("crates"), &[]).unwrap_err();
+        assert!(error.contains("symlinked source directory"), "{error}");
+        assert!(!process_calls_only_in_platform(d.path()));
+        assert!(!ui_has_no_side_effects(d.path()));
+        assert!(!no_real_machine_sessions(d.path()));
+        assert!(!locks::check(d.path()));
+
+        let broken = fixture("crates/ui-egui/src/lib.rs", "#[path = \"shared/helper.rs\"] mod helper;");
+        symlink(broken.path().join("missing"), broken.path().join("crates/ui-egui/src/shared")).unwrap();
+        assert!(source_policy::rust_files(&broken.path().join("crates"), &[]).is_err(), "an uninspectable link cannot be counted clean");
+
+        let d = fixture("crates/ui-egui/src/lib.rs", "mod shared;");
+        let source = d.path().join("shared.rs");
+        std::fs::write(&source, "fn allowed() {}").unwrap();
+        symlink(&source, d.path().join("crates/ui-egui/src/shared.rs")).unwrap();
+        assert!(process_calls_only_in_platform(d.path()));
+        assert!(ui_has_no_side_effects(d.path()));
+        assert!(no_real_machine_sessions(d.path()));
+        assert!(locks::check(d.path()));
+        std::fs::write(&source, "fn f() { std::process::Command::new(\"app\"); }").unwrap();
+        assert!(!process_calls_only_in_platform(d.path()), "a linked Rust file is still checked");
     }
 
     #[test]

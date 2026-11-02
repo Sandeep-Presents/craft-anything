@@ -93,6 +93,9 @@ keep checking its production siblings and source directories (even one named `te
 `cfg(any(test, feature = "app"))` may contain production code; a cfg string containing "test"
 isn't enough to exempt it. The source-policy checks follow explicit imports and module files,
 not macro expansion, globs, re-exports or all Rust name resolution; compiler checks still matter.
+Hidden module directories are source too. Symlinked source directories fail visibly rather than
+being omitted or followed into cycles; ordinary Rust file links are read and checked. Git metadata
+stays out of the scan.
 
 **A heartbeat sampled before shutdown raced a successful stop.** A child could write between
 the baseline read and `stop()`, failing the descendant cleanup test even when cleanup worked.

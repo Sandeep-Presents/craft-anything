@@ -22,13 +22,25 @@ pub fn rust_files(dir: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             let kind = entry.file_type().map_err(|e| format!("cannot inspect {}: {e}", path.display()))?;
-            if kind.is_dir() {
-                // Below src/, these are module names. Elsewhere, exempt only crate boundaries.
-                let boundary = dir.join("Cargo.toml").is_file() || path.join("Cargo.toml").is_file();
-                let exempt = !in_source && boundary && skip.contains(&name.as_ref());
-                if !name.starts_with('.') && !exempt {
-                    walk(&path, skip, in_source || name == "src", files)?;
+            if name == ".git" {
+                continue;
+            }
+            // Below src/, these are module names. Elsewhere, exempt only crate boundaries.
+            let exempt = !in_source && skip.contains(&name.as_ref()) && (dir.join("Cargo.toml").is_file() || path.join("Cargo.toml").is_file());
+            if exempt {
+                continue;
+            }
+            let linked_dir = if kind.is_symlink() {
+                std::fs::metadata(&path).map_err(|e| format!("cannot inspect source link {}: {e}", path.display()))?.is_dir()
+            } else {
+                false
+            };
+            if kind.is_dir() || linked_dir {
+                // Do not silently omit linked modules, or follow links into a directory cycle.
+                if kind.is_symlink() {
+                    return Err(format!("cannot scan symlinked source directory {}; use a real directory so source policies can inspect it", path.display()));
                 }
+                walk(&path, skip, in_source || name == "src", files)?;
             } else if path.extension().is_some_and(|e| e == "rs") {
                 files.push(path);
             }
