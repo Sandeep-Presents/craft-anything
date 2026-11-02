@@ -95,7 +95,7 @@ pub fn summary(checks: &[CheckResult], good_enough: f64) -> String {
 /// What the builder is told about its own check: each result with its likeness and the bar,
 /// what's still unknown (the checks' and its own open questions), where its pictures are, and
 /// whether it would pass.
-pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_evidence::Unknown]) -> String {
+pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_evidence::Unknown], can_refine: impl Fn(&CheckResult) -> bool) -> String {
     if checks.is_empty() {
         return "There was nothing to check yet.".into();
     }
@@ -132,8 +132,11 @@ pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_e
     }
     lines.push(if checks.iter().all(|c| c.good(good_enough)) {
         "This would pass. Finish what you're doing, then reply.".to_string()
-    } else {
+    } else if checks.iter().any(|c| !c.good(good_enough) && can_refine(c)) {
         "Not good enough yet: fix what it lists, build again, and check again with rebuild_check.".to_string()
+    } else {
+        "These checks remain incomplete; another builder turn cannot resolve them. Finish what you're doing and state the unverified comparisons in your reply."
+            .to_string()
     });
     lines.join("\n")
 }
@@ -164,7 +167,8 @@ impl Worker {
             let (text, line) = match checked {
                 Ok(checks) => {
                     let line = format!("The builder checked its work: {}.", summary(&checks, good_enough));
-                    (report(&checks, good_enough, &open_questions(ws)), line)
+                    let kind_checks = kind.checks(ws);
+                    (report(&checks, good_enough, &open_questions(ws), |c| kinds::can_refine(&kind_checks, c)), line)
                 }
                 Err(e) if e.code == ErrorCode::Cancelled => {
                     // A stopped build says so: the builder isn't left waiting on a check that
@@ -189,6 +193,10 @@ impl Worker {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_evidence::Unknown]) -> String {
+        super::report(checks, good_enough, open, |_| true)
+    }
 
     #[test]
     fn the_report_says_what_differs_and_whether_it_would_pass() {
@@ -238,6 +246,23 @@ mod tests {
         assert_eq!(summary(std::slice::from_ref(&blind), 90.0), "about 95% like the original; 1 comparison remains unverified");
         let unknowns = CheckResult { unknowns: vec!["first".into(), "second".into()], ..CheckResult::new("mechanics", 1, true, "readable") };
         assert_eq!(summary(&[unknowns], 90.0), "0 of 1 checks pass; 2 comparisons remain unverified");
+    }
+
+    #[test]
+    fn an_unavailable_mechanics_oracle_does_not_ask_the_builder_to_retry() {
+        let c = CheckResult {
+            unknowns: vec!["Mechanics behavior has not been measured.".into()],
+            ..CheckResult::new("mechanics", 0, true, "The sheet is readable; behavior is unverified.")
+        };
+        let kind_checks: Vec<Box<dyn Check>> = vec![Box::new(MechanicsCheck), Box::new(BuildCheck)];
+        let text = super::report(std::slice::from_ref(&c), 90.0, &[], |r| kinds::can_refine(&kind_checks, r));
+        assert!(text.contains("another builder turn cannot resolve"), "{text}");
+        assert!(!text.contains("fix what it lists"), "{text}");
+        assert!(!text.contains("This would pass"), "uncertainty remains: {text}");
+        let failed = CheckResult::new("build", 0, false, "Build failed.");
+        let text = super::report(&[c, failed], 90.0, &[], |r| kinds::can_refine(&kind_checks, r));
+        assert!(text.ends_with("check again with rebuild_check."), "a refinable failure still needs work: {text}");
+        assert!(kinds::can_refine(&kind_checks, &CheckResult::new("plugin-check", 0, false, "failed")));
     }
 
     #[test]

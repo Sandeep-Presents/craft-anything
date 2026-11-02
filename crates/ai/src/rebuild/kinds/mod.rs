@@ -331,6 +331,11 @@ pub trait Check: Send + Sync {
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError>;
 }
 
+/// A plugin check absent from the kind's own list retains the default refinement behavior.
+pub(super) fn can_refine(checks: &[Box<dyn Check>], result: &CheckResult) -> bool {
+    checks.iter().find(|check| check.id() == result.check).is_none_or(|check| check.can_refine(result))
+}
+
 /// A check that runs only in Deep mode on a program target, where the brief asked for what it
 /// checks (an app's mechanics sheet, the credits for a game's original files).
 pub struct DeepOnly<C>(pub C);

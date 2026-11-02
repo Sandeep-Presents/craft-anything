@@ -1033,13 +1033,7 @@ impl Worker {
                 continue;
             }
             let kind_checks = kind.checks(ws);
-            let not_good = checks.iter().find(|c| {
-                !c.good(opts.good_enough)
-                    && kind_checks
-                        .iter()
-                        .find(|check| check.id() == c.check)
-                        .is_none_or(|check| check.can_refine(c))
-            });
+            let not_good = checks.iter().find(|c| !c.good(opts.good_enough) && kinds::can_refine(&kind_checks, c));
             if not_good.is_some() && progress_available && progress.stalled() {
                 // A check-only resume skipped the builder's before-turn scan. A real edit
                 // while the project was closed (or during this check) still starts an attempt.
