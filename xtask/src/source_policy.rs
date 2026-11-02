@@ -14,22 +14,27 @@ pub fn read(path: &Path) -> Result<syn::File, String> {
 }
 
 pub fn rust_files(dir: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
-    let mut files = Vec::new();
-    let entries = std::fs::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("cannot list {}: {e}", dir.display()))?;
-        let path = entry.path();
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        let kind = entry.file_type().map_err(|e| format!("cannot inspect {}: {e}", path.display()))?;
-        if kind.is_dir() {
-            if !name.starts_with('.') && !skip.contains(&name.as_ref()) {
-                files.extend(rust_files(&path, skip)?);
+    fn walk(dir: &Path, skip: &[&str], in_source: bool, files: &mut Vec<PathBuf>) -> Result<(), String> {
+        let entries = std::fs::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("cannot list {}: {e}", dir.display()))?;
+            let path = entry.path();
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let kind = entry.file_type().map_err(|e| format!("cannot inspect {}: {e}", path.display()))?;
+            if kind.is_dir() {
+                // Below src/, these are module names, not crate or integration-test exceptions.
+                if !name.starts_with('.') && (in_source || !skip.contains(&name.as_ref())) {
+                    walk(&path, skip, in_source || name == "src", files)?;
+                }
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                files.push(path);
             }
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            files.push(path);
         }
+        Ok(())
     }
+    let mut files = Vec::new();
+    walk(dir, skip, dir.file_name().is_some_and(|n| n == "src"), &mut files)?;
     Ok(files)
 }
 
@@ -102,7 +107,8 @@ impl Policy {
             Self::Ui => {
                 pair("std", "process")
                     || pair("File", "create")
-                    || parts.iter().any(|p| matches!(*p, "OpenOptions" | "write_atomic" | "Launch" | "Process"))
+                    || parts.iter().any(|p| matches!(*p, "OpenOptions" | "write_atomic"))
+                    || parts.iter().take(parts.len().saturating_sub(1)).any(|p| matches!(*p, "Launch" | "Process"))
                     || parts.windows(2).any(|p| {
                         p.first() == Some(&"fs")
                             && p.get(1).is_some_and(|p| *p == "write" || p.starts_with("create_dir") || p.starts_with("remove_") || *p == "rename")

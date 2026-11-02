@@ -532,6 +532,8 @@ mod policy_tests {
             r#"
             /* std::fs::write("example", b"x"); */
             const EXAMPLE: &str = "File::create fs::write Process::new";
+            struct Process;
+            fn display_state(_: Option<Process>) {}
             #[cfg(all(unix, test))]
             mod tests { fn legal() { std::fs::write("out", b"x"); } }
             fn production() { let _ = std::fs::read("in"); }
@@ -580,6 +582,33 @@ mod policy_tests {
         .unwrap();
         assert!(!process_calls_only_in_platform(d.path()));
         assert!(!ui_has_no_side_effects(d.path()));
+    }
+
+    #[test]
+    fn production_source_directories_are_not_test_or_platform_exemptions() {
+        for name in ["tests", "platform", "xtask", "target", "examples"] {
+            let d = fixture("crates/sample/src/lib.rs", format!("mod {name};"));
+            let dir = d.path().join("crates/sample/src").join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(
+                dir.join("mod.rs"),
+                r#"
+                fn f() { std::process::Command::new("app"); let n = e.session().a() + e.session().b(); }
+            "#,
+            )
+            .unwrap();
+            assert!(!process_calls_only_in_platform(d.path()), "production src/{name}");
+            assert!(!locks::check(d.path()), "production src/{name}");
+            std::fs::write(d.path().join("crates/sample/src/lib.rs"), format!("#[cfg(test)] mod {name};")).unwrap();
+            assert!(process_calls_only_in_platform(d.path()), "test-only src/{name}");
+            assert!(locks::check(d.path()), "test-only src/{name}");
+        }
+        let d = fixture("crates/ui-egui/src/lib.rs", "mod tests;");
+        std::fs::create_dir_all(d.path().join("crates/ui-egui/src/tests")).unwrap();
+        std::fs::write(d.path().join("crates/ui-egui/src/tests/mod.rs"), "fn f() { std::fs::write(\"out\", b\"x\"); }").unwrap();
+        assert!(!ui_has_no_side_effects(d.path()));
+        std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "#[cfg(test)] mod tests;").unwrap();
+        assert!(ui_has_no_side_effects(d.path()));
     }
 
     #[test]
