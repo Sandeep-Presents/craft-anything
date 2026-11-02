@@ -87,6 +87,13 @@ names (`git merge-base --is-ancestor <fix> <release tag>`), and check the messag
 
 ## Tests
 
+**A test module hid later production code from a policy gate.** The source scan stopped at the
+first `cfg(test)`, and unreadable files looked empty. Inspect syntax for the actual test item,
+keep checking its production siblings, and report source failures. `cfg(not(test))` and
+`cfg(any(test, feature = "app"))` may contain production code; a cfg string containing "test"
+isn't enough to exempt it. The source-policy checks follow explicit imports and module files,
+not macro expansion, globs, re-exports or all Rust name resolution; compiler checks still matter.
+
 **A heartbeat sampled before shutdown raced a successful stop.** A child could write between
 the baseline read and `stop()`, failing the descendant cleanup test even when cleanup worked.
 Probe for exit instead of timing writes: the child holds a file lock the system releases only
