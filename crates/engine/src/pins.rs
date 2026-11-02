@@ -441,17 +441,14 @@ fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut
         }
         if mode == PinMode::Light && f.shared && std::fs::hard_link(&f.from, &f.to).is_ok() {
             shared = shared.saturating_add(f.len);
-        } else if mode == PinMode::Light && f.shared {
-            std::fs::copy(&f.from, &f.to).map_err(|e| {
-                ToolError::io(f.from.display(), e)
-                    .with_remediation("Check there's room on the drive for the copy, or pin it as a light copy, which takes less.")
-            })?;
-            copied_shared = copied_shared.saturating_add(f.len);
         } else {
             std::fs::copy(&f.from, &f.to).map_err(|e| {
                 ToolError::io(f.from.display(), e)
-                    .with_remediation("Check there's room on the drive for the copy, or pin it as a light copy, which takes less.")
+                    .with_remediation("Check there's room on the drive for the copy.")
             })?;
+            if mode == PinMode::Light && f.shared {
+                copied_shared = copied_shared.saturating_add(f.len);
+            }
         }
         done = done.saturating_add(f.len);
     }
@@ -844,6 +841,13 @@ mod tests {
         let newer = read_pin(br#"{"version":9,"id":2,"name":"A","mode":"frozen","created_ms":5,"colour":"red"}"#).unwrap();
         assert_eq!(newer.version, 9, "a newer pin keeps its version");
         assert!(read_pin(b"[]").is_err());
+    }
+
+    #[test]
+    fn an_old_pin_without_copied_shared_bytes_still_loads() {
+        let old = read_pin(br#"{"version":1,"id":2,"name":"A","mode":"light","created_ms":5,"bytes":10,"shared_bytes":8}"#).unwrap();
+        assert_eq!(old.copied_shared_bytes, 0, "a pin written before copied_shared_bytes existed reads as zero");
+        assert_eq!((old.bytes, old.shared_bytes), (10, 8));
     }
 
     #[test]
