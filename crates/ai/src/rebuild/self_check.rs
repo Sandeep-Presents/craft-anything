@@ -102,6 +102,9 @@ pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_e
     let mut lines = Vec::new();
     for c in checks {
         let mut line = format!("{}: {}", c.check, if c.passed { "passed" } else { "failed" });
+        if !c.good(good_enough) && !can_refine(c) {
+            line.push_str(" (incomplete; another builder turn cannot resolve this)");
+        }
         if let Some(s) = c.similarity {
             line.push_str(&format!(", {s:.0}% alike (needs {:.0}%)", c.good_enough.unwrap_or(good_enough)));
         }
@@ -262,6 +265,11 @@ mod tests {
         let failed = CheckResult::new("build", 0, false, "Build failed.");
         let text = super::report(&[c, failed], 90.0, &[], |r| kinds::can_refine(&kind_checks, r));
         assert!(text.ends_with("check again with rebuild_check."), "a refinable failure still needs work: {text}");
+        assert!(
+            text.contains("mechanics: passed (incomplete; another builder turn cannot resolve this)"),
+            "a mixed report identifies the unrefinable comparison: {text}"
+        );
+        assert!(text.contains("build: failed") && text.contains("Build failed."), "the actionable failure remains clear: {text}");
         assert!(kinds::can_refine(&kind_checks, &CheckResult::new("plugin-check", 0, false, "failed")));
     }
 

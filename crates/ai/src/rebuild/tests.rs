@@ -1459,6 +1459,16 @@ impl TargetKind for SheetKind {
 }
 
 #[test]
+fn builder_instructions_allow_an_unverified_comparison_to_remain_open() {
+    for deep in [false, true] {
+        let steps = super::brief::steps(deep);
+        assert!(!steps.contains("until it says it would pass"), "{steps}");
+        assert!(steps.contains("another builder turn cannot resolve"), "{steps}");
+    }
+    assert!(CHECK_BEFORE_REPLYING.contains("unverified comparisons"), "{CHECK_BEFORE_REPLYING}");
+}
+
+#[test]
 fn the_mechanics_sheet_is_required_without_claiming_effective_behavior() {
     let d = tempfile::tempdir().unwrap();
     let ws = Workspace::create(d.path(), "Arena", "Recreate this game", TargetRef::None).unwrap();
