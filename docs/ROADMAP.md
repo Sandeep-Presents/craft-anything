@@ -1030,6 +1030,7 @@ Owner: maintainers · Status: in progress
 
 ### R2.5 Behaviour checks for non-web builds
 Owner: open · Status: in progress
+- [ ] Keep mechanics behavior unverified when only the sheet has been read (claimed: contributor, branch bugfix/verification-gates)
 - [ ] Behaviour checks that use the sheet: run the build with scripted input and measure values
       (speed, jump height, fire rate) against it (needs R2.4's scripted input)
 - [ ] Hold the self-test to what the check can see too: picture the game after its scripted
