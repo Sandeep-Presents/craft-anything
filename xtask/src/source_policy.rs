@@ -23,8 +23,10 @@ pub fn rust_files(dir: &Path, skip: &[&str]) -> Result<Vec<PathBuf>, String> {
             let name = name.to_string_lossy();
             let kind = entry.file_type().map_err(|e| format!("cannot inspect {}: {e}", path.display()))?;
             if kind.is_dir() {
-                // Below src/, these are module names, not crate or integration-test exceptions.
-                if !name.starts_with('.') && (in_source || !skip.contains(&name.as_ref())) {
+                // Below src/, these are module names. Elsewhere, exempt only crate boundaries.
+                let boundary = dir.join("Cargo.toml").is_file() || path.join("Cargo.toml").is_file();
+                let exempt = !in_source && boundary && skip.contains(&name.as_ref());
+                if !name.starts_with('.') && !exempt {
                     walk(&path, skip, in_source || name == "src", files)?;
                 }
             } else if path.extension().is_some_and(|e| e == "rs") {

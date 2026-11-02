@@ -453,6 +453,11 @@ mod policy_tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("crates")).unwrap();
         std::fs::create_dir_all(dir.path().join("apps")).unwrap();
+        if path.starts_with("crates/") || path.starts_with("apps/") {
+            let package: PathBuf = Path::new(path).components().take(2).collect();
+            std::fs::create_dir_all(dir.path().join(&package)).unwrap();
+            std::fs::write(dir.path().join(package).join("Cargo.toml"), "[package]\nname = \"sample\"\nversion = \"0.0.0\"\nedition = \"2024\"\n").unwrap();
+        }
         let file = dir.path().join(path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(file, source).unwrap();
@@ -609,6 +614,17 @@ mod policy_tests {
         assert!(!ui_has_no_side_effects(d.path()));
         std::fs::write(d.path().join("crates/ui-egui/src/lib.rs"), "#[cfg(test)] mod tests;").unwrap();
         assert!(ui_has_no_side_effects(d.path()));
+    }
+
+    #[test]
+    fn explicit_modules_outside_src_do_not_gain_name_based_exemptions() {
+        let d = fixture("crates/sample/src/lib.rs", "#[path = \"../modules/platform/runtime.rs\"] mod runtime;");
+        let dir = d.path().join("crates/sample/modules/platform");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("runtime.rs"), "fn f() { std::process::Command::new(\"app\"); }").unwrap();
+        assert!(!process_calls_only_in_platform(d.path()));
+        std::fs::write(d.path().join("crates/sample/src/lib.rs"), "#[cfg(test)] #[path = \"../modules/platform/runtime.rs\"] mod runtime;").unwrap();
+        assert!(process_calls_only_in_platform(d.path()));
     }
 
     #[test]
