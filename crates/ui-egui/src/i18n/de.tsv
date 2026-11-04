@@ -2,6 +2,7 @@
 # UTF-8: English source<TAB>translation. Keep placeholders and escapes intact.
 Capture a screen state	Einen Bildschirmzustand erfassen
 Crashes of an app	Abstürze einer App
+Map an app's screens	Die Bildschirme einer App kartieren
 OpenCode default	OpenCode-Standard
 Model default	Modellstandard
 Press keys	Tasten drücken
@@ -593,6 +594,7 @@ Just a question: nothing was changed. Answered by	Nur eine Frage: Nichts wurde g
 Just ask	Einfach fragen
 Just look inside	Einfach hineinsehen
 Type text	Text eingeben
+Walk through an app's screens	Durch die Bildschirme einer App gehen
 Work on my project	An meinem Projekt arbeiten
 Work on a project you already have	An einem Projekt arbeiten, das du schon hast
 Pick its folder, say what you want, then press Start.	Wähle seinen Ordner, sag, was du willst, und drücke dann Start.
