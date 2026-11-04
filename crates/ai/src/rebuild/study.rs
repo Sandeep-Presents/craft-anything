@@ -238,6 +238,8 @@ impl Worker {
                 "launch_wait_ms": build.android_launch_wait_ms,
                 "wait_ms": build.android_wait_ms,
                 "dump_lead_ms": build.android_dump_lead_ms,
+                "time_budget_s": build.android_time_budget_s.clamp(60, 7200),
+                "max_presses": build.android_max_presses.clamp(1, 5000),
                 "output_directory": map_dir.display().to_string(),
             });
             match self.call("adb_app_map", params) {

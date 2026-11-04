@@ -167,6 +167,11 @@ pub struct BuildSettings {
     pub android_wait_ms: u32,
     /// Milliseconds the controls dump starts before the last key (0 = after the wait).
     pub android_dump_lead_ms: u32,
+    /// Seconds the map may take (60..7200): every capture relaunches the app, so a real app
+    /// needs more than the tool's own default.
+    pub android_time_budget_s: u32,
+    /// Most key presses the map may make in all, replayed paths counted (1..5000).
+    pub android_max_presses: u32,
     /// How far (dp) a control may sit from the original's and still match.
     pub android_dp_tolerance: u32,
     /// Pause after Study so the person can look at capture/ before the builder reads it (only
@@ -190,6 +195,8 @@ impl Default for BuildSettings {
             android_launch_wait_ms: 4000,
             android_wait_ms: 1500,
             android_dump_lead_ms: 0,
+            android_time_budget_s: 1800,
+            android_max_presses: 400,
             android_dp_tolerance: 1,
             review_capture: false,
         }
@@ -519,6 +526,7 @@ auto_mode = true
         assert_eq!(old.build, BuildSettings::default());
         assert_eq!(old.build.picture_good_enough, None, "picture likeness is only reported unless set");
         assert_eq!((old.build.android_max_states, old.build.android_dp_tolerance, old.build.review_capture), (24, 1, false));
+        assert_eq!((old.build.android_time_budget_s, old.build.android_max_presses), (1800, 400), "the map's budget has the tool's defaults until set");
         let device: Settings = toml::from_str(
             "version = 1
 [build]
