@@ -2212,7 +2212,8 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         }
         let skipped = adb_ui::matches_skip(&got.nodes, &p.skip_texts);
         let name = adb_ui::state_name(&got.nodes);
-        let focus = got.focused_title();
+        // A focus position's key: what the focused control says, else which control it is.
+        let focus = got.focused_title().filter(|t| !t.is_empty()).or_else(|| got.tree["focused"].as_u64().map(|i| format!("#{i}")));
         let (id, new) = map.arrive(from, key, &got.fingerprint, |id| adb_ui::MapState {
             id,
             name,

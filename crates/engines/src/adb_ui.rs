@@ -452,6 +452,30 @@ fn decode_entities(s: &str) -> String {
     out
 }
 
+/// What the focused control says: its own label, else the labels of the controls inside it (a
+/// Compose button is a group with no text of its own and a text child), else its identifier.
+/// None without a focused control; empty when it has no words at all.
+pub fn focus_title(nodes: &[UiNode]) -> Option<String> {
+    let (i, f) = nodes.iter().enumerate().find(|(_, n)| n.focused)?;
+    if !f.label().is_empty() {
+        return Some(f.label().to_string());
+    }
+    let mut inside = String::new();
+    for n in nodes.iter().skip(i + 1).take_while(|n| n.depth > f.depth) {
+        let l = n.label().trim();
+        if !l.is_empty() {
+            if !inside.is_empty() {
+                inside.push(' ');
+            }
+            inside.push_str(l);
+            if inside.len() > 80 {
+                break;
+            }
+        }
+    }
+    Some(if inside.is_empty() { f.resource_id.clone() } else { inside })
+}
+
 /// The dump as the `ui-tree.json` the window tools write: `nodes` with `role`, `title`,
 /// `identifier`, `value`, `depth`, `position` and `size` in pixels (and `dp` when the density is
 /// known), plus what a remote cares about: `focused`, `focusable`, `selected`, `clickable`,
@@ -487,7 +511,7 @@ pub fn ui_tree_json(nodes: &[UiNode], density_dpi: Option<u32>, package: Option<
         })
         .collect();
     let focused = nodes.iter().find(|n| n.focused).map(|n| n.index);
-    let focused_title = nodes.iter().find(|n| n.focused).map(|n| n.label().to_string());
+    let focused_title = focus_title(nodes);
     json!({
         "version": 1,
         "source": "uiautomator",
@@ -879,6 +903,28 @@ mod map_tests {
         let json = map.to_json(json!({}));
         assert_eq!(json["exits"][0], json!({"from": "s01", "key": "BACK", "package": "com.android.tvlauncher"}));
         assert_eq!(json["states"][0]["focuses"][1], json!({"title": "Settings", "path": ["DPAD_DOWN", "DPAD_DOWN"]}));
+    }
+
+    #[test]
+    fn the_focus_is_named_by_the_words_inside_a_wordless_control() {
+        // A Compose button: a focused group with no text, its text in a child.
+        let mut nodes = screen(&["Trial home", "", "Channels", "", "Settings"], 1);
+        nodes[1].depth = 1;
+        nodes[2].depth = 2;
+        nodes[3].depth = 1;
+        nodes[4].depth = 2;
+        assert_eq!(focus_title(&nodes).as_deref(), Some("Channels"), "the child's text, not the sibling's");
+        nodes[1].focused = false;
+        nodes[3].focused = true;
+        assert_eq!(focus_title(&nodes).as_deref(), Some("Settings"));
+        let mut own = screen(&["Guide", "x"], 0);
+        own[1].depth = 1;
+        assert_eq!(focus_title(&own).as_deref(), Some("Guide"), "its own label first");
+        let mut bare = screen(&["", ""], 0);
+        bare[0].resource_id = "app:id/row".into();
+        assert_eq!(focus_title(&bare).as_deref(), Some("app:id/row"), "an identifier when nothing has words");
+        assert_eq!(focus_title(&screen(&["a"], 9)), None, "nothing focused");
+        assert_eq!(ui_tree_json(&nodes, None, None)["focused_title"], "Settings");
     }
 
     #[test]
