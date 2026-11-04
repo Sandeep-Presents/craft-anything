@@ -202,6 +202,9 @@ impl DeviceCheck {
     /// folder; returns the states, whether it crashed, and the installed APK.
     fn pass(cx: &mut CheckCx, serial: &str, package: &str, apk: &Path, screens: &Value, dir: &Path) -> Result<(Vec<StateScore>, bool), ToolError> {
         let build = cx.build_settings();
+        // A TV that fell asleep since it was last driven (the test device waits an hour between
+        // passes) launches the app with its screen off and returns empty dumps: wake it first.
+        let _ = cx.call("adb_keys_press", json!({"serial": serial, "keys": ["WAKEUP"]}));
         cx.call("adb_app_install", json!({"serial": serial, "apk_path": apk, "replace": true}))?;
         let category = screens.get("launch_category").and_then(Value::as_str).unwrap_or("leanback");
         let timing = &screens["timing"];

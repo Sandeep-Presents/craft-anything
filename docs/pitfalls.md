@@ -657,6 +657,9 @@ And the gate failed in silence: the test device held an older build of the same 
 with another key, the install was refused, and the reason went only to the builder's tool result;
 nothing in the CLI's output, the feed or device.json said why `gate` stayed null. A check that
 couldn't look says so wherever its score is shown, and names what to do.
+Then the gate ran on a TV that had fallen asleep in the hour since its last pass: the app was
+launched with the screen off, every dump came back empty, and the first four screens were lost
+before a hand-sent WAKEUP. A device is woken before it is driven, every pass.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it

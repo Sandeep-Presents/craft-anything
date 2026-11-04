@@ -26,6 +26,7 @@ const MAX_ATTR: usize = 4_096;
 /// code name (without the `KEYCODE_` prefix). Power, sleep and the like are not here: nothing
 /// in this list changes the device beyond what the app on screen does with it.
 pub const KEYS: &[&str] = &[
+    "WAKEUP",
     "DPAD_UP",
     "DPAD_DOWN",
     "DPAD_LEFT",
@@ -1121,6 +1122,7 @@ mod tests {
         let keys = parse_keys(&["DPAD_RIGHT".into(), "down x3".into(), "OK".into(), "KEYCODE_BACK".into(), "7".into(), "a".into()]).unwrap();
         let names: Vec<&str> = keys.iter().map(|k| k.key.as_str()).collect();
         assert_eq!(names, ["DPAD_RIGHT", "DPAD_DOWN", "DPAD_CENTER", "BACK", "7", "A"]);
+        assert!(parse_keys(&["WAKEUP".to_string()]).is_ok(), "a sleeping TV is woken before it is driven");
         assert_eq!(keys[1].times, 3);
         assert!(parse_keys(&["POWER".into()]).is_err(), "power is not a key a person sends to an app");
         assert!(parse_keys(&["DPAD_UP x0".into()]).is_err());
