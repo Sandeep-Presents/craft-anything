@@ -417,14 +417,22 @@ fn unreachable_server(base: &str, why: &str) -> ToolError {
         .with_remediation("Start ComfyUI and check the address (it listens on port 8188 unless told otherwise).")
 }
 
+/// Only ComfyUI's own `error.message` is passed on, never the raw answer: the address can come
+/// from a builder agent, so another program's page must not reach it.
 fn http_error(base: &str, status: u16, text: &str) -> ToolError {
-    ToolError::new(ErrorCode::EngineMissing, format!("ComfyUI at {base} answered {status}: {}", text.chars().take(200).collect::<String>()))
+    let why = serde_json::from_str::<Value>(text)
+        .ok()
+        .and_then(|v| v.pointer("/error/message").and_then(Value::as_str).map(|m| format!(": {}", m.chars().take(200).collect::<String>())))
+        .unwrap_or_default();
+    ToolError::new(ErrorCode::EngineMissing, format!("ComfyUI at {base} answered {status}{why}"))
         .with_remediation("Check that the address is a ComfyUI server (not another program on that port).")
 }
 
 fn agent(timeout: Duration) -> ureq::Agent {
     ureq::Agent::config_builder()
         .http_status_as_error(false)
+        // Never follow a redirect: every request stays on the address the person gave.
+        .max_redirects(0)
         .user_agent("CraftAnything")
         .timeout_connect(Some(Duration::from_secs(10)))
         .timeout_global(Some(timeout))
@@ -626,6 +634,22 @@ mod tests {
     }
 
     /// A file that can't be read says why, not that it is too big.
+    /// A check never follows a redirect elsewhere, and another program's page never reaches the error.
+    #[test]
+    fn a_check_stays_on_its_address_and_never_repeats_another_programs_page() {
+        let (elsewhere, hit) = serve(|_, _| json_out(json!({"system": {"comfyui_version": "0.3.10"}})));
+        let to: &'static str = Box::leak(format!("text/plain\r\nLocation: {elsewhere}/system_stats").into_boxed_str());
+        let (base, _) = serve(move |_, _| (302, to, Vec::new()));
+        let err = check(&base).unwrap_err();
+        assert!(err.message.contains("answered 302"), "{}", err.message);
+        assert!(hit.lock().unwrap().is_empty(), "the redirect was followed");
+        let (base, _) = serve(|_, _| (500, "text/html", b"<html>internal admin page</html>".to_vec()));
+        let err = check(&base).unwrap_err();
+        assert!(err.message.ends_with("answered 500") && !err.message.contains("admin"), "{}", err.message);
+        let (base, _) = serve(|_, _| (500, "application/json", json!({"error": {"message": "out of memory"}}).to_string().into_bytes()));
+        assert!(check(&base).unwrap_err().message.ends_with("answered 500: out of memory"));
+    }
+
     #[cfg(unix)]
     #[test]
     fn a_workflow_that_cant_be_read_says_why() {
