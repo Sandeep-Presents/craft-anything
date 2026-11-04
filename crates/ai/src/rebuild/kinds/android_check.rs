@@ -100,6 +100,12 @@ fn fresh_dir(dir: &Path) -> Result<(), ToolError> {
     std::fs::create_dir_all(dir).map_err(|e| ToolError::io(dir.display(), e))
 }
 
+/// The claims that must hold for a pass whatever its likeness: each screen reached and read
+/// (the first claim `state_claims` makes for a screen). The run judges the rest by likeness.
+pub fn must_hold(states: &[StateScore]) -> Vec<Claim> {
+    states.iter().filter_map(|s| s.claims.first().cloned()).collect()
+}
+
 /// Whether the build's dump is worth reading again for its focus: the original's screen has a
 /// focused control, the build's was read with controls, but nothing on it has the focus yet.
 pub fn focus_not_yet(original: &Value, built: &Value) -> bool {
@@ -329,6 +335,12 @@ impl Check for DeviceCheck {
         };
         let mut claims: Vec<Claim> = states.iter().flat_map(|s| s.claims.clone()).collect();
         claims.push(Claim::new(format!("No crash of {package} on {serial}"), !crashed, "the device's crash log names it"));
+        // What the run is handed: the claims that must hold (every screen reached and read, no
+        // crash), while the likeness is the bar for the rest. Every detail claim stays in the
+        // scorecard and names the weakest screens in the note; handing them all over would ask
+        // for 100% before Ready, whatever good_enough says.
+        let mut musts = must_hold(&states);
+        musts.push(Claim::new(format!("No crash of {package} on {serial}"), !crashed, "the device's crash log names it"));
         let read_any = states.iter().any(|s| s.files.is_some());
         let mut unknowns: Vec<String> =
             states.iter().filter(|s| s.files.is_none()).map(|s| format!("{} {} couldn't be read on the device", s.id, s.name)).collect();
@@ -358,6 +370,8 @@ impl Check for DeviceCheck {
                         let mut gclaims: Vec<Claim> =
                             gstates.iter().flat_map(|s| s.claims.clone()).map(|c| Claim { title: format!("Test device: {}", c.title), ..c }).collect();
                         gclaims.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
+                        musts.extend(must_hold(&gstates).into_iter().map(|c| Claim { title: format!("Test device: {}", c.title), ..c }));
+                        musts.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
                         let gscore = likeness(&gclaims);
                         gate_ok = !gcrashed && gscore >= good_enough;
                         note.push_str(&format!(" On the test device {gs}: {gscore:.0}% alike{}.", if gcrashed { ", and it crashed" } else { "" }));
@@ -381,13 +395,40 @@ impl Check for DeviceCheck {
         craft_anything_engine::project::write_atomic(&file, text.as_bytes())?;
         let artifacts = file.strip_prefix(&cx.ws.root).ok().map(Path::to_path_buf).into_iter().collect();
         let passed = read_any && !crashed && gate_ok;
-        Ok(CheckResult { similarity: Some(score), claims, unknowns, artifacts, ..CheckResult::new(DEVICE, round, passed, note) })
+        Ok(CheckResult { similarity: Some(score), claims: musts, unknowns, artifacts, ..CheckResult::new(DEVICE, round, passed, note) })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Likeness is the bar: a pass at 92% with every screen read and no crash is good at 90,
+    /// whatever its detail claims say; a screen that couldn't be read is not.
+    #[test]
+    fn the_run_is_handed_only_what_must_hold() {
+        let screen = |id: &str, read: bool, detail_ok: bool| StateScore {
+            id: id.into(),
+            name: "Home".into(),
+            likeness: if read { 50.0 } else { 0.0 },
+            claims: vec![
+                Claim::new(format!("{id} Home: the screen is read on the device"), read, ""),
+                Claim::new(format!("{id} Home: it has \"Guide\""), detail_ok, "no control with that text"),
+            ],
+            files: read.then(|| format!("checks/round-0/device/states/{id}")),
+        };
+        let states = vec![screen("s01", true, true), screen("s02", true, false)];
+        let mut musts = must_hold(&states);
+        assert_eq!(musts.len(), 2, "one claim per screen: that it was read");
+        assert!(musts.iter().all(|c| c.passed && c.title.ends_with("read on the device")));
+        musts.push(Claim::new("No crash", true, ""));
+        let result = CheckResult { similarity: Some(92.0), claims: musts.clone(), ..CheckResult::new(DEVICE, 1, true, "") };
+        assert!(result.good(90.0), "92% with every screen read is good at 90");
+        assert!(!result.good(95.0), "and not at 95");
+        let unread = must_hold(&[screen("s01", true, true), screen("s03", false, false)]);
+        let result = CheckResult { similarity: Some(92.0), claims: unread, ..CheckResult::new(DEVICE, 1, true, "") };
+        assert!(!result.good(90.0), "a screen that couldn't be read must hold first");
+    }
 
     /// A builder that checks twice in one round: the second pass must not trip over the first's
     /// state folders.

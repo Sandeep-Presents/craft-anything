@@ -660,6 +660,11 @@ couldn't look says so wherever its score is shown, and names what to do.
 Then the gate ran on a TV that had fallen asleep in the hour since its last pass: the app was
 launched with the screen off, every dump came back empty, and the first four screens were lost
 before a hand-sent WAKEUP. A device is woken before it is driven, every pass.
+And a run at 92% on both devices went on "Improving the build" instead of Ready: a check is good
+only when every claim it hands over holds, and the device check handed over all 600 of its detail
+claims, so the bar was 100%, whatever `good_enough` said, and the builder was told to fix all 50.
+A check with a likeness hands the run only what must hold (each screen read, no crash); its detail
+goes in its scorecard and its note. Read `CheckResult::good` before deciding what a check's claims are.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
