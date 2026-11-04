@@ -1106,6 +1106,9 @@ room throughout: nothing is pulled off the device or decoded.
       (repeatable) grants a device tool for the project up front, so `--unattended` doesn't refuse
       it; a builder turn that changed no file but raised a check's likeness counts as progress
       — claimed: rock-meister, branch feature/r2.12-unattended-run
+- [ ] A screen is known by its structure and the texts of its controls, not by every text on it:
+      a live map of a TV guide made a new state of every scroll position and every minute of the
+      clock (digits in a label are read as one) — claimed: rock-meister, branch feature/r2.12-map-fingerprint
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
