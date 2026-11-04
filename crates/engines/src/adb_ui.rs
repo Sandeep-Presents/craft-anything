@@ -542,15 +542,19 @@ pub fn ui_tree_json(nodes: &[UiNode], density_dpi: Option<u32>, package: Option<
 /// entries is not.
 pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
     use std::hash::{Hash, Hasher};
-    // Pass 1: which run of same-shaped consecutive siblings each node belongs to.
+    // Pass 1: which run of same-shaped consecutive siblings each node belongs to. Same-shaped
+    // means the whole subtree (classes and ids, texts left out), not the class alone: the rows
+    // of a list share a shape, the layers an activity stacks as sibling FrameLayouts don't.
+    let shapes = subtree_shapes(nodes);
     let mut run_of = vec![0usize; nodes.len()];
     let mut run_size: Vec<usize> = Vec::new();
-    let mut prev: Vec<Option<(usize, &str, &str)>> = Vec::new();
+    let mut prev: Vec<Option<(usize, u64)>> = Vec::new();
     for (i, n) in nodes.iter().enumerate() {
+        let shape = shapes.get(i).copied().unwrap_or_default();
         prev.truncate(n.depth + 1);
         prev.resize(n.depth + 1, None);
         match prev[n.depth] {
-            Some((r, class, id)) if class == n.class && id == n.resource_id => {
+            Some((r, seen)) if seen == shape => {
                 run_of[i] = r;
                 if let Some(size) = run_size.get_mut(r) {
                     *size += 1;
@@ -560,7 +564,7 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
                 let r = run_size.len();
                 run_size.push(1);
                 run_of[i] = r;
-                prev[n.depth] = Some((r, n.class.as_str(), n.resource_id.as_str()));
+                prev[n.depth] = Some((r, shape));
             }
         }
     }
@@ -588,6 +592,38 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
         (n.depth, n.class.as_str(), n.resource_id.as_str(), text).hash(&mut h);
     }
     format!("{:016x}", h.finish())
+}
+
+/// Each node's subtree shape: its class and id and its children's shapes, in order; texts, bounds
+/// and states left out. Walked backwards, so a node's children (one level below it) are known
+/// when it is reached; a child whose parent is missing from a cut-off dump is dropped.
+fn subtree_shapes(nodes: &[UiNode]) -> Vec<u64> {
+    use std::hash::{Hash, Hasher};
+    let mut shapes = vec![0u64; nodes.len()];
+    let mut pending: Vec<Vec<u64>> = Vec::new();
+    for (i, n) in nodes.iter().enumerate().rev() {
+        let below = n.depth.saturating_add(1);
+        if pending.len() <= below {
+            pending.resize(below + 1, Vec::new());
+        }
+        let children = pending.get_mut(below).map(std::mem::take).unwrap_or_default();
+        pending.truncate(below + 1);
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        n.class.hash(&mut h);
+        n.resource_id.hash(&mut h);
+        children.len().hash(&mut h);
+        for c in children.iter().rev() {
+            c.hash(&mut h);
+        }
+        let shape = h.finish();
+        if let Some(slot) = shapes.get_mut(i) {
+            *slot = shape;
+        }
+        if let Some(level) = pending.get_mut(n.depth) {
+            level.push(shape);
+        }
+    }
+    shapes
 }
 
 /// A label with every run of digits read as one (`50:28` → `#:#`, `Channel 23` → `Channel #`).
@@ -1167,5 +1203,36 @@ mod tests {
         assert_eq!(control_words(&home, 1), "Channels");
         assert_eq!(control_words(&home, 0), "Trial home");
         assert_eq!(control_words(&home, 9), "");
+    }
+
+    /// An activity that stacks its screens as same-class, id-less sibling layers (a player, and
+    /// over it a guide, a menu) is not a list: a layer with other controls is another screen.
+    #[test]
+    fn the_layers_of_one_activity_are_not_folded_as_a_list() {
+        let layer = |button: Option<&str>| {
+            let mut n = vec![UiNode { depth: 1, class: "android.widget.FrameLayout".into(), visible: true, ..Default::default() }];
+            match button {
+                None => n.push(UiNode { depth: 2, class: "android.view.View".into(), visible: true, ..Default::default() }),
+                Some(b) => {
+                    n.push(UiNode { depth: 2, class: "android.widget.Button".into(), text: b.into(), focusable: true, visible: true, ..Default::default() })
+                }
+            }
+            n
+        };
+        let stack = |layers: Vec<Vec<UiNode>>| {
+            let mut n = vec![UiNode { class: "android.widget.FrameLayout".into(), visible: true, ..Default::default() }];
+            n.extend(layers.into_iter().flatten());
+            n
+        };
+        let player = stack(vec![layer(None)]);
+        let guide_over_player = stack(vec![layer(None), layer(Some("TV guide"))]);
+        let menu_over_player = stack(vec![layer(None), layer(Some("Settings"))]);
+        assert_ne!(screen_fingerprint(&player), screen_fingerprint(&guide_over_player), "an overlay is another screen");
+        assert_ne!(screen_fingerprint(&guide_over_player), screen_fingerprint(&menu_over_player), "another overlay is another screen");
+        // Same-shaped layers (rows) still fold, however many.
+        let three = stack(vec![layer(None), layer(None), layer(None)]);
+        let five = stack(vec![layer(None), layer(None), layer(None), layer(None), layer(None)]);
+        assert_eq!(screen_fingerprint(&three), screen_fingerprint(&five), "rows of one shape are a list");
+        assert_eq!(screen_fingerprint(&player), screen_fingerprint(&three), "a list's length is not part of the screen");
     }
 }

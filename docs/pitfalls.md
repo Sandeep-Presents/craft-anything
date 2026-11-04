@@ -865,6 +865,15 @@ an exit, never a screen; and what a walk explores (screen plus focus position) i
 counts (screens). Try a new map on an app with two screens and a BACK that leaves it before
 one with fifty.
 
+**A whole app folded into one screen.** The first map of a real TV player found one state in
+523 s: every key led back to s01. The player is one activity that stacks its screens as sibling
+`FrameLayout` layers with no ids, and the fingerprint folded a run of same-class siblings as a list,
+hashing only the first; the guide, the menu and the channel list were all layers after the first,
+so nothing after the player counted. The two-screen trial app had no such stack. A list is a run
+of siblings with the same subtree shape, not the same class; and before the real map, capture the
+original by hand on three screens that differ (`adb_screen_state_capture` with keys) and check
+that their fingerprints differ.
+
 **A device check that launched the original.** The Android device check installed the build's
 APK, then launched, drove and read the crash log of the *target's* package (the original app's),
 so a rebuild under its own id was never opened: the original was replayed against its own map
