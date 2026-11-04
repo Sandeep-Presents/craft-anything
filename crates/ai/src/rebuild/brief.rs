@@ -14,6 +14,9 @@ Rules:
 - Never start dev servers, watchers or anything that doesn't exit (npm run dev, npm start, vite, cargo watch). Craft Anything serves and checks the build itself.
 - Finish with 3-5 plain sentences for the person: what you built, what differs from the original or is still unknown, and one idea for what to ask next. No code and no file paths in that summary.";
 
+/// An app on a device is only ever watched as a person uses it, in either mode: the map Study
+/// made of its screens is what the builder works from.
+pub(super) const DEVICE_FROM_OUTSIDE: &str = "capture/ holds what was seen of the app on its device, as a person using it would: README.md (start here: the device, its screen size and density, the rule for reading positions, and the list of screens found), map/screens.json (every screen reached from the app's home-screen entry: its id, name, the keys that reach it from launch, the control that had the focus, and the files that show it), and map/states/<id>/ with ui.json (every control on that screen: role, text, identifier, position and size in pixels and in dp, and whether it is focused, focusable, selected or scrollable) and screen.png (open it with the Read tool and match its layout and proportions). A screen marked skipped in screens.json is one the person asked to leave alone: it has no files, and you don't rebuild it. Nothing inside the app was read (not its files, code or packages), in Clean room or Deep mode: the screens are what you work from, and the device check after each round replays the same keys on your build and compares.";
 /// How the builder works, for every kind: it leads, the tools answer with evidence, it tests its
 /// build against the original itself, and nothing unknown is passed off as known.
 /// How to work. The follow-up questions the tools may answer depend on the mode: in Clean room
@@ -107,6 +110,7 @@ pub(super) fn brief(kind: &dyn TargetKind, cx: &BriefCx, extra: Option<&str>) ->
     let target = match &m.target {
         TargetRef::Website { url } => format!("the website {url}"),
         TargetRef::Local { path } => format!("the program at {}", path.display()),
+        TargetRef::Device { serial, package } => format!("the app {package} on the device {serial}"),
         TargetRef::None => "nothing specific (build from the request)".into(),
     };
     let sees = cx.sees_pictures;
@@ -126,6 +130,7 @@ pub(super) fn brief(kind: &dyn TargetKind, cx: &BriefCx, extra: Option<&str>) ->
             "capture/README.md holds a first static look at the program (nothing was run) and, for a game, a list of its own files: maps, textures, models, sounds and settings. Read its settings and scripts for the real numbers (speeds, health, weapons, modes, controls){style}; never change anything in that folder. Deep mode: every craft-anything tool is yours, so learn how the parts the person cares about work before you build: core_target_open and core_target_triage first, then native_functions_list, native_strings_find and native_function_pseudocode for a program's code, managed_assembly_show and managed_members_list for .NET, java_* and android_* for Java and Android apps, js_app_map, js_sources_restore and js_electron_* for an Electron app, and game_archives_list and the other game_* tools for a game's files.",
             style = sight(sees, " and open a few of its pictures with the Read tool to learn the style", ""),
         ),
+        TargetRef::Device { .. } => DEVICE_FROM_OUTSIDE.into(),
         TargetRef::None => "There is no target to study.".into(),
     };
     let goal = if m.own_project() { "what their request asks of the project in this folder" } else { kind.goal() };

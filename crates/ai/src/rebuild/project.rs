@@ -50,8 +50,14 @@ pub fn new_project(
     let stack = build_with.map(self::build_with).transpose()?;
     let target_ref = if target.trim() == "-" { TargetRef::None } else { TargetRef::parse(target) };
     if target_ref == TargetRef::None && target.trim() != "-" {
-        return Err(ToolError::invalid(format!("{target:?} is neither a web address nor an existing absolute path"))
-            .with_remediation("Pass https://… for a website, a full path for a program, or - for none."));
+        // A device target that doesn't parse says exactly what's wrong with it.
+        if TargetRef::looks_like_device(target) {
+            return Err(TargetRef::parse_device(target.trim().trim_matches('"').trim_start_matches(TargetRef::DEVICE_PREFIX))
+                .err()
+                .unwrap_or_else(|| ToolError::invalid(format!("{target:?} isn't an app on a device"))));
+        }
+        return Err(ToolError::invalid(format!("{target:?} is neither a web address, an app on a device nor an existing absolute path"))
+            .with_remediation("Pass https://… for a website, adb:<serial>/<package> for an app on a phone or TV, a full path for a program, or - for none."));
     }
     let name = suggest_name(request, &target_ref);
     let mut ws = match place {
