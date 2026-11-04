@@ -1219,7 +1219,8 @@ fn comfy_rows(app: &mut CraftApp, ui: &mut Ui) -> bool {
         ui.add_space(4.0);
         let gap = ui.spacing().item_spacing.x;
         ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), 30.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            test = widgets::secondary_min(ui, Some("activity"), "Test", 30.0).clicked() && ask.is_some();
+            // Greyed out until the address looks like a web address, as on the AI form.
+            test = ui.add_enabled_ui(ask.is_some(), |ui| widgets::secondary_min(ui, Some("activity"), "Test", 30.0)).inner.clicked() && ask.is_some();
             let width = ui.available_width() - label_w - gap;
             model_pick::status_line_w(ui, &app.comfy_form.choice, line.as_ref(), width, true);
         });
