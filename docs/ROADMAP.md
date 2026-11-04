@@ -514,7 +514,7 @@ been run live.
       llama.cpp routers don't answer it
 - [x] The first run's AI step can add a model server on another computer by its address (llama.cpp,
       Ollama or LM Studio on a home server), the same form as Settings → AI
-- [ ] A custom endpoint tab in the first run and Settings → AI: pick a service or your own server,
+- [x] A custom endpoint tab in the first run and Settings → AI: pick a service or your own server,
       its models load from its model list, a custom model or alias can be typed, and Test checks it
       before adding; key cards pick their model from the service's list instead of a fixed one, and
       each added AI has a Test button (claimed: ghzgod, branch feature/r5.4-endpoint-models)

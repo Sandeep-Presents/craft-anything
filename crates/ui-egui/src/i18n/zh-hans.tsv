@@ -741,7 +741,6 @@ Not now	暂时不要
 Nothing allowed yet.	尚未允许任何操作。
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	尚无可用的构建助手：请安装 Claude Code (并先登录一次)，或在下方添加配置了 API 密钥的 AI。
 Nothing found	未找到内容
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	尚未找到。我们会查找你已有的 API 密钥、本地模型服务器 (Ollama、LM Studio) 和智能体应用。其他端口或其他电脑上的服务器可以在下方按地址添加。
 Nothing inside it is read.	不会读取其内部内容。
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	不会读取其内部内容；Craft Anything 仅依据你能看到的内容工作。你的版本会使用自己的美术素材。
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	不会读取原作的内部内容，包括代码、文件和网页源码。Craft Anything 仅根据可见内容工作：图片、访客所见的网页以及运行时的表现。
@@ -1290,7 +1289,6 @@ Write the brief	撰写需求简报
 Write the handoff	撰写交接说明
 Wrote {what} to {}	已将{what}写入 {}
 You answered: {a}	你的回答：{a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	之后可以在“设置 → AI”中添加 Claude、ChatGPT 或 OpenRouter 密钥、本地模型 (Ollama、LM Studio)，或你正在使用的智能体。
 You chose:	你的选择：
 You're all set	准备就绪
 Your app is ready	你的应用已就绪
@@ -1467,3 +1465,33 @@ Connecting to {name}… {seconds} s	正在连接 {name}… {seconds} 秒
 Stopped adding {name}.	已停止添加 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那里，因此改用 {program}。
 Use it	使用它
+Custom endpoint	自定义端点
+Custom LLM endpoint	自定义 LLM 端点
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	任何使用 OpenAI API 的引擎(如 llama.cpp),或带密钥的托管服务。
+Service	服务
+Name	名称
+Address	地址
+e.g. Home server	例如:家用服务器
+e.g. http://192.168.1.20:8080/v1	例如: http://192.168.1.20:8080/v1
+if it needs one	如需要
+model name	模型名称
+Custom model	自定义模型
+Custom model or alias…	自定义模型或别名…
+Looking for models…	正在查找模型…
+{n} models found	找到 {n} 个模型
+1 model found	找到 1 个模型
+It lists no models yet.	它还没有列出任何模型。
+Testing… a model that isn't loaded yet can take a minute	正在测试… 尚未加载的模型可能需要一分钟
+Answered in {seconds} s	{seconds} 秒内已回复
+Answered in {seconds} s: {reply}	{seconds} 秒内已回复:{reply}
+Installed: {reply}	已安装:{reply}
+Test	测试
+Testing…	正在测试…
+Test an AI	测试 AI
+Anthropic API	Anthropic API
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Gemini API	Gemini API
+Coding agent	编码代理
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	尚未找到。我们会查找 API 密钥、本地模型服务器(llama.cpp、LM Studio)以及你已有的代理应用。其他端口或其他电脑上的服务器可在“自定义端点”标签页添加。
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	你可以稍后在 设置 → AI 中添加 Claude、ChatGPT 或 OpenRouter 密钥、本地模型(llama.cpp、LM Studio)或你已在用的代理。按地址添加的服务器放在“自定义端点”标签页。

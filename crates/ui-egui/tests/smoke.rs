@@ -72,6 +72,9 @@ fn first_run_ai_step_can_add_a_server_by_its_address() {
     h.get_by_label("I'm new to this").click();
     h.run_steps(3);
     assert_eq!(h.state().state.first_run, FirstRunStep::Brain);
+    assert!(h.query_by_label("Server address").is_none(), "the form waits on its own tab");
+    h.get_by_label("Custom endpoint").click();
+    h.run_steps(3);
     let _ = h.get_by_label("Server address");
     let _ = h.get_by_label("AI name");
     // The demo already has an AI, so "we didn't find one" isn't said.
@@ -1388,20 +1391,13 @@ fn an_ai_server_is_added_by_its_address() {
         a
     });
     h.run_steps(2);
-    h.get_by_label("Add an AI by its address");
+    h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Custom);
+    h.run_steps(2);
+    h.get_by_label("Custom LLM endpoint");
     h.state_mut().server_form = craft_anything_ui_egui::ServerForm { name: "Studio box".into(), address: url.clone(), ..Default::default() };
     h.run_steps(1);
-    // The AI settings page scrolls, and the key row added in #1486 puts the form's Add button
-    // below its visible part. A pointer click there lands outside the scroll area, so scroll the
-    // page first, as a person would.
-    h.event(egui::Event::PointerMoved(egui::pos2(640.0, 400.0)));
-    h.event(egui::Event::MouseWheel {
-        unit: egui::MouseWheelUnit::Point,
-        delta: egui::vec2(0.0, -300.0),
-        phase: egui::TouchPhase::Move,
-        modifiers: egui::Modifiers::NONE,
-    });
-    h.run_steps(20);
+    h.get_by_label("Add").scroll_to_me();
+    h.run_steps(3);
     h.get_by_label("Add").click();
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Studio box" && b.model == "qwen3:8b")), "added with a model that can chat");
     assert!(h.state().server_form.name.is_empty(), "the form empties once it's added");
@@ -1586,6 +1582,8 @@ fn claude_codes_account_folder_is_set_in_settings() {
     // Added already, so it's offered again under the next free name, on the coding agents' tab.
     h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Harnesses);
     h.run_steps(2);
+    h.get_by_label("Add another").scroll_to_me();
+    h.run_steps(3);
     h.get_by_label("Add another").click();
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Claude Code 2" && b.model == "claude-code")));
 }
@@ -2862,13 +2860,24 @@ fn ai_discovery_controls_have_even_spacing() {
         h.run_steps(4);
         let providers = h.get_by_label(&format!("Providers ({count})")).rect();
         let harnesses = h.get_by_label(&format!("Harnesses ({count})")).rect();
+        let custom = h.get_by_label("Custom endpoint").rect();
         let detect = h.get_by_label("Detect").rect();
-        assert!(!providers.intersects(detect) && !harnesses.intersects(detect), "controls overlap at {width}: {providers:?}, {harnesses:?}, {detect:?}");
+        assert!(
+            [providers, harnesses, custom].iter().all(|tab| !tab.intersects(detect)),
+            "controls overlap at {width}: {providers:?}, {harnesses:?}, {custom:?}, {detect:?}"
+        );
         let tab_gap = harnesses.left() - providers.right();
-        let action_gap = detect.left() - harnesses.right();
-        assert!(tab_gap > 0.0 && action_gap > 0.0, "controls need a visible gap at {width}");
-        assert!((tab_gap - action_gap).abs() <= 1.0, "spacing differs at {width}: {tab_gap} vs {action_gap}");
-        assert!(providers.top() < detect.bottom() && detect.top() < providers.bottom(), "controls share a row at {width}");
+        let custom_gap = custom.left() - harnesses.right();
+        assert!(tab_gap > 0.0 && (tab_gap - custom_gap).abs() <= 1.0, "tab spacing differs at {width}: {tab_gap} vs {custom_gap}");
+        if detect.top() < custom.bottom() {
+            // Detect fits on the tabs' row: the same gap after the last tab.
+            let action_gap = detect.left() - custom.right();
+            assert!(action_gap > 0.0, "controls need a visible gap at {width}");
+            assert!((tab_gap - action_gap).abs() <= 1.0, "spacing differs at {width}: {tab_gap} vs {action_gap}");
+        } else {
+            // It wraps with them: the next row starts where the tabs do.
+            assert!((detect.left() - providers.left()).abs() <= 0.5, "Detect wrapped to {detect:?}, tabs start at {providers:?}");
+        }
         h.get_by_label(&format!("Harnesses ({count})")).click();
         h.run_steps(2);
         assert_eq!(h.state().state.detect_tab, Some(craft_anything_ui_egui::detect_tabs::DetectTab::Harnesses));
@@ -3331,4 +3340,158 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
     let content = h.ctx.content_rect();
     let start = h.get_by_label("Start").rect();
     assert!(start.left() >= 0.0 && start.right() <= content.right(), "Start ({start:?}) stays inside the window ({content:?})");
+}
+
+fn ai_settings() -> egui_kittest::Harness<'static, CraftApp> {
+    let mut h = harness(|| {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a.state.backend = Some("Claude".into());
+        a
+    });
+    h.run_steps(3);
+    h
+}
+
+/// The "In use" chip is as tall as the buttons beside it, and sits level with them.
+#[test]
+fn an_ais_status_chip_is_as_tall_as_its_buttons() {
+    let h = ai_settings();
+    let chip = h.get_by_label("In use").rect();
+    let test = h.get_all_by_label("Build with this").next().expect("a button in the chip's row").rect();
+    assert_eq!(chip.height(), test.height(), "chip {chip:?} vs button {test:?}");
+    assert_eq!(chip.top(), test.top(), "chip {chip:?} vs button {test:?}");
+}
+
+/// The row says what kind of AI it is in words.
+#[test]
+fn an_ais_row_names_its_kind() {
+    let h = ai_settings();
+    let _ = h.get_by_label_contains("Anthropic API");
+}
+
+/// On the Custom endpoint tab, Test and Add are the same height, and the status line keeps its
+/// place whether or not it has anything to say.
+#[test]
+fn the_custom_form_keeps_its_buttons_level_and_its_status_line_put() {
+    let mut h = ai_settings();
+    h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Custom);
+    h.run_steps(3);
+    let (add, test) = (h.get_by_label("Add").rect(), h.get_all_by_label("Test").last().expect("the form Test button").rect());
+    assert_eq!(add.height(), test.height(), "Add {add:?} vs Test {test:?}");
+    assert_eq!(add.top(), test.top());
+    // Every control in the form has one left edge and one right edge, and Add ends there too.
+    let edges = |h: &Harness<'static, CraftApp>| {
+        ["Service", "AI name", "Server address", "API key", "Model"].map(|l| {
+            let r = h.get_by_label(l).rect();
+            (l, r.left(), r.right())
+        })
+    };
+    let fields = edges(&h);
+    for (l, left, right) in fields {
+        assert!((left - fields[0].1).abs() < 0.5, "{l} starts at {left}, Service at {}", fields[0].1);
+        assert!((right - fields[0].2).abs() < 0.5, "{l} ends at {right}, Service at {}", fields[0].2);
+    }
+    assert!((add.right() - fields[0].2).abs() < 0.5, "Add ends at {}, the fields at {}", add.right(), fields[0].2);
+    let _ = h.get_by_label("Service");
+    h.state_mut().server_form.address = "http://127.0.0.1:9/v1".into();
+    h.run_steps(3);
+    let after = h.get_by_label("Add").rect();
+    assert_eq!(add.top(), after.top(), "typing an address moved the buttons");
+}
+
+/// A key card lists the models its key offers once a key is pasted, and Connect uses the one chosen.
+#[test]
+fn a_key_card_picks_a_model() {
+    let url = model_server();
+    let card = craft_anything_ai::Detected {
+        suggestion: craft_anything_ai::BackendConfig {
+            name: "Keyed".into(),
+            kind: craft_anything_ai::BackendKind::OpenaiCompatible,
+            model: "nomic-embed-text".into(),
+            base_url: Some(url),
+            ssh_host: None,
+            enabled: true,
+        },
+        reason: "Paste your key".into(),
+        needs_key: true,
+    };
+    let mut h = harness(move || {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a.detected = Some(vec![card]);
+        a
+    });
+    h.run_steps(3);
+    assert!(h.query_by_label("2 models found").is_none(), "nothing to list without a key");
+    h.state_mut().key_inputs.insert("Keyed".into(), "sk-test-12345678".into());
+    let start = Instant::now();
+    while h.query_by_label("2 models found").is_none() && start.elapsed() < Duration::from_secs(10) {
+        h.run_steps(2);
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let _ = h.get_by_label("2 models found");
+    let (combo, connect) = (h.get_by_label("Model").rect(), h.get_by_label("Add").rect());
+    assert!((combo.center().y - connect.center().y).abs() < 1.0, "the picker {combo:?} and the button {connect:?} share a centre");
+    h.get_by_label("Model").scroll_to_me();
+    h.run_steps(3);
+    h.get_by_label("Model").click();
+    h.run_steps(2);
+    h.get_by_label("qwen3:8b").click();
+    h.run_steps(2);
+    h.get_by_label("Add").click();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Keyed" && b.model == "qwen3:8b")), "Connect uses the chosen model");
+}
+
+/// A row's buttons wrap, and every line of them starts where the first one does.
+#[test]
+fn an_ais_buttons_wrap_to_the_column_they_start_in() {
+    let mut h = harness_sized(egui::vec2(900.0, 900.0), || {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a.state.backend = Some("Claude".into());
+        a
+    });
+    h.run_steps(3);
+    let chip = h.get_by_label("In use").rect();
+    let mut tops: Vec<(f32, f32)> = Vec::new();
+    for l in ["In use", "Build with this", "Extract with this", "Turn off", "Test", "Remove Claude"] {
+        if let Some(n) = h.query_by_label(l) {
+            let r = n.rect();
+            if r.top() >= chip.top() - 1.0 && r.top() < chip.top() + 200.0 {
+                tops.push((r.top(), r.left()));
+            }
+        }
+    }
+    tops.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+    let mut lines: Vec<(f32, f32)> = Vec::new();
+    for (top, left) in tops {
+        if !lines.iter().any(|(t, _)| (t - top).abs() < 4.0) {
+            lines.push((top, left));
+        }
+    }
+    eprintln!("LINES {lines:?} chip {chip:?}");
+    assert!(lines.len() >= 2, "the row didn't wrap, so this checks nothing: {lines:?}");
+    for (top, left) in &lines {
+        assert!((left - chip.left()).abs() < 0.5, "the line at {top} starts at {left}, the first at {}", chip.left());
+    }
+}
+
+/// The form's caption sits at the form's left edge on the first run too, not centred over it.
+#[test]
+fn the_first_run_form_caption_is_left_aligned() {
+    let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, false)));
+    h.run_steps(3);
+    h.get_by_label("I'm new to this").click();
+    h.run_steps(3);
+    h.get_by_label("Custom endpoint").click();
+    h.run_steps(3);
+    let caption = h.get_by_label("Custom LLM endpoint").rect();
+    let field = h.get_by_label("Server address").rect();
+    let service = h.get_by_label("Service").rect();
+    assert!(caption.left() < service.left() - 40.0, "caption {caption:?} vs fields {service:?}");
+    assert!((service.left() - field.left()).abs() < 0.5 && (service.right() - field.right()).abs() < 0.5);
 }
