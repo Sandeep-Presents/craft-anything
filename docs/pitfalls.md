@@ -648,6 +648,11 @@ It happened again in the Android device check: it made `checks/round-N/device/` 
 `device/states/`, and `adb_screen_state_capture` refuses a folder whose parent is missing, so
 every screen came back "couldn't be read" and the first live round scored 0% (the build check
 had passed). A check's first live run is on a build known to match; a 0% there is the check.
+And a third time, on the first real run: the builder checked its work twice in one round, the
+second pass reused `round-0/device/states/<id>` from the first, the capture refused each folder
+that was already there, and the scorecard went from 70% to 4% with every screen "couldn't be
+read"; the builder then went off reading our source for the reason. A check empties its own output
+folder before a pass. When a score collapses to a single failure kind, suspect the check first.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it

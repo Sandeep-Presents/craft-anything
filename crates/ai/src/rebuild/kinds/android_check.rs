@@ -90,6 +90,16 @@ pub fn state_claims(id: &str, name: &str, original: &Value, built: &Value, toler
     claims
 }
 
+/// The check's own output folder, emptied: a builder may check its work more than once in a
+/// round, and `adb_screen_state_capture` refuses a state folder that is already there, so a
+/// second pass over the last one's states would read every screen as unreadable.
+fn fresh_dir(dir: &Path) -> Result<(), ToolError> {
+    if dir.is_dir() {
+        std::fs::remove_dir_all(dir).map_err(|e| ToolError::io(dir.display(), e))?;
+    }
+    std::fs::create_dir_all(dir).map_err(|e| ToolError::io(dir.display(), e))
+}
+
 /// Whether the build's dump is worth reading again for its focus: the original's screen has a
 /// focused control, the build's was read with controls, but nothing on it has the focus yet.
 pub fn focus_not_yet(original: &Value, built: &Value) -> bool {
@@ -307,7 +317,7 @@ impl Check for DeviceCheck {
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
             .unwrap_or(Value::Null);
         let dir = cx.ws.checks_dir().join(format!("round-{round}")).join(DEVICE);
-        std::fs::create_dir_all(&dir).map_err(|e| ToolError::io(dir.display(), e))?;
+        fresh_dir(&dir)?;
         let good_enough = cx.build_settings().good_enough;
         let gate_serial = cx.build_settings().android_gate_serial.filter(|s| !s.trim().is_empty() && *s != serial);
         let (states, crashed) = match Self::pass(cx, &serial, &package, &apk, &screens, &dir) {
@@ -339,7 +349,7 @@ impl Check for DeviceCheck {
         if let Some(gs) = gate_serial {
             if score >= good_enough && !crashed {
                 let gdir = dir.join("gate");
-                std::fs::create_dir_all(&gdir).map_err(|e| ToolError::io(gdir.display(), e))?;
+                fresh_dir(&gdir)?;
                 match Self::pass(cx, &gs, &package, &apk, &screens, &gdir) {
                     Ok((gstates, gcrashed)) => {
                         let mut gclaims: Vec<Claim> =
@@ -375,6 +385,21 @@ impl Check for DeviceCheck {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A builder that checks twice in one round: the second pass must not trip over the first's
+    /// state folders.
+    #[test]
+    fn a_pass_starts_from_an_empty_device_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("round-0").join("device");
+        std::fs::create_dir_all(dir.join("states").join("s01")).unwrap();
+        std::fs::write(dir.join("states").join("s01").join("ui.json"), b"{}").unwrap();
+        std::fs::write(dir.join("device.json"), b"{}").unwrap();
+        fresh_dir(&dir).unwrap();
+        assert!(dir.is_dir() && std::fs::read_dir(&dir).unwrap().next().is_none(), "the folder is there and empty");
+        fresh_dir(&dir).unwrap();
+        assert!(dir.is_dir(), "an empty folder is fine too");
+    }
 
     fn tree(focus: &str, controls: &[(&str, [i64; 4])]) -> Value {
         let nodes: Vec<Value> = controls
