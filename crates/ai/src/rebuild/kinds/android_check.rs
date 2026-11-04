@@ -96,14 +96,28 @@ pub struct StateScore {
     pub files: Option<String>,
 }
 
-/// `device.json`: the scorecard of one device pass.
-pub fn scorecard(serial: &str, package: &str, apk: &Path, states: &[StateScore], crashed: Option<bool>, gate: Option<Value>) -> Value {
+/// The package an APK declares in its manifest: what the build is installed and driven as. A
+/// rebuild has its own id (and `.dev` for a debug build), never the original's, so the check
+/// reads it from the APK rather than taking the target's.
+pub fn apk_package(apk: &Path) -> Option<String> {
+    let bytes = std::fs::read(apk).ok()?;
+    let archive = craft_anything_formats::zip::parse(&bytes, 100_000).ok()?;
+    let entry = archive.entries.iter().find(|e| e.name == "AndroidManifest.xml")?;
+    let manifest = craft_anything_formats::zip::read_entry(&bytes, entry, 4 << 20).ok()?;
+    let doc = craft_anything_formats::axml::parse(&manifest).ok()?;
+    craft_anything_formats::axml::manifest(&doc).package.filter(|p| !p.trim().is_empty())
+}
+
+/// `device.json`: the scorecard of one device pass. `package` is the build's, `original` the
+/// app it is judged against.
+pub fn scorecard(serial: &str, package: &str, original: &str, apk: &Path, states: &[StateScore], crashed: Option<bool>, gate: Option<Value>) -> Value {
     let all: Vec<&Claim> = states.iter().flat_map(|s| &s.claims).collect();
     let held = all.iter().filter(|c| c.passed).count();
     json!({
         "version": 1,
         "serial": serial,
         "package": package,
+        "original_package": original,
         "apk": apk,
         "screens": states.len(),
         "claims": all.len(),
@@ -215,7 +229,7 @@ impl Check for DeviceCheck {
         let Some(serial) = Self::serial_of(cx) else {
             return Ok(CheckResult::new(DEVICE, round, false, "No device to check on: set build.android_serial or use a device target."));
         };
-        let package = match &cx.ws.manifest.target {
+        let original = match &cx.ws.manifest.target {
             TargetRef::Device { package, .. } => package.clone(),
             _ => {
                 return Ok(CheckResult::new(
@@ -229,6 +243,26 @@ impl Check for DeviceCheck {
         let Some(apk) = super::super::check::debug_apk(&cx.ws.app_dir()) else {
             return Ok(CheckResult::new(DEVICE, round, false, format!("No debug APK under {}: build with ./gradlew assembleDebug first.", cx.ws.app_place())));
         };
+        // The build is installed and driven as the package its own manifest declares; the
+        // original's package is only what it is judged against, and is never launched here.
+        let Some(package) = apk_package(&apk) else {
+            return Ok(CheckResult::new(
+                DEVICE,
+                round,
+                false,
+                format!("Couldn't read the package name from {}: is it a complete APK with an AndroidManifest.xml?", apk.display()),
+            ));
+        };
+        if package == original {
+            return Ok(CheckResult::new(
+                DEVICE,
+                round,
+                false,
+                format!(
+                    "The build declares the original's own package ({original}): give it its own applicationId, so the check never replaces or drives the original."
+                ),
+            ));
+        }
         let screens = std::fs::read(cx.ws.capture_dir().join("map").join("screens.json"))
             .ok()
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
@@ -275,7 +309,7 @@ impl Check for DeviceCheck {
                         let gscore = likeness(&gclaims);
                         gate_ok = !gcrashed && gscore >= good_enough;
                         note.push_str(&format!(" On the test device {gs}: {gscore:.0}% alike{}.", if gcrashed { ", and it crashed" } else { "" }));
-                        gate = Some(scorecard(&gs, &package, &apk, &gstates, Some(gcrashed), None));
+                        gate = Some(scorecard(&gs, &package, &original, &apk, &gstates, Some(gcrashed), None));
                         score = score.min(gscore);
                         claims.extend(gclaims);
                     }
@@ -289,7 +323,7 @@ impl Check for DeviceCheck {
                 note.push_str(&format!(" The test device {gs} waits until the build device is good enough."));
             }
         }
-        let card = scorecard(&serial, &package, &apk, &states, Some(crashed), gate);
+        let card = scorecard(&serial, &package, &original, &apk, &states, Some(crashed), gate);
         let file = dir.join("device.json");
         let text = serde_json::to_string_pretty(&card).map_err(|e| ToolError::internal(e.to_string()))?;
         craft_anything_engine::project::write_atomic(&file, text.as_bytes())?;
@@ -366,6 +400,7 @@ mod tests {
         };
         let card = scorecard(
             "192.168.1.20:5555",
+            "com.example.tv.dev",
             "com.example.tv",
             Path::new("/p/app/tv/build/outputs/apk/debug/tv-debug.apk"),
             &[a.clone(), b.clone(), c.clone()],
@@ -379,5 +414,19 @@ mod tests {
         assert_eq!(weakest(&[a], 3), Vec::<String>::new());
         let flat: Vec<Claim> = [b, c].iter().flat_map(|s| s.claims.clone()).chain([Claim::new("No crash of com.example.tv on x", true, "")]).collect();
         assert_eq!(weakest_from_claims(&flat, 2), ["s02 Guide (3 of 4 claims fail)", "s03 Settings (1 of 2 claims fail)"]);
+        assert_eq!((card["package"].as_str(), card["original_package"].as_str()), (Some("com.example.tv.dev"), Some("com.example.tv")));
+    }
+
+    #[test]
+    fn the_build_is_driven_as_the_package_its_apk_declares() {
+        // The APK's own manifest names what gets installed and launched, not the target's package.
+        let d = tempfile::tempdir().unwrap();
+        let apk = d.path().join("tv-debug.apk");
+        std::fs::write(&apk, craft_anything_testkit::android::notes_apk()).unwrap();
+        assert_eq!(apk_package(&apk).as_deref(), Some(craft_anything_testkit::android::PACKAGE));
+        let not_apk = d.path().join("notes.txt");
+        std::fs::write(&not_apk, b"not a zip").unwrap();
+        assert_eq!(apk_package(&not_apk), None);
+        assert_eq!(apk_package(&d.path().join("missing.apk")), None);
     }
 }

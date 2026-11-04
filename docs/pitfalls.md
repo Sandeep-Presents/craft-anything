@@ -846,6 +846,14 @@ backends from older versions or found from a key got a new id on every run. A fa
 run is a workaround, not a fix: give each saved provider backend its id once, at startup, before
 any session lock is held (`AiHub::ensure_session_id`), and test a restart keeps the same id.
 
+**A device check that launched the original.** The Android device check installed the build's
+APK, then launched, drove and read the crash log of the *target's* package (the original app's),
+so a rebuild under its own id was never opened: the original was replayed against its own map
+and scored 100%, whatever the build did. Found by reading the code while setting up a trial
+with distinct package ids; a self-compare trial (the same app as original and build) would have
+hidden it. What a check drives is the thing it built, named by what was built (the APK's own
+manifest), never by the target; and a trial of a check compares two different things.
+
 ## Agent tooling
 
 **Shared CLI efforts reached Claude unchanged.** Keep CLI-only levels available for agents, but
