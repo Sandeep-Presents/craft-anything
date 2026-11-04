@@ -457,11 +457,19 @@ fn decode_entities(s: &str) -> String {
 /// None without a focused control; empty when it has no words at all.
 pub fn focus_title(nodes: &[UiNode]) -> Option<String> {
     let (i, f) = nodes.iter().enumerate().find(|(_, n)| n.focused)?;
-    if !f.label().is_empty() {
-        return Some(f.label().to_string());
+    let words = control_words(nodes, i);
+    Some(if words.is_empty() { f.resource_id.clone() } else { words })
+}
+
+/// What control `i` says: its own label, else the labels of the nodes inside it (a Compose
+/// button is a group with no text of its own and a text child), joined, at most about 80 bytes.
+pub fn control_words(nodes: &[UiNode], i: usize) -> String {
+    let Some(c) = nodes.get(i) else { return String::new() };
+    if !c.label().is_empty() {
+        return c.label().to_string();
     }
     let mut inside = String::new();
-    for n in nodes.iter().skip(i + 1).take_while(|n| n.depth > f.depth) {
+    for n in nodes.iter().skip(i + 1).take_while(|n| n.depth > c.depth) {
         let l = n.label().trim();
         if !l.is_empty() {
             if !inside.is_empty() {
@@ -473,7 +481,7 @@ pub fn focus_title(nodes: &[UiNode]) -> Option<String> {
             }
         }
     }
-    Some(if inside.is_empty() { f.resource_id.clone() } else { inside })
+    inside
 }
 
 /// The dump as the `ui-tree.json` the window tools write: `nodes` with `role`, `title`,
@@ -524,24 +532,60 @@ pub fn ui_tree_json(nodes: &[UiNode], density_dpi: Option<u32>, package: Option<
     })
 }
 
-/// A short fingerprint of a screen: its structure (depth, class and id of each control, with a
-/// run of identical siblings counted once, so a list with more or fewer rows is the same
-/// screen) and the texts of the controls a person can land on (digits read as one, so a clock
-/// or a counter doesn't make a new screen). Bounds, focus and plain text content are left out:
-/// a scrolled guide, a moved focus or a new minute on the clock is still the same screen; a
-/// different set of buttons or menu entries is not.
+/// A short fingerprint of a screen: its structure (depth, class and id of each control) and
+/// the words of the controls a person can land on (their own label or the words inside them,
+/// digits read as one, so a clock or a counter doesn't make a new screen). A list is content,
+/// not a control: a run of three or more siblings of the same shape counts once, as its first
+/// member with its subtree and without its words, so a list with other or more rows is the
+/// same screen. Bounds, focus and plain text are left out: a scrolled guide, a moved focus or
+/// a new minute on the clock is still the same screen; a different set of buttons or menu
+/// entries is not.
 pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
     use std::hash::{Hash, Hasher};
+    // Pass 1: which run of same-shaped consecutive siblings each node belongs to.
+    let mut run_of = vec![0usize; nodes.len()];
+    let mut run_size: Vec<usize> = Vec::new();
+    let mut prev: Vec<Option<(usize, &str, &str)>> = Vec::new();
+    for (i, n) in nodes.iter().enumerate() {
+        prev.truncate(n.depth + 1);
+        prev.resize(n.depth + 1, None);
+        match prev[n.depth] {
+            Some((r, class, id)) if class == n.class && id == n.resource_id => {
+                run_of[i] = r;
+                if let Some(size) = run_size.get_mut(r) {
+                    *size += 1;
+                }
+            }
+            _ => {
+                let r = run_size.len();
+                run_size.push(1);
+                run_of[i] = r;
+                prev[n.depth] = Some((r, n.class.as_str(), n.resource_id.as_str()));
+            }
+        }
+    }
+    // Pass 2: hash each node once per run, its subtree with it.
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    let mut last: Option<(usize, &str, &str, String)> = None;
-    for n in nodes {
-        let text = if n.focusable || n.clickable { digits_as_one(n.label()) } else { String::new() };
-        let key = (n.depth, n.class.as_str(), n.resource_id.as_str(), text);
-        if last.as_ref() == Some(&key) {
+    let mut seen = vec![0usize; run_size.len()];
+    let mut skip_below: Option<usize> = None;
+    for (i, n) in nodes.iter().enumerate() {
+        if skip_below.is_some_and(|d| n.depth > d) {
             continue;
         }
-        key.hash(&mut h);
-        last = Some(key);
+        skip_below = None;
+        let r = run_of[i];
+        let (Some(size), Some(count)) = (run_size.get(r), seen.get_mut(r)) else { continue };
+        *count += 1;
+        if *count > 1 {
+            skip_below = Some(n.depth);
+            continue;
+        }
+        // A control's words count when it is one (a button, a menu entry), not a list; a
+        // container with controls inside is shape only, its controls speak for themselves.
+        let container = nodes.iter().skip(i + 1).take_while(|m| m.depth > n.depth).any(|m| m.focusable || m.clickable);
+        let landable = (n.focusable || n.clickable) && *size < 3 && !container;
+        let text = if landable { digits_as_one(&control_words(nodes, i)) } else { String::new() };
+        (n.depth, n.class.as_str(), n.resource_id.as_str(), text).hash(&mut h);
     }
     format!("{:016x}", h.finish())
 }
@@ -798,7 +842,7 @@ impl ScreenMap {
 mod map_tests {
     use super::*;
 
-    fn screen(labels: &[&str], focused: usize) -> Vec<UiNode> {
+    pub(super) fn screen(labels: &[&str], focused: usize) -> Vec<UiNode> {
         labels
             .iter()
             .enumerate()
@@ -1072,5 +1116,56 @@ mod tests {
         assert_ne!(screen_fingerprint(&three), screen_fingerprint(&other_button), "another control is another screen");
         assert_eq!(digits_as_one("50:28 · Channel 23"), "#:# · Channel #");
         assert_eq!(digits_as_one("abc"), "abc");
+    }
+
+    #[test]
+    fn a_fingerprint_reads_the_words_inside_wordless_buttons_and_folds_rows_with_their_children() {
+        use super::map_tests::screen;
+        // Two Compose screens of the same shape: a title and two buttons whose text is a child.
+        let compose = |title: &str, a: &str, b: &str| {
+            let mut n = screen(&[title, "", a, "", b], 1);
+            n[1].class = "android.view.View".into();
+            n[3].class = "android.view.View".into();
+            n[2].depth = 1;
+            n[4].depth = 1;
+            n[2].focusable = false;
+            n[4].focusable = false;
+            n
+        };
+        let home = compose("Trial home", "Channels", "Settings");
+        let settings = compose("Trial settings", "Theme", "Back to home");
+        assert_ne!(screen_fingerprint(&home), screen_fingerprint(&settings), "other buttons are another screen");
+        let mut moved = compose("Trial home", "Channels", "Settings");
+        moved[1].focused = false;
+        moved[3].focused = true;
+        assert_eq!(screen_fingerprint(&home), screen_fingerprint(&moved), "a moved focus is the same screen");
+        // A guide: landable rows of the same shape, each with its own texts inside, and a button.
+        let guide = |rows: &[&str]| {
+            let mut n = vec![UiNode { class: "android.widget.FrameLayout".into(), focusable: true, visible: true, ..Default::default() }];
+            for r in rows {
+                n.push(UiNode {
+                    depth: 1,
+                    class: "android.view.View".into(),
+                    resource_id: "app:id/row".into(),
+                    focusable: true,
+                    visible: true,
+                    ..Default::default()
+                });
+                n.push(UiNode { depth: 2, class: "android.widget.TextView".into(), text: (*r).into(), visible: true, ..Default::default() });
+            }
+            n.push(UiNode { depth: 1, class: "android.widget.Button".into(), text: "Filter".into(), focusable: true, visible: true, ..Default::default() });
+            n
+        };
+        assert_eq!(
+            screen_fingerprint(&guide(&["BBC One", "ITV", "Channel 4"])),
+            screen_fingerprint(&guide(&["Sky", "Dave", "Gold", "More4", "E4"])),
+            "a scrolled guide is the same screen"
+        );
+        let mut other = guide(&["BBC One", "ITV", "Channel 4"]);
+        other.last_mut().unwrap().text = "Search".into();
+        assert_ne!(screen_fingerprint(&guide(&["BBC One", "ITV", "Channel 4"])), screen_fingerprint(&other), "another button is another screen");
+        assert_eq!(control_words(&home, 1), "Channels");
+        assert_eq!(control_words(&home, 0), "Trial home");
+        assert_eq!(control_words(&home, 9), "");
     }
 }
