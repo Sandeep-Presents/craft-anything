@@ -1124,6 +1124,11 @@ room throughout: nothing is pulled off the device or decoded.
       (INSTALL_FAILED_UPDATE_INCOMPATIBLE), and the reason reached only the builder's tool result;
       the CLI printed the score alone and device.json kept `gate: null`. Put the gate's note in the
       feed and the scorecard, and name the fix (uninstall the old build, or sign with the same key).
+- [ ] A map that fails is not a study: when the map of a device target fails, Study writes a
+      README and goes on to build with no screens at all, and a later resume sees capture/ and
+      skips Study for good (seen twice on the second study of a TV player). A failed map tries
+      once more, then stops the run with the reason; and Study counts as done only with a
+      screens.json.
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
