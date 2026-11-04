@@ -87,6 +87,14 @@ pub fn state_claims(id: &str, name: &str, original: &Value, built: &Value, toler
     claims
 }
 
+/// Whether the build's dump is worth reading again for its focus: the original's screen has a
+/// focused control, the build's was read with controls, but nothing on it has the focus yet.
+pub fn focus_not_yet(original: &Value, built: &Value) -> bool {
+    let has_focus = |t: &Value| t.get("focused_title").and_then(Value::as_str).is_some_and(|f| !f.trim().is_empty());
+    let read = built.get("count").and_then(Value::as_u64).unwrap_or(0) > 0;
+    has_focus(original) && read && !has_focus(built)
+}
+
 /// Claims that hold, as a percentage (0 for none at all).
 pub fn likeness(claims: &[Claim]) -> f64 {
     if claims.is_empty() {
@@ -213,6 +221,21 @@ impl DeviceCheck {
                 );
                 if got.is_ok() {
                     built = read(&out.join("ui.json")).unwrap_or(Value::Null);
+                }
+                // The focus lands a moment after the controls are drawn (Compose asks for it
+                // once the screen is up): a dump with nothing focused is read once more.
+                if focus_not_yet(&original, &built) {
+                    std::thread::sleep(Duration::from_millis(wait_ms.min(10_000)));
+                    let again = match cx.call("adb_ui_read", json!({"serial": serial})) {
+                        Ok(ToolOutput::Evidence(e)) => e.result.clone(),
+                        _ => Value::Null,
+                    };
+                    if again.get("focused_title").and_then(Value::as_str).is_some_and(|t| !t.trim().is_empty()) {
+                        if let Ok(text) = serde_json::to_vec_pretty(&again) {
+                            let _ = craft_anything_engine::project::write_atomic(&out.join("ui.json"), &text);
+                        }
+                        built = again;
+                    }
                 }
             }
             let claims = state_claims(&id, &name, &original, &built, build.android_dp_tolerance);
@@ -413,6 +436,18 @@ mod tests {
         let claims = state_claims("s01", "Trial home", &original, &moved, 1);
         let failed: Vec<&str> = claims.iter().filter(|c| !c.passed).map(|c| c.title.as_str()).collect();
         assert_eq!(failed, ["s01 Trial home: \"Settings\" sits within 1 dp"]);
+    }
+
+    #[test]
+    fn a_dump_with_nothing_focused_yet_is_read_again_only_when_the_original_has_a_focus() {
+        let original = tree("Guide", &[("Guide", [72, 251, 220, 39])]);
+        let mut unfocused = original.clone();
+        unfocused["focused_title"] = Value::Null;
+        assert!(focus_not_yet(&original, &unfocused));
+        assert!(!focus_not_yet(&original, &original), "the focus is there");
+        assert!(!focus_not_yet(&unfocused, &unfocused), "the original has none to wait for");
+        assert!(!focus_not_yet(&original, &json!({"count": 0})), "an unread screen is a failed read, not a wait");
+        assert!(!focus_not_yet(&original, &Value::Null));
     }
 
     #[test]
