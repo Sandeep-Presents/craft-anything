@@ -266,9 +266,15 @@ fn from_workflow(path: &std::path::Path, vars: &Vars) -> Result<Value, ToolError
             .with_remediation("In ComfyUI choose Export (API), save the file, and pick that file in Settings → Builds → Picture model.")
     };
     let file = std::fs::File::open(path).map_err(|e| bad(format!("{} ({e})", path.display())))?;
-    let bytes = read_capped(file, MAX_WORKFLOW).map_err(|_| bad("it is over 2 MB".into()))?;
+    let bytes = read_capped(file, MAX_WORKFLOW).map_err(|e| match e.code {
+        ErrorCode::OverLimit => bad("it is over 2 MB".into()),
+        _ => bad(format!("{} ({})", path.display(), e.message)),
+    })?;
     let mut graph: Value = serde_json::from_slice(&bytes).map_err(|e| bad(format!("it isn't JSON ({e})")))?;
-    if !graph.is_object() {
+    // Every node names its class: anything else (a settings or credentials file picked by mistake)
+    // is never sent to the server.
+    let api_graph = graph.as_object().is_some_and(|nodes| !nodes.is_empty() && nodes.values().all(|n| n.get("class_type").is_some_and(Value::is_string)));
+    if !api_graph {
         return Err(bad("it isn't an API-format graph (an object of nodes)".into()));
     }
     fill(&mut graph, vars);
@@ -600,6 +606,35 @@ mod tests {
         let big = dir.path().join("big.json");
         std::fs::write(&big, vec![b' '; (MAX_WORKFLOW + 10) as usize]).unwrap();
         assert!(picture(&ComfyUi::new(base, "m", Some(big)), "x", Shape::Square).unwrap_err().message.contains("2 MB"));
+    }
+
+    /// Only a graph of nodes is sent: a settings or credentials file picked by mistake, or an empty
+    /// object, is refused before anything reaches the server.
+    #[test]
+    fn a_json_file_that_isnt_a_graph_of_nodes_is_never_sent() {
+        let dir = tempfile::tempdir().unwrap();
+        let (base, seen) = happy(b"png");
+        for (name, body) in
+            [("keys.json", r#"{"api_key": "sk-test"}"#), ("empty.json", "{}"), ("half.json", r#"{"1": {"class_type": "SaveImage"}, "2": {"inputs": {}}}"#)]
+        {
+            let file = dir.path().join(name);
+            std::fs::write(&file, body).unwrap();
+            let err = picture(&ComfyUi::new(base.clone(), "m", Some(file)), "x", Shape::Square).unwrap_err();
+            assert_eq!(err.code, ErrorCode::BadSettings, "{name}");
+        }
+        assert!(seen.lock().unwrap().iter().all(|(line, _)| !line.starts_with("POST /prompt")), "nothing was posted");
+    }
+
+    /// A file that can't be read says why, not that it is too big.
+    #[cfg(unix)]
+    #[test]
+    fn a_workflow_that_cant_be_read_says_why() {
+        let dir = tempfile::tempdir().unwrap();
+        let (base, _) = happy(b"png");
+        // A folder opens on Unix and fails on the read.
+        let err = picture(&ComfyUi::new(base, "m", Some(dir.path().to_path_buf())), "x", Shape::Square).unwrap_err();
+        assert_eq!(err.code, ErrorCode::BadSettings);
+        assert!(!err.message.contains("2 MB"), "{err:?}");
     }
 
     #[test]
