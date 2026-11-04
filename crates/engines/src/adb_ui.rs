@@ -500,18 +500,44 @@ pub fn ui_tree_json(nodes: &[UiNode], density_dpi: Option<u32>, package: Option<
     })
 }
 
-/// A short fingerprint of a screen's structure (classes, ids and texts in order, bounds left
-/// out), so two dumps of the same screen match and a scrolled list or a moved focus still does.
+/// A short fingerprint of a screen: its structure (depth, class and id of each control, with a
+/// run of identical siblings counted once, so a list with more or fewer rows is the same
+/// screen) and the texts of the controls a person can land on (digits read as one, so a clock
+/// or a counter doesn't make a new screen). Bounds, focus and plain text content are left out:
+/// a scrolled guide, a moved focus or a new minute on the clock is still the same screen; a
+/// different set of buttons or menu entries is not.
 pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
+    let mut last: Option<(usize, &str, &str, String)> = None;
     for n in nodes {
-        n.depth.hash(&mut h);
-        n.class.hash(&mut h);
-        n.resource_id.hash(&mut h);
-        n.label().hash(&mut h);
+        let text = if n.focusable || n.clickable { digits_as_one(n.label()) } else { String::new() };
+        let key = (n.depth, n.class.as_str(), n.resource_id.as_str(), text);
+        if last.as_ref() == Some(&key) {
+            continue;
+        }
+        key.hash(&mut h);
+        last = Some(key);
     }
     format!("{:016x}", h.finish())
+}
+
+/// A label with every run of digits read as one (`50:28` → `#:#`, `Channel 23` → `Channel #`).
+pub fn digits_as_one(label: &str) -> String {
+    let mut out = String::with_capacity(label.len());
+    let mut in_digits = false;
+    for c in label.chars() {
+        if c.is_ascii_digit() {
+            if !in_digits {
+                out.push('#');
+                in_digits = true;
+            }
+        } else {
+            out.push(c);
+            in_digits = false;
+        }
+    }
+    out
 }
 
 /// Most states one map keeps.
@@ -545,10 +571,12 @@ pub fn matches_skip(nodes: &[UiNode], skip_texts: &[String]) -> Option<String> {
 /// A short name for a screen: the focused control's label, else the longest label on it, else
 /// the first control's class; at most 60 characters.
 pub fn state_name(nodes: &[UiNode]) -> String {
-    let focused = nodes.iter().find(|n| n.focused).map(|n| n.label()).filter(|l| !l.is_empty());
-    let longest = nodes.iter().filter(|n| n.visible).map(|n| n.label()).filter(|l| !l.is_empty()).max_by_key(|l| l.chars().count());
-    let class = nodes.first().map(|n| n.class.rsplit('.').next().unwrap_or("screen"));
-    let name = focused.or(longest).or(class).unwrap_or("screen");
+    let wordy = |l: &str| l.chars().filter(|c| c.is_alphabetic()).count() >= 2;
+    let focused = nodes.iter().find(|n| n.focused).map(|n| n.label()).filter(|l| wordy(l));
+    let control = nodes.iter().filter(|n| n.visible && (n.focusable || n.clickable)).map(|n| n.label()).find(|l| wordy(l));
+    let longest = nodes.iter().filter(|n| n.visible).map(|n| n.label()).filter(|l| wordy(l)).max_by_key(|l| l.chars().count());
+    let class = nodes.iter().find(|n| n.focused).or(nodes.first()).map(|n| n.class.rsplit('.').next().unwrap_or("screen"));
+    let name = focused.or(control).or(longest).or(class).unwrap_or("screen");
     name.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(60).collect()
 }
 
@@ -707,6 +735,8 @@ mod map_tests {
         let s = screen(&["Guide", "Settings", "A much longer label here"], 1);
         assert_eq!(state_name(&s), "Settings");
         assert_eq!(state_name(&screen(&["x", "A much longer label"], 9)), "A much longer label");
+        assert_eq!(state_name(&screen(&["50:28", "Guide"], 0)), "Guide", "a clock in focus isn't a name; a control with words is");
+        assert_eq!(state_name(&screen(&["50:28", "1", "2"], 0)), "TextView", "nothing wordy: the focused control's class");
         assert_eq!(state_name(&[]), "screen");
         assert_eq!(visible_texts(&screen(&["a", "b", "a", ""], 0)), ["a", "b"]);
         assert_eq!(matches_skip(&s, &["about".into(), "SETTINGS".into()]), Some("SETTINGS".into()));
@@ -857,12 +887,34 @@ mod tests {
     }
 
     #[test]
-    fn a_fingerprint_ignores_bounds_and_focus() {
+    fn a_fingerprint_ignores_bounds_focus_list_length_plain_text_and_digits() {
         let a = parse_ui_dump(DUMP, 100);
         let moved = DUMP.replace("[144,502][584,579]", "[144,600][584,677]").replace("focused=\"true\"", "focused=\"false\"");
         let b = parse_ui_dump(&moved, 100);
         assert_eq!(screen_fingerprint(&a), screen_fingerprint(&b));
+        // The text of a control a person can land on is part of the screen.
         let other = DUMP.replace("All movies", "All shows");
         assert_ne!(screen_fingerprint(&a), screen_fingerprint(&parse_ui_dump(&other, 100)));
+        // Rows of a list: more of the same rows is the same screen; a clock is the same screen.
+        let node = |cls: &str, id: &str, t: &str, focusable: bool| {
+            format!(
+                "<node index=\"0\" text=\"{t}\" resource-id=\"{id}\" class=\"{cls}\" package=\"p\" content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"{focusable}\" enabled=\"true\" focusable=\"{focusable}\" focused=\"false\" scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" visible-to-user=\"true\" bounds=\"[0,0][100,20]\" />"
+            )
+        };
+        let screen = |rows: &[&str], time: &str, btn: &str| {
+            let rows: String = rows.iter().map(|r| node("android.widget.TextView", "app:id/row", r, false)).collect();
+            format!(
+                "<hierarchy>{}{rows}{}</hierarchy>",
+                node("android.widget.TextView", "app:id/clock", time, false),
+                node("android.widget.Button", "app:id/go", btn, true)
+            )
+        };
+        let three = parse_ui_dump(&screen(&["News", "Sports", "Movies"], "7:49 PM", "Channel 23"), 100);
+        let five = parse_ui_dump(&screen(&["Kids", "Docs", "Music", "News", "Sports"], "7:50 PM", "Channel 24"), 100);
+        assert_eq!(screen_fingerprint(&three), screen_fingerprint(&five), "a scrolled list and a new minute are the same screen");
+        let other_button = parse_ui_dump(&screen(&["News"], "7:49 PM", "Settings"), 100);
+        assert_ne!(screen_fingerprint(&three), screen_fingerprint(&other_button), "another control is another screen");
+        assert_eq!(digits_as_one("50:28 · Channel 23"), "#:# · Channel #");
+        assert_eq!(digits_as_one("abc"), "abc");
     }
 }
