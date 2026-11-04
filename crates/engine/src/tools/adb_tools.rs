@@ -24,6 +24,7 @@ use craft_anything_platform::process::{Cancel, Output};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -358,6 +359,28 @@ pub fn specs() -> Vec<ToolSpec> {
             schema_of::<CrashLogParams>,
             adb_crash_log_read,
         ),
+        spec(
+            "adb_ui_walkthrough_record",
+            "Walk through an app's screens",
+            "Run a scripted walkthrough on the screen as it is: up to 40 steps, each some keys (as adb_keys_press takes them), a wait and a dump lead of its own, and after each a capture of the screen's controls and a picture (as adb_screen_state_capture makes them) into steps/NN-<name>/ of a fresh host folder, with walkthrough.json listing every step's focused control and fingerprint. Changes the device.",
+            "Press a planned series of buttons on the phone or TV and record what the screen shows after each.",
+            Adb,
+            device_write | Effects::WRITES_FILESYSTEM,
+            eng,
+            schema_of::<WalkthroughParams>,
+            adb_ui_walkthrough_record,
+        ),
+        spec(
+            "adb_app_map",
+            "Map an app's screens",
+            "Map the screens an app reaches from its home-screen entry with a remote's keys, breadth first and bounded: from a fresh launch, each exploration key (default the D-pad, OK, BACK and MENU) is pressed on each known screen, the screen is read and pictured, and a screen not seen before (by the fingerprint of its controls, bounds left out) becomes a new state reached by that key path; every state is reached again from a fresh launch by its path, so the map is replayable. A screen whose text contains one of skip_texts is recorded as a row with no details and is never kept or explored further. Stops at max_states (default 20, at most 60), max_presses (default 400), time_budget_s (default 1800) or when nothing new is reached. Writes screens.json and states/<id>/{ui.json,screen.png,keys.txt} into a fresh host folder. Changes the device (the app is started and driven many times).",
+            "Press every button on every screen of an app, within limits, and record the screens found.",
+            Adb,
+            device_write | Effects::WRITES_FILESYSTEM,
+            eng,
+            schema_of::<MapParams>,
+            adb_app_map,
+        ),
     ]
 }
 
@@ -686,6 +709,106 @@ struct CrashLogParams {
     /// Number of recent crash-log lines to read (1..10000, default 500).
     #[serde(default = "default_count")]
     count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct WalkStep {
+    /// A short name for the step (its folder is `NN-<name>`); the keys when left out.
+    #[serde(default)]
+    name: Option<String>,
+    /// Keys to press, as adb_keys_press takes them; none to only read the screen.
+    #[serde(default)]
+    keys: Vec<String>,
+    /// Milliseconds between presses (0..10000, default 300).
+    #[serde(default = "default_gap_ms")]
+    gap_ms: u32,
+    /// Milliseconds to wait after the last press before reading the screen (0..60000, default 1000).
+    #[serde(default = "default_wait_ms")]
+    wait_ms: u32,
+    /// Start the controls dump this many ms before the last key (0..5000, default 0).
+    #[serde(default)]
+    dump_lead_ms: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct WalkthroughParams {
+    serial: String,
+    /// The steps, in order (1..40).
+    steps: Vec<WalkStep>,
+    /// Most controls to keep per step (1..5000, default 500).
+    #[serde(default = "default_max_nodes")]
+    max_nodes: usize,
+    /// Absolute host folder that must not exist yet; it is created fresh.
+    output_directory: String,
+}
+
+fn default_max_states() -> usize {
+    20
+}
+
+fn default_max_presses() -> u32 {
+    400
+}
+
+fn default_time_budget_s() -> u32 {
+    1800
+}
+
+fn default_launch_wait_ms() -> u32 {
+    4000
+}
+
+fn default_map_wait_ms() -> u32 {
+    1500
+}
+
+fn default_map_keys() -> Vec<String> {
+    ["DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT", "DPAD_CENTER", "BACK", "MENU"].iter().map(|s| s.to_string()).collect()
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct MapParams {
+    serial: String,
+    /// Package name (e.g. com.example.app).
+    package: String,
+    /// Which home-screen entry starts it: `launcher` (default, with a TV's entry as fallback) or `leanback`.
+    #[serde(default)]
+    category: LaunchCategory,
+    /// Most screens to keep (1..60, default 20).
+    #[serde(default = "default_max_states")]
+    max_states: usize,
+    /// Most key presses in all, counting the replayed paths (1..5000, default 400).
+    #[serde(default = "default_max_presses")]
+    max_presses: u32,
+    /// Seconds the map may take (60..7200, default 1800).
+    #[serde(default = "default_time_budget_s")]
+    time_budget_s: u32,
+    /// The keys pressed on every screen, one key name each (default the D-pad, OK, BACK and MENU).
+    #[serde(default = "default_map_keys")]
+    keys: Vec<String>,
+    /// Texts of screens to leave alone (case-insensitive): such a screen is a row with no details.
+    #[serde(default)]
+    skip_texts: Vec<String>,
+    /// Milliseconds to wait after each launch before pressing keys (0..60000, default 4000).
+    #[serde(default = "default_launch_wait_ms")]
+    launch_wait_ms: u32,
+    /// Milliseconds between presses (0..10000, default 300).
+    #[serde(default = "default_gap_ms")]
+    gap_ms: u32,
+    /// Milliseconds to wait after the last press before reading the screen (0..60000, default 1500).
+    #[serde(default = "default_map_wait_ms")]
+    wait_ms: u32,
+    /// Start the controls dump this many ms before the last key (0..5000, default 0).
+    #[serde(default)]
+    dump_lead_ms: u32,
+    /// Most controls to keep per screen (1..5000, default 500).
+    #[serde(default = "default_max_nodes")]
+    max_nodes: usize,
+    /// Absolute host folder that must not exist yet; it is created fresh.
+    output_directory: String,
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1361,31 +1484,7 @@ fn adb_app_launch(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolEr
     let package = adb::validate_package(&p.package)?;
     let adb = adb_for(ctx)?;
     ensure_online(&adb, serial)?;
-    // The entry asked for; with the default, a TV's entry next, for an app that has only that.
-    let categories: &[LaunchCategory] = match p.category {
-        LaunchCategory::Launcher => &[LaunchCategory::Launcher, LaunchCategory::Leanback],
-        LaunchCategory::Leanback => &[LaunchCategory::Leanback],
-    };
-    let mut tried = Vec::new();
-    let mut launched = None;
-    let mut last_output = String::new();
-    for category in categories {
-        let line = format!("monkey -p {package} -c {} 1", category.intent());
-        let out = adb.shell(serial, &line)?;
-        let combined = format!("{}{}", out.stdout_text(), out.stderr_text());
-        let failed = combined.contains("No activities found") || combined.contains("Error");
-        last_output = tail_text(&combined).trim().to_string();
-        tried.push(json!({"category": category, "ok": !failed, "output": last_output}));
-        if !failed {
-            launched = Some(*category);
-            break;
-        }
-    }
-    let Some(category) = launched else {
-        return Err(ToolError::new(ErrorCode::ProgramFailed, format!("Could not launch {package}: {last_output}"))
-            .with_remediation("The app may have no launcher activity; use adb_activity_open with an explicit component.")
-            .with_details(json!({"tried": tried})));
-    };
+    let (category, tried) = launch_app(&adb, serial, package, p.category)?;
     let entry = match category {
         LaunchCategory::Launcher => "launcher",
         LaunchCategory::Leanback => "TV (leanback)",
@@ -1664,7 +1763,7 @@ fn nodes_of(xml: &str, max_nodes: usize) -> Result<Vec<adb_ui::UiNode>, ToolErro
     Ok(nodes)
 }
 
-fn write_json(file: &std::path::Path, value: &Value) -> Result<(), ToolError> {
+fn write_json(file: &Path, value: &Value) -> Result<(), ToolError> {
     let text = serde_json::to_string_pretty(value).map_err(|e| ToolError::internal(e.to_string()))?;
     write_atomic(file, text.as_bytes())
 }
@@ -1753,6 +1852,131 @@ fn adb_ui_read(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
     done(e)
 }
 
+/// Start `package` by its home-screen entry: the category asked for and, for the default, a
+/// TV's entry next, for an app that has only that. Returns the entry that worked and what was
+/// tried.
+fn launch_app(adb: &Adb, serial: &str, package: &str, category: LaunchCategory) -> Result<(LaunchCategory, Vec<Value>), ToolError> {
+    let categories: &[LaunchCategory] = match category {
+        LaunchCategory::Launcher => &[LaunchCategory::Launcher, LaunchCategory::Leanback],
+        LaunchCategory::Leanback => &[LaunchCategory::Leanback],
+    };
+    let mut tried = Vec::new();
+    let mut last_output = String::new();
+    for category in categories {
+        let out = adb.shell(serial, &launch_command(package, *category))?;
+        let combined = format!("{}{}", out.stdout_text(), out.stderr_text());
+        let failed = combined.contains("No activities found") || combined.contains("Error");
+        last_output = tail_text(&combined).trim().to_string();
+        tried.push(json!({"category": category, "ok": !failed, "output": last_output}));
+        if !failed {
+            return Ok((*category, tried));
+        }
+    }
+    Err(ToolError::new(ErrorCode::ProgramFailed, format!("Could not launch {package}: {last_output}"))
+        .with_remediation("The app may have no launcher activity; use adb_activity_open with an explicit component.")
+        .with_details(json!({"tried": tried})))
+}
+
+/// The device-shell command that starts a package by one home-screen entry.
+fn launch_command(package: &str, category: LaunchCategory) -> String {
+    format!("monkey -p {package} -c {} 1", category.intent())
+}
+
+/// What one capture of the screen does: commands to run first (a launch), the keys, the
+/// timings and how much to keep.
+struct CaptureSpec<'a> {
+    /// Device-shell commands run before the keys (a force-stop and launch, then a wait).
+    pre: Vec<String>,
+    /// The keys as the person wrote them, for keys.txt.
+    key_tokens: &'a [String],
+    keys: Vec<adb_ui::KeyPress>,
+    gap_ms: u32,
+    wait_ms: u32,
+    dump_lead_ms: u32,
+    max_nodes: usize,
+}
+
+impl CaptureSpec<'_> {
+    fn presses(&self) -> u64 {
+        self.keys.iter().map(|k| u64::from(k.times)).sum()
+    }
+
+    /// Milliseconds the device will spend sleeping for this capture.
+    fn busy_ms(&self) -> u64 {
+        self.presses() * (u64::from(self.gap_ms) + 100) + u64::from(self.wait_ms) + u64::from(self.dump_lead_ms)
+    }
+}
+
+/// What a capture left in its folder and what it saw.
+struct StateFiles {
+    ui_file: PathBuf,
+    screen_file: Option<PathBuf>,
+    keys_file: PathBuf,
+    nodes: Vec<adb_ui::UiNode>,
+    tree: Value,
+    fingerprint: String,
+    density: Option<u32>,
+    with_lead: bool,
+}
+
+impl StateFiles {
+    fn focused_title(&self) -> Option<String> {
+        self.tree["focused_title"].as_str().map(str::to_string)
+    }
+
+    /// The files relative to `base`, for a listing.
+    fn files_json(&self, base: &Path) -> Value {
+        let rel = |p: &Path| p.strip_prefix(base).unwrap_or(p).to_string_lossy().to_string();
+        json!({"ui": rel(&self.ui_file), "screen": self.screen_file.as_deref().map(rel), "keys": rel(&self.keys_file)})
+    }
+}
+
+/// One capture of the screen into `outdir` (which exists and is empty): the `pre` commands, the
+/// keys, the dump (led or after a wait) and the picture, all through one device-shell call plus
+/// one for the picture. The shared body of adb_screen_state_capture, the walkthrough and the map.
+fn capture_state(adb: &Adb, serial: &str, spec: &CaptureSpec<'_>, outdir: &Path) -> Result<StateFiles, ToolError> {
+    let (dump, read) = dump_commands(&dump_path(serial));
+    let key_cmds = adb_ui::key_commands(&spec.keys, spec.gap_ms);
+    let mut cmds = spec.pre.clone();
+    let with_lead = spec.dump_lead_ms > 0 && !key_cmds.is_empty();
+    if with_lead {
+        // The dump attaches to the screen about a second after it starts, then reads it once it
+        // has been still for a moment: started `lead` before the last key, it reads the screen
+        // right after that key, not seconds later. The other keys go first.
+        let (head, last) = key_cmds.split_at(key_cmds.len().saturating_sub(1));
+        cmds.extend(head.iter().cloned());
+        cmds.push(format!("{dump} &"));
+        cmds.push(format!("sleep {}", adb_ui::seconds(spec.dump_lead_ms)));
+        cmds.extend(last.iter().cloned());
+        cmds.push("wait".to_string());
+    } else {
+        cmds.extend(key_cmds);
+        if spec.wait_ms > 0 {
+            cmds.push(format!("sleep {}", adb_ui::seconds(spec.wait_ms)));
+        }
+        cmds.push(dump);
+    }
+    cmds.push(read);
+    let xml = shell_text(adb, serial, &join_commands(&cmds), "uiautomator dump")?;
+    let nodes = nodes_of(&xml, spec.max_nodes)?;
+    let density = density_of(adb, serial);
+    let package = nodes.iter().map(|n| n.package.as_str()).find(|p| !p.is_empty());
+    let tree = adb_ui::ui_tree_json(&nodes, density, package);
+    let ui_file = outdir.join("ui.json");
+    write_json(&ui_file, &tree)?;
+    let keys_file = outdir.join("keys.txt");
+    write_atomic(&keys_file, spec.key_tokens.join("\n").as_bytes())?;
+    // The picture, best effort: a screen that refuses capture still has its controls.
+    let shot = adb.exec_out(serial, "screencap -p")?;
+    let png = shot.stdout.len() >= 8 && shot.stdout.get(1..4) == Some(b"PNG");
+    let screen_file = outdir.join("screen.png");
+    if png {
+        write_atomic(&screen_file, &shot.stdout)?;
+    }
+    let fingerprint = adb_ui::screen_fingerprint(&nodes);
+    Ok(StateFiles { ui_file, screen_file: png.then_some(screen_file), keys_file, nodes, tree, fingerprint, density, with_lead })
+}
+
 fn adb_screen_state_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: StateCaptureParams = parse_params(params)?;
     let serial = serial_of(&p.serial)?;
@@ -1763,49 +1987,12 @@ fn adb_screen_state_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutp
     let max_nodes = check_nodes(p.max_nodes)?;
     let outdir = create_absent_dir(&p.output_directory)?;
     let made = UnlessWritten::new(&outdir);
-    let presses: u64 = keys.iter().map(|k| u64::from(k.times)).sum();
-    let adb = adb_for_wait(ctx, presses * (u64::from(p.gap_ms) + 100) + u64::from(p.wait_ms) + u64::from(p.dump_lead_ms))?;
+    let spec = CaptureSpec { pre: Vec::new(), key_tokens: &p.keys, keys, gap_ms: p.gap_ms, wait_ms: p.wait_ms, dump_lead_ms: p.dump_lead_ms, max_nodes };
+    let presses = spec.presses();
+    let adb = adb_for_wait(ctx, spec.busy_ms())?;
     ensure_online(&adb, serial)?;
-    let (dump, read) = dump_commands(&dump_path(serial));
-    let key_cmds = adb_ui::key_commands(&keys, p.gap_ms);
-    let mut cmds = Vec::new();
-    let with_lead = p.dump_lead_ms > 0 && !key_cmds.is_empty();
-    if with_lead {
-        // The dump attaches to the screen about a second after it starts, then reads it once it
-        // has been still for a moment: started `lead` before the last key, it reads the screen
-        // right after that key, not seconds later. The other keys go first.
-        let (head, last) = key_cmds.split_at(key_cmds.len().saturating_sub(1));
-        cmds.extend(head.iter().cloned());
-        cmds.push(format!("{dump} &"));
-        cmds.push(format!("sleep {}", adb_ui::seconds(p.dump_lead_ms)));
-        cmds.extend(last.iter().cloned());
-        cmds.push("wait".to_string());
-    } else {
-        cmds.extend(key_cmds);
-        if p.wait_ms > 0 {
-            cmds.push(format!("sleep {}", adb_ui::seconds(p.wait_ms)));
-        }
-        cmds.push(dump);
-    }
-    cmds.push(read);
-    let xml = shell_text(&adb, serial, &join_commands(&cmds), "uiautomator dump")?;
-    let nodes = nodes_of(&xml, max_nodes)?;
-    let density = density_of(&adb, serial);
-    let package = nodes.iter().map(|n| n.package.as_str()).find(|p| !p.is_empty());
-    let tree = adb_ui::ui_tree_json(&nodes, density, package);
-    let ui_file = outdir.join("ui.json");
-    write_json(&ui_file, &tree)?;
-    let keys_file = outdir.join("keys.txt");
-    write_atomic(&keys_file, p.keys.join("\n").as_bytes())?;
-    // The picture, best effort: a screen that refuses capture still has its controls.
-    let shot = adb.exec_out(serial, "screencap -p")?;
-    let png = shot.stdout.len() >= 8 && shot.stdout.get(1..4) == Some(b"PNG");
-    let screen_file = outdir.join("screen.png");
-    if png {
-        write_atomic(&screen_file, &shot.stdout)?;
-    }
-    let fingerprint = adb_ui::screen_fingerprint(&nodes);
-    let focus = tree["focused_title"].as_str().map(|t| format!(" Focus is on \"{t}\".")).unwrap_or_default();
+    let got = capture_state(&adb, serial, &spec, &outdir)?;
+    let focus = got.focused_title().map(|t| format!(" Focus is on \"{t}\".")).unwrap_or_default();
     let mut e = dev_ev(
         ctx,
         "adb_screen_state_capture",
@@ -1813,29 +2000,282 @@ fn adb_screen_state_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutp
         json!({"serial": serial, "keys": p.keys, "gap_ms": p.gap_ms, "wait_ms": p.wait_ms, "dump_lead_ms": p.dump_lead_ms, "max_nodes": max_nodes, "output_directory": outdir.to_string_lossy()}),
     )
     .result(json!({
-        "ui_file": ui_file,
-        "screen_file": png.then_some(&screen_file),
-        "keys_file": keys_file,
-        "keys": keys,
+        "ui_file": got.ui_file,
+        "screen_file": got.screen_file,
+        "keys_file": got.keys_file,
+        "keys": spec.keys,
         "presses": presses,
-        "count": nodes.len(),
-        "focused": tree["focused"],
-        "focused_title": tree["focused_title"],
-        "fingerprint": fingerprint,
-        "density_dpi": density,
-        "dump_lead_used": with_lead,
+        "count": got.nodes.len(),
+        "focused": got.tree["focused"],
+        "focused_title": got.tree["focused_title"],
+        "fingerprint": got.fingerprint,
+        "density_dpi": got.density,
+        "dump_lead_used": got.with_lead,
     }))
-    .summary(format!("Captured the screen after {presses} key(s): {} control(s).{focus}", nodes.len()))
-    .location(Location::new("path", ui_file.to_string_lossy()))
-    .coverage(Coverage::complete(nodes.len() as u64));
+    .summary(format!("Captured the screen after {presses} key(s): {} control(s).{focus}", got.nodes.len()))
+    .location(Location::new("path", got.ui_file.to_string_lossy()))
+    .coverage(Coverage::complete(got.nodes.len() as u64));
     if presses > 0 {
         e = e.limitation(Limitation::new("device_changed", "This pressed keys on the device; the app on screen reacted to them."));
     }
-    if !png {
+    if got.screen_file.is_none() {
         e = e.limitation(Limitation::new("no_picture", "The screenshot didn't come back as a PNG (some screens block capture), so screen.png wasn't written."));
     }
-    if nodes.len() >= max_nodes {
+    if got.nodes.len() >= max_nodes {
         e = e.limitation(Limitation::new("truncated", format!("Only the first {max_nodes} controls were kept; raise max_nodes for the rest.")));
+    }
+    let e = e.build()?;
+    made.keep();
+    done(e)
+}
+
+fn adb_ui_walkthrough_record(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: WalkthroughParams = parse_params(params)?;
+    let serial = serial_of(&p.serial)?;
+    if p.steps.is_empty() || p.steps.len() > 40 {
+        return Err(ToolError::invalid("steps must hold 1 to 40 entries"));
+    }
+    let max_nodes = check_nodes(p.max_nodes)?;
+    // Every step is checked before the first key is pressed.
+    let mut specs = Vec::with_capacity(p.steps.len());
+    for (i, step) in p.steps.iter().enumerate() {
+        let keys = if step.keys.is_empty() {
+            Vec::new()
+        } else {
+            adb_ui::parse_keys(&step.keys).map_err(|e| ToolError::invalid(format!("step {}: {}", i + 1, e.message)))?
+        };
+        check_at_most(step.gap_ms, 10_000, "gap_ms")?;
+        check_at_most(step.wait_ms, 60_000, "wait_ms")?;
+        check_at_most(step.dump_lead_ms, 5_000, "dump_lead_ms")?;
+        specs.push(CaptureSpec {
+            pre: Vec::new(),
+            key_tokens: &step.keys,
+            keys,
+            gap_ms: step.gap_ms,
+            wait_ms: step.wait_ms,
+            dump_lead_ms: step.dump_lead_ms,
+            max_nodes,
+        });
+    }
+    let outdir = create_absent_dir(&p.output_directory)?;
+    let made = UnlessWritten::new(&outdir);
+    let busy: u64 = specs.iter().map(CaptureSpec::busy_ms).sum();
+    let adb = adb_for_wait(ctx, busy)?;
+    ensure_online(&adb, serial)?;
+    let mut steps = Vec::new();
+    let mut presses = 0u64;
+    let mut pictures = 0usize;
+    for (i, (step, spec)) in p.steps.iter().zip(&specs).enumerate() {
+        ctx.cancel.check()?;
+        let name =
+            step.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| if step.keys.is_empty() { "look".to_string() } else { step.keys.join(" ") });
+        let dir = outdir.join("steps").join(format!("{:02}-{}", i + 1, adb_ui::slug(&name)));
+        std::fs::create_dir_all(&dir).map_err(|e| ToolError::io(dir.display(), e))?;
+        let got = capture_state(&adb, serial, spec, &dir)?;
+        presses += spec.presses();
+        pictures += usize::from(got.screen_file.is_some());
+        steps.push(json!({
+            "step": i + 1,
+            "name": name,
+            "keys": step.keys,
+            "focused_title": got.focused_title(),
+            "fingerprint": got.fingerprint,
+            "count": got.nodes.len(),
+            "texts": adb_ui::visible_texts(&got.nodes).into_iter().take(40).collect::<Vec<_>>(),
+            "files": got.files_json(&outdir),
+        }));
+    }
+    let listing = json!({"version": 1, "serial": serial, "steps": steps, "presses": presses});
+    let file = outdir.join("walkthrough.json");
+    write_json(&file, &listing)?;
+    let e = dev_ev(
+        ctx,
+        "adb_ui_walkthrough_record",
+        serial,
+        json!({"serial": serial, "steps": p.steps.len(), "max_nodes": max_nodes, "output_directory": outdir.to_string_lossy()}),
+    )
+    .result(json!({"file": file, "steps": listing["steps"], "presses": presses}))
+    .summary(format!("Walked {} step(s), {presses} key(s) pressed; {pictures} picture(s).", p.steps.len()))
+    .location(Location::new("path", file.to_string_lossy()))
+    .limitation(Limitation::new("device_changed", "This pressed keys on the device; the app on screen reacted to them."))
+    .coverage(Coverage::complete(p.steps.len() as u64))
+    .build()?;
+    made.keep();
+    done(e)
+}
+
+/// Why a map stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum MapStop {
+    /// Every key on every kept screen was pressed.
+    Exhausted,
+    MaxStates,
+    MaxPresses,
+    TimeBudget,
+    Cancelled,
+}
+
+fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: MapParams = parse_params(params)?;
+    let serial = serial_of(&p.serial)?;
+    let package = adb::validate_package(&p.package)?;
+    if !(1..=adb_ui::MAX_MAP_STATES).contains(&p.max_states) {
+        return Err(ToolError::invalid(format!("max_states must be between 1 and {}", adb_ui::MAX_MAP_STATES)));
+    }
+    if !(1..=5000).contains(&p.max_presses) {
+        return Err(ToolError::invalid("max_presses must be between 1 and 5000"));
+    }
+    if !(60..=7200).contains(&p.time_budget_s) {
+        return Err(ToolError::invalid("time_budget_s must be between 60 and 7200"));
+    }
+    check_at_most(p.launch_wait_ms, 60_000, "launch_wait_ms")?;
+    check_at_most(p.gap_ms, 10_000, "gap_ms")?;
+    check_at_most(p.wait_ms, 60_000, "wait_ms")?;
+    check_at_most(p.dump_lead_ms, 5_000, "dump_lead_ms")?;
+    let max_nodes = check_nodes(p.max_nodes)?;
+    // The exploration keys: one key each, no repeats.
+    let parsed = adb_ui::parse_keys(&p.keys)?;
+    if parsed.len() > 20 || parsed.iter().any(|k| k.times != 1) {
+        return Err(ToolError::invalid("keys must be 1 to 20 single key names, one per entry (no repeats like `x3`)"));
+    }
+    let explore: Vec<String> = parsed.into_iter().map(|k| k.key).collect();
+    let outdir = create_absent_dir(&p.output_directory)?;
+    let made = UnlessWritten::new(&outdir);
+    let states_dir = outdir.join("states");
+    std::fs::create_dir(&states_dir).map_err(|e| ToolError::io(states_dir.display(), e))?;
+    let adb = adb_for_wait(ctx, 120_000)?;
+    ensure_online(&adb, serial)?;
+    // The entry that starts the app, found once; every capture then relaunches it the same way.
+    let (category, _) = launch_app(&adb, serial, package, p.category)?;
+    let pre = vec![
+        format!("am force-stop {package}"),
+        format!("{} >/dev/null 2>&1", launch_command(package, category)),
+        format!("sleep {}", adb_ui::seconds(p.launch_wait_ms)),
+    ];
+    let density = density_of(&adb, serial);
+    let size = shell_text(&adb, serial, "wm size", "wm size").ok().and_then(|t| adb_ui::parse_wm_size(&t));
+    let started = std::time::Instant::now();
+    let budget = Duration::from_secs(u64::from(p.time_budget_s));
+    let mut map = adb_ui::ScreenMap::new();
+    // Counters the capture closure and the loop both read.
+    let presses = std::cell::Cell::new(0u64);
+    let captures = std::cell::Cell::new(0u64);
+    let mut stop = MapStop::Exhausted;
+    // One capture: launch afresh, press `path`, read the screen into a temporary folder, then
+    // keep it under the state's id (new), drop it (seen before or skipped).
+    let capture = |map: &mut adb_ui::ScreenMap, from: Option<&str>, key: Option<&str>, path: &[String]| -> Result<(String, bool), ToolError> {
+        let keys = if path.is_empty() { Vec::new() } else { adb_ui::parse_keys(path)? };
+        let spec = CaptureSpec { pre: pre.clone(), key_tokens: path, keys, gap_ms: p.gap_ms, wait_ms: p.wait_ms, dump_lead_ms: p.dump_lead_ms, max_nodes };
+        presses.set(presses.get() + spec.presses());
+        captures.set(captures.get() + 1);
+        let tmp = states_dir.join(format!(".capture-{}", captures.get()));
+        std::fs::create_dir(&tmp).map_err(|e| ToolError::io(tmp.display(), e))?;
+        let got = match capture_state(&adb, serial, &spec, &tmp) {
+            Ok(got) => got,
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&tmp);
+                return Err(e);
+            }
+        };
+        let skipped = adb_ui::matches_skip(&got.nodes, &p.skip_texts);
+        let name = adb_ui::state_name(&got.nodes);
+        let (id, new) = map.arrive(from, key, &got.fingerprint, |id| adb_ui::MapState {
+            id,
+            name,
+            fingerprint: String::new(),
+            path: path.to_vec(),
+            parent: from.map(str::to_string),
+            key: key.map(str::to_string),
+            skipped: skipped.clone(),
+            focused_title: if skipped.is_some() { None } else { got.focused_title() },
+            count: if skipped.is_some() { 0 } else { got.nodes.len() },
+            files: None,
+        });
+        if new && skipped.is_none() {
+            let dir = states_dir.join(&id);
+            std::fs::rename(&tmp, &dir).map_err(|e| ToolError::io(dir.display(), e))?;
+            let rel = |p: &Path| {
+                p.file_name().map(|n| dir.join(n)).and_then(|q| q.strip_prefix(&outdir).ok().map(|r| r.to_string_lossy().to_string())).unwrap_or_default()
+            };
+            map.set_files(&id, json!({"ui": rel(&got.ui_file), "screen": got.screen_file.as_deref().map(rel), "keys": rel(&got.keys_file)}));
+        } else {
+            // Seen before, or a screen the person said to leave alone: nothing of it is kept.
+            let _ = std::fs::remove_dir_all(&tmp);
+        }
+        Ok((id, new && skipped.is_none()))
+    };
+    let (start, _) = capture(&mut map, None, None, &[])?;
+    let mut frontier = std::collections::VecDeque::from([start]);
+    'outer: while let Some(from) = frontier.pop_front() {
+        let path = map.get(&from).map(|s| s.path.clone()).unwrap_or_default();
+        for key in &explore {
+            if ctx.cancel.is_cancelled() {
+                stop = MapStop::Cancelled;
+                break 'outer;
+            }
+            if map.len() >= p.max_states {
+                stop = MapStop::MaxStates;
+                break 'outer;
+            }
+            if presses.get() >= u64::from(p.max_presses) {
+                stop = MapStop::MaxPresses;
+                break 'outer;
+            }
+            if started.elapsed() > budget {
+                stop = MapStop::TimeBudget;
+                break 'outer;
+            }
+            let mut next = path.clone();
+            next.push(key.clone());
+            let (id, explore_it) = capture(&mut map, Some(&from), Some(key), &next)?;
+            if explore_it {
+                frontier.push_back(id);
+            }
+        }
+    }
+    let kept = map.states().iter().filter(|s| s.skipped.is_none()).count();
+    let skipped = map.len() - kept;
+    let meta = json!({
+        "serial": serial,
+        "package": package,
+        "launch_category": category,
+        "density_dpi": density,
+        "size_px": size.map(|(w, h)| json!({"width": w, "height": h})),
+        "keys": explore,
+        "skip_texts": p.skip_texts,
+        "timing": {"launch_wait_ms": p.launch_wait_ms, "gap_ms": p.gap_ms, "wait_ms": p.wait_ms, "dump_lead_ms": p.dump_lead_ms},
+        "limits": {"max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "stopped_by": stop},
+        "presses": presses.get(),
+        "captures": captures.get(),
+        "seconds": started.elapsed().as_secs(),
+    });
+    let screens = map.to_json(meta);
+    let file = outdir.join("screens.json");
+    write_json(&file, &screens)?;
+    let why = match stop {
+        MapStop::Exhausted => "every key on every screen was pressed".to_string(),
+        MapStop::MaxStates => format!("stopped at max_states ({})", p.max_states),
+        MapStop::MaxPresses => format!("stopped at max_presses ({})", p.max_presses),
+        MapStop::TimeBudget => format!("stopped at time_budget_s ({})", p.time_budget_s),
+        MapStop::Cancelled => "stopped because the call was cancelled".to_string(),
+    };
+    let mut e = dev_ev(
+        ctx,
+        "adb_app_map",
+        serial,
+        json!({"serial": serial, "package": package, "category": p.category, "max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "keys": p.keys, "skip_texts": p.skip_texts, "output_directory": outdir.to_string_lossy()}),
+    )
+    .result(json!({"file": file, "count": map.len(), "kept": kept, "skipped": skipped, "presses": presses.get(), "captures": captures.get(), "stopped_by": stop, "states": screens["states"], "edges": screens["edges"]}))
+    .summary(format!("Mapped {kept} screen(s) of {package} ({skipped} left alone) with {} key press(es) in {} s; {why}.", presses.get(), started.elapsed().as_secs()))
+    .location(Location::new("path", file.to_string_lossy()))
+    .limitation(Limitation::new("device_changed", "This started the app many times and pressed keys on the device."))
+    .coverage(Coverage::complete(map.len() as u64));
+    if stop != MapStop::Exhausted {
+        e = e.limitation(Limitation::new(
+            "bounded",
+            format!("The map is partial: {why}. Raise the limit, or map from a deeper screen with adb_ui_walkthrough_record."),
+        ));
     }
     let e = e.build()?;
     made.keep();
@@ -1979,6 +2419,53 @@ mod tests {
             let err = refused(&e, id, json!({"serial": "emulator-5554", "keys": ["OK"], "text": "hi", "package": "com.example.app"}));
             assert_eq!(err.code, ErrorCode::EngineMissing, "{id} gave {:?}", err.code);
         }
+    }
+
+    /// The walkthrough and the map (R2.12) check every step and limit before adb is looked for,
+    /// run in Clean room, and leave a failed call's folder free.
+    #[test]
+    fn walkthrough_and_map_check_their_input_first() {
+        let (e, _d) = engine_without_adb();
+        for id in ["adb_ui_walkthrough_record", "adb_app_map"] {
+            assert!(crate::clean_room::allows(id), "{id} watches from outside, so Clean room runs it");
+            assert!(e.registry().get(id).unwrap().effects.needs_consent(), "{id} changes the device");
+        }
+        let with_consent = |id: &str, params: Value| match e.call(id, params, CallOptions { consent: crate::Consent::Granted, ..CallOptions::new(Caller::Mcp) })
+        {
+            Ok(v) => panic!("{id} should fail, got {v:?}"),
+            Err(err) => err,
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out").to_string_lossy().to_string();
+        let bad = [
+            ("adb_ui_walkthrough_record", json!({"serial": "emulator-5554", "steps": [], "output_directory": out})),
+            ("adb_ui_walkthrough_record", json!({"serial": "emulator-5554", "steps": [{"keys": ["POWER"]}], "output_directory": out})),
+            ("adb_ui_walkthrough_record", json!({"serial": "emulator-5554", "steps": [{"keys": ["OK"], "wait_ms": 99999}], "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_states": 0, "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_states": 61, "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "keys": ["DPAD_DOWN x3"], "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "time_budget_s": 5, "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "not a package", "output_directory": out})),
+        ];
+        for (id, params) in bad {
+            let err = with_consent(id, params);
+            assert_eq!(err.code, ErrorCode::BadInput, "{id} gave {:?}: {}", err.code, err.message);
+            assert!(!dir.path().join("out").exists(), "{id}: a refused call made no folder");
+        }
+        if adb_locatable(&e) {
+            return;
+        }
+        for id in ["adb_ui_walkthrough_record", "adb_app_map"] {
+            let err = with_consent(id, json!({"serial": "emulator-5554", "package": "com.example.tv", "steps": [{"keys": ["OK"]}], "output_directory": out}));
+            assert_eq!(err.code, ErrorCode::EngineMissing, "{id} gave {:?}", err.code);
+            assert!(!dir.path().join("out").exists(), "{id}: no adb, no folder left behind");
+        }
+    }
+
+    #[test]
+    fn a_launch_command_names_the_entry() {
+        assert_eq!(launch_command("com.example.tv", LaunchCategory::Leanback), "monkey -p com.example.tv -c android.intent.category.LEANBACK_LAUNCHER 1");
+        assert_eq!(launch_command("com.example.tv", LaunchCategory::Launcher), "monkey -p com.example.tv -c android.intent.category.LAUNCHER 1");
     }
 
     #[test]

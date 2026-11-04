@@ -1088,7 +1088,7 @@ room throughout: nothing is pulled off the device or decoded.
       (`uiautomator dump` in the node shape `runtime_ui_read` gives, bounds in px and dp),
       `adb_screen_state_capture` (keys, wait, dump and screenshot in one shell call, with a lead so
       the dump reads the screen right after the last key), `adb_crash_log_read` — claimed: rock-meister, branch feature/r2.12-adb-screen-tools
-- [ ] `adb_ui_walkthrough_record` (scripted steps, a state per step) and `adb_app_map` (a bounded
+- [x] `adb_ui_walkthrough_record` (scripted steps, a state per step) and `adb_app_map` (a bounded
       breadth-first map of an app's screens from its keys: screens.json and a dump and picture per
       state; a screen whose text matches a skip list is a row with no details) — claimed: rock-meister, branch feature/r2.12-app-map
 - [ ] `TargetRef::Device { serial, package }` (`adb:<serial>/<package>`): the Make screen's third

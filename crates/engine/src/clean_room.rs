@@ -135,6 +135,8 @@ pub const TOOLS: &[&str] = &[
     "adb_ui_read",
     "adb_screen_state_capture",
     "adb_crash_log_read",
+    "adb_ui_walkthrough_record",
+    "adb_app_map",
 ];
 
 /// Whether `id` runs in Clean room.

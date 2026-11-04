@@ -514,6 +514,249 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
     format!("{:016x}", h.finish())
 }
 
+/// Most states one map keeps.
+pub const MAX_MAP_STATES: usize = 60;
+
+/// The texts a person reads on a screen: every non-empty label, in document order, each once.
+pub fn visible_texts(nodes: &[UiNode]) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    nodes.iter().filter(|n| n.visible).map(|n| n.label().trim()).filter(|t| !t.is_empty()).filter(|t| seen.insert(t.to_string())).map(str::to_string).collect()
+}
+
+/// The first of `skip_texts` that a label on screen contains (case-insensitive), when the screen
+/// is one the person said to leave alone.
+pub fn matches_skip(nodes: &[UiNode], skip_texts: &[String]) -> Option<String> {
+    let wanted: Vec<(String, &str)> = skip_texts.iter().map(|t| (t.trim().to_lowercase(), t.as_str())).filter(|(l, _)| !l.is_empty()).collect();
+    if wanted.is_empty() {
+        return None;
+    }
+    for n in nodes.iter().filter(|n| n.visible) {
+        let label = n.label().to_lowercase();
+        if label.is_empty() {
+            continue;
+        }
+        if let Some((_, original)) = wanted.iter().find(|(l, _)| label.contains(l.as_str())) {
+            return Some((*original).to_string());
+        }
+    }
+    None
+}
+
+/// A short name for a screen: the focused control's label, else the longest label on it, else
+/// the first control's class; at most 60 characters.
+pub fn state_name(nodes: &[UiNode]) -> String {
+    let focused = nodes.iter().find(|n| n.focused).map(|n| n.label()).filter(|l| !l.is_empty());
+    let longest = nodes.iter().filter(|n| n.visible).map(|n| n.label()).filter(|l| !l.is_empty()).max_by_key(|l| l.chars().count());
+    let class = nodes.first().map(|n| n.class.rsplit('.').next().unwrap_or("screen"));
+    let name = focused.or(longest).or(class).unwrap_or("screen");
+    name.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(60).collect()
+}
+
+/// A file-name-safe form of a name: lower case, letters and digits joined by `-`, at most 40
+/// characters, `screen` when nothing is left.
+pub fn slug(name: &str) -> String {
+    let mut out = String::new();
+    let mut dash = false;
+    for c in name.chars().flat_map(char::to_lowercase) {
+        if c.is_ascii_alphanumeric() {
+            out.push(c);
+            dash = false;
+        } else if !dash && !out.is_empty() {
+            out.push('-');
+            dash = true;
+        }
+        if out.len() >= 40 {
+            break;
+        }
+    }
+    let out = out.trim_end_matches('-').to_string();
+    if out.is_empty() { "screen".to_string() } else { out }
+}
+
+/// One screen of a mapped app.
+#[derive(Debug, Clone, Serialize)]
+pub struct MapState {
+    /// `s01`, `s02`… in the order found.
+    pub id: String,
+    pub name: String,
+    pub fingerprint: String,
+    /// The keys from the app's launch that reach it.
+    pub path: Vec<String>,
+    pub parent: Option<String>,
+    /// The key pressed on the parent to get here.
+    pub key: Option<String>,
+    /// The skip text that matched: the screen is a row with no details.
+    pub skipped: Option<String>,
+    pub focused_title: Option<String>,
+    /// Controls read on it (0 for a skipped one).
+    pub count: usize,
+    /// Where its dump and picture are, relative to the map folder (none when skipped).
+    pub files: Option<Value>,
+}
+
+/// A key pressed on one screen and where it led.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MapEdge {
+    pub from: String,
+    pub key: String,
+    pub to: String,
+}
+
+/// The screens of an app and the keys between them, built breadth first. Pure: the caller
+/// drives the device and brings each capture here.
+#[derive(Debug, Default)]
+pub struct ScreenMap {
+    states: Vec<MapState>,
+    edges: Vec<MapEdge>,
+    by_fingerprint: std::collections::BTreeMap<String, String>,
+}
+
+impl ScreenMap {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.states.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    pub fn states(&self) -> &[MapState] {
+        &self.states
+    }
+
+    pub fn get(&self, id: &str) -> Option<&MapState> {
+        self.states.iter().find(|s| s.id == id)
+    }
+
+    /// The state a capture belongs to: the one already known by its fingerprint, else a new one
+    /// made by `make` with the next id. Returns the id and whether it is new. A key from `from`
+    /// records an edge either way.
+    pub fn arrive(&mut self, from: Option<&str>, key: Option<&str>, fingerprint: &str, make: impl FnOnce(String) -> MapState) -> (String, bool) {
+        let (id, new) = match self.by_fingerprint.get(fingerprint) {
+            Some(id) => (id.clone(), false),
+            None => {
+                let id = format!("s{:02}", self.states.len() + 1);
+                let mut state = make(id.clone());
+                state.id = id.clone();
+                state.fingerprint = fingerprint.to_string();
+                self.states.push(state);
+                self.by_fingerprint.insert(fingerprint.to_string(), id.clone());
+                (id, true)
+            }
+        };
+        if let (Some(from), Some(key)) = (from, key) {
+            let edge = MapEdge { from: from.to_string(), key: key.to_string(), to: id.clone() };
+            if !self.edges.contains(&edge) {
+                self.edges.push(edge);
+            }
+        }
+        (id, new)
+    }
+
+    /// Fill in a new state's files once its folder has its final name.
+    pub fn set_files(&mut self, id: &str, files: Value) {
+        if let Some(s) = self.states.iter_mut().find(|s| s.id == id) {
+            s.files = Some(files);
+        }
+    }
+
+    /// The map as `screens.json`: `meta` fields first (device, package, limits), then the states
+    /// and edges.
+    pub fn to_json(&self, meta: Value) -> Value {
+        let mut out = json!({"version": 1});
+        if let (Some(o), Some(m)) = (out.as_object_mut(), meta.as_object()) {
+            for (k, v) in m {
+                o.insert(k.clone(), v.clone());
+            }
+            o.insert("count".into(), json!(self.states.len()));
+            o.insert("skipped".into(), json!(self.states.iter().filter(|s| s.skipped.is_some()).count()));
+            o.insert("states".into(), json!(self.states));
+            o.insert("edges".into(), json!(self.edges));
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+mod map_tests {
+    use super::*;
+
+    fn screen(labels: &[&str], focused: usize) -> Vec<UiNode> {
+        labels
+            .iter()
+            .enumerate()
+            .map(|(i, l)| UiNode {
+                index: i,
+                class: "android.widget.TextView".into(),
+                text: (*l).into(),
+                focused: i == focused,
+                focusable: true,
+                visible: true,
+                enabled: true,
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn names_texts_skips_and_slugs() {
+        let s = screen(&["Guide", "Settings", "A much longer label here"], 1);
+        assert_eq!(state_name(&s), "Settings");
+        assert_eq!(state_name(&screen(&["x", "A much longer label"], 9)), "A much longer label");
+        assert_eq!(state_name(&[]), "screen");
+        assert_eq!(visible_texts(&screen(&["a", "b", "a", ""], 0)), ["a", "b"]);
+        assert_eq!(matches_skip(&s, &["about".into(), "SETTINGS".into()]), Some("SETTINGS".into()));
+        assert_eq!(matches_skip(&s, &["About".into(), "  ".into()]), None);
+        assert_eq!(matches_skip(&s, &[]), None);
+        assert_eq!(slug("All movies / shows!"), "all-movies-shows");
+        assert_eq!(slug("***"), "screen");
+        let long = slug(&"ab ".repeat(40));
+        assert!(long.len() <= 40 && !long.ends_with('-'), "{long}");
+    }
+
+    #[test]
+    fn a_map_grows_breadth_first_and_folds_known_screens() {
+        let mut map = ScreenMap::new();
+        let mk = |name: &str| {
+            let name = name.to_string();
+            move |id: String| MapState {
+                id,
+                name,
+                fingerprint: String::new(),
+                path: vec![],
+                parent: None,
+                key: None,
+                skipped: None,
+                focused_title: None,
+                count: 1,
+                files: None,
+            }
+        };
+        let (home, new) = map.arrive(None, None, "fp-home", mk("Home"));
+        assert!(new && home == "s01");
+        let (guide, new) = map.arrive(Some("s01"), Some("DPAD_RIGHT"), "fp-guide", mk("Guide"));
+        assert!(new && guide == "s02");
+        // BACK from the guide leads to a screen already known: no new state, one more edge.
+        let (back, new) = map.arrive(Some("s02"), Some("BACK"), "fp-home", mk("Home again"));
+        assert!(!new && back == "s01");
+        assert_eq!(map.len(), 2);
+        // The same edge twice is kept once.
+        map.arrive(Some("s02"), Some("BACK"), "fp-home", mk("Home again"));
+        let json = map.to_json(json!({"package": "com.example.tv"}));
+        assert_eq!(json["count"], 2);
+        assert_eq!(json["edges"].as_array().unwrap().len(), 2);
+        assert_eq!(json["package"], "com.example.tv");
+        assert_eq!(json["states"][1]["name"], "Guide");
+        map.set_files("s02", json!({"ui": "states/s02/ui.json"}));
+        assert_eq!(map.get("s02").unwrap().files.as_ref().unwrap()["ui"], "states/s02/ui.json");
+        assert!(map.get("s09").is_none());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
