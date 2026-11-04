@@ -90,6 +90,11 @@ names (`git merge-base --is-ancestor <fix> <release tag>`), and check the messag
 
 ## Tests
 
+**A commit went out with a failing test because the shell chain keyed off `grep`.** `cargo test … | grep
+'^test result|FAILED' && git commit …` commits whenever grep printed anything, a FAILED line included.
+Key a chain off cargo's own exit status (`cargo test … ; test ${PIPESTATUS[0]} -eq 0 && git commit …`, or
+run the tests and read the result before a separate commit command), never off a filter's.
+
 **A heartbeat sampled before shutdown raced a successful stop.** A child could write between
 the baseline read and `stop()`, failing the descendant cleanup test even when cleanup worked.
 Probe for exit instead of timing writes: the child holds a file lock the system releases only

@@ -1042,12 +1042,6 @@ impl Worker {
             self.step(ws, Step::Check, Status::Checking, checking)?;
             let previous: Vec<CheckResult> = ws.manifest.checks.iter().filter(|c| c.round + 1 == round).cloned().collect();
             let checks = self.checks_with_a_retry(ws, kind, round)?;
-            // A turn that changed no file but made the build measurably better (a check newly
-            // passes, its likeness rose) is progress: the unchanged-turn count starts again.
-            if progress_available && self_check::moved(&previous, &checks) {
-                progress.reset();
-                progress.save(&ws.root)?;
-            }
             ws.manifest.checks.extend(checks.iter().cloned());
             ws.manifest.awaiting_check = false;
             // A round in which every check works (built and served) ends the streak; any other
@@ -1070,6 +1064,14 @@ impl Worker {
             }
             let kind_checks = kind.checks(ws);
             let not_good = checks.iter().find(|c| !c.good(opts.good_enough) && kinds::can_refine(&kind_checks, c));
+            // A turn that changed no file but made the build measurably better (a check newly
+            // passes, its likeness rose) is progress while the round still isn't good enough:
+            // the unchanged-turn count starts again. A round that passes keeps its count, so
+            // Try again keeps the saved limit.
+            if not_good.is_some() && progress_available && self_check::moved(&previous, &checks) {
+                progress.reset();
+                progress.save(&ws.root)?;
+            }
             if not_good.is_some() && progress_available && progress.stalled() {
                 // A check-only resume skipped the builder's before-turn scan. A real edit
                 // while the project was closed (or during this check) still starts an attempt.
