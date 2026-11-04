@@ -1,7 +1,11 @@
 # zh-hant: original Chinese UI translations. Licensed MIT OR Apache-2.0.
 # UTF-8: English source<TAB>translation. Keep placeholders and escapes intact.
+Capture a screen state	擷取畫面狀態
+Crashes of an app	應用程式的當機
 OpenCode default	OpenCode 預設設定
 Model default	模型預設設定
+Press keys	按下按鍵
+Read the screen's controls	讀取畫面控制項
 Thinking depth	思考深度
 OpenCode model	OpenCode 模型
 Remote program	遠端程式
@@ -588,6 +592,7 @@ Jobs ({n})	工作（{n}）
 Just a question: nothing was changed. Answered by	僅回答問題，未作任何修改。回答者：
 Just ask	只提問
 Just look inside	只檢視內部
+Type text	輸入文字
 Work on my project	繼續做自己的專案
 Work on a project you already have	繼續做你已有的專案
 Pick its folder, say what you want, then press Start.	選擇它的資料夾，描述你的需求，然後點選開始。

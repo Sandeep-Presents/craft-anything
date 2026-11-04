@@ -1467,3 +1467,8 @@ Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
 Stopped adding {name}.	{name} lisamine peatati.
 It isn't there any more, so {program} runs in its place.	Seda pole enam seal, nii et selle asemel käivitub {program}.
 Use it	Kasuta seda
+Capture a screen state	Jäädvusta ekraani olek
+Crashes of an app	Rakenduse krahhid
+Press keys	Vajuta klahve
+Read the screen's controls	Loe ekraani juhtelemente
+Type text	Sisesta tekst
