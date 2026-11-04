@@ -1003,8 +1003,10 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
                     }
                     form.service = i;
                     form.test = None;
-                    // The old service's list and pick would otherwise be saved with the new one's address.
+                    // The old service's list, pick and key would otherwise go to the new one's address
+                    // (the key with the next model listing, unasked).
                     form.choice = Default::default();
+                    form.key.clear();
                 }
             }
         });
@@ -1016,6 +1018,8 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
     }
     form_row(ui, label_w, "API key", |ui, w| field(ui, w, &mut form.key, "if it needs one", "API key", true));
     let ask = form_ask(form, service);
+    // Test needs only what the listing needs; Add also needs a name.
+    let can_test = ask.is_some();
     let default_model = service.default_model;
     // Taken out while the form's other fields are drawn, and put back after.
     let mut choice = std::mem::take(&mut form.choice);
@@ -1037,7 +1041,7 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
     ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), 34.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
         let added = widgets::primary_icon(ui, Some("plus"), "Add", addable);
         add = added.clicked() && addable;
-        test = widgets::secondary_min(ui, Some("activity"), "Test", added.rect.height()).clicked() && ready;
+        test = ui.add_enabled_ui(can_test, |ui| widgets::secondary_min(ui, Some("activity"), "Test", added.rect.height())).inner.clicked() && can_test;
         let width = ui.available_width() - label_w - gap;
         model_pick::status_line_w(ui, &form.choice, line.as_ref(), width);
     });

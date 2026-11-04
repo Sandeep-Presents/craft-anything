@@ -3421,6 +3421,39 @@ fn a_new_service_in_the_custom_form_drops_the_old_models() {
     assert!(form.choice.models.iter().all(|m| m != "qwen3:8b") && form.choice.picked != "qwen3:8b", "{:?}", form.choice);
 }
 
+/// A key typed for one service is dropped when another is picked, so it is never sent to the new one.
+#[test]
+fn a_new_service_in_the_custom_form_drops_the_typed_key() {
+    let mut h = ai_settings();
+    h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Custom);
+    h.state_mut().server_form.key = "sk-test-0000".into();
+    h.run_steps(3);
+    h.get_by_label("Add").scroll_to_me();
+    h.run_steps(3);
+    h.get_by_label("Service").click();
+    h.run_steps(2);
+    h.get_by_label("OpenRouter").click();
+    h.run_steps(2);
+    assert!(h.state().server_form.key.is_empty());
+}
+
+/// Test needs a web address, not a name: an unnamed server can be tried before it is added.
+#[test]
+fn an_unnamed_server_in_the_custom_form_can_be_tested() {
+    let mut h = ai_settings();
+    h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Custom);
+    h.state_mut().server_form.address = "not an address".into();
+    h.run_steps(3);
+    h.get_all_by_label("Test").last().expect("the form Test button").click_accesskit();
+    h.run_steps(2);
+    assert!(h.state().server_form.test.is_none(), "no web address, no test");
+    h.state_mut().server_form.address = "http://127.0.0.1:9/v1".into();
+    h.run_steps(2);
+    h.get_all_by_label("Test").last().expect("the form Test button").click_accesskit();
+    h.run_steps(2);
+    assert!(h.state().server_form.test.is_some(), "a test started with no name");
+}
+
 /// A key card lists the models its key offers once a key is pasted, and Connect uses the one chosen.
 #[test]
 fn a_key_card_picks_a_model() {
