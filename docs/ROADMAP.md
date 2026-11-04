@@ -1102,7 +1102,7 @@ room throughout: nothing is pulled off the device or decoded.
 - [x] A device check: install the debug APK on the build device, replay each mapped state's keys,
       claims per state (focused text, the original's focusable controls, paired bounds within the
       tolerance, no crash), likeness from the claims — claimed: rock-meister, branch feature/r2.12-device-check
-- [ ] A run nobody watches: the CLI's `--rounds` defaults to `build.max_rounds`; `--allow tool:<id>`
+- [x] A run nobody watches: the CLI's `--rounds` defaults to `build.max_rounds`; `--allow tool:<id>`
       (repeatable) grants a device tool for the project up front, so `--unattended` doesn't refuse
       it; a builder turn that changed no file but raised a check's likeness counts as progress
       — claimed: rock-meister, branch feature/r2.12-unattended-run
