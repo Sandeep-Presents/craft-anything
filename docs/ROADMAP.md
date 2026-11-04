@@ -1099,7 +1099,7 @@ room throughout: nothing is pulled off the device or decoded.
 - [x] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback
       launcher, no touchscreen required), a Gradle arm in `build_check`, JDK and Android SDK as
       engines `engines_list` reports — claimed: rock-meister, branch feature/r2.12-android-app-kind
-- [ ] A device check: install the debug APK on the build device, replay each mapped state's keys,
+- [x] A device check: install the debug APK on the build device, replay each mapped state's keys,
       claims per state (focused text, the original's focusable controls, paired bounds within the
       tolerance, no crash), likeness from the claims — claimed: rock-meister, branch feature/r2.12-device-check
 

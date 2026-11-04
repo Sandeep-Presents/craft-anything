@@ -63,7 +63,23 @@ impl TargetKind for AndroidAppKind {
     }
 
     fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
-        vec![Box::new(BuildCheck)]
+        vec![Box::new(BuildCheck), Box::new(super::android_check::DeviceCheck)]
+    }
+
+    /// After a device check: the weakest screens first, with where their dumps and pictures are.
+    fn refine(&self, check: &CheckResult) -> String {
+        if check.check != super::android_check::DEVICE {
+            return format!(
+                "Check {}: {}\n\nFix this in app/, build again until it succeeds, and reply with 1-2 plain sentences on what you changed.",
+                check.round, check.note
+            );
+        }
+        let weak = super::android_check::weakest_from_claims(&check.claims, 3);
+        let focus = if weak.is_empty() { String::new() } else { format!(" Start with the weakest screens: {}.", weak.join("; ")) };
+        format!(
+            "Check {}: {}{focus} Your build's dump and picture of each screen are in checks/round-{}/device/states/<id>/ (ui.json, screen.png), the original's in capture/map/states/<id>/; checks/round-{}/device/device.json lists every claim with why it failed. Fix the failed claims (the focus, missing controls by their exact text, controls out of place in dp, a crash), build it again, and reply with 1-2 plain sentences on what you changed.",
+            check.round, check.note, check.round, check.round
+        )
     }
 }
 
