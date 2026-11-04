@@ -14,8 +14,11 @@ use serde::Serialize;
 pub const DEVICE: &str = "device";
 
 /// Labels as compared: without case, extra spacing or a trailing colon.
+/// What makes two labels the same control: spacing, case and a trailing colon don't, and no
+/// run of digits does (a guide cell says "Programme 22609" at map time and "Programme 27796" an
+/// hour later; a clock moves on), as the screen fingerprint reads them.
 fn key_of(label: &str) -> String {
-    label.split_whitespace().collect::<Vec<_>>().join(" ").trim_end_matches(':').trim().to_lowercase()
+    craft_anything_engines::adb_ui::digits_as_one(&label.split_whitespace().collect::<Vec<_>>().join(" ").trim_end_matches(':').trim().to_lowercase())
 }
 
 /// A screen's controls as (key, label shown, dp bounds) for the ones a person can land on
@@ -395,6 +398,18 @@ mod tests {
         let failed: Vec<&str> = claims.iter().filter(|c| !c.passed).map(|c| c.title.as_str()).collect();
         assert_eq!(failed, ["s01 Home: the focus is on \"Guide\"", "s01 Home: \"Guide\" sits within 1 dp", "s01 Home: it has \"Search\""]);
         assert!(claims.iter().any(|c| c.title.ends_with("it has \"Guide\"") && c.passed), "labels match without case or trailing spaces");
+        // Data on the screen moves on between the map and the check: digits read as one.
+        let then = tree(
+            "Channel 23 News Programme 22609 & more",
+            &[("Channel 23 News Programme 22609 & more", [72, 251, 220, 39]), ("07:30 — 08:00", [72, 300, 220, 39])],
+        );
+        let later = tree(
+            "Channel 23 News Programme 27796 & more",
+            &[("Channel 23 News Programme 27796 & more", [72, 251, 220, 39]), ("09:00 — 10:00", [72, 300, 220, 39])],
+        );
+        assert!(state_claims("s05", "Guide", &then, &later, 1).iter().all(|c| c.passed), "a later programme and a later time are the same controls");
+        let other = tree("Channel 23 Sport", &[("Channel 23 Sport", [72, 251, 220, 39])]);
+        assert!(!state_claims("s05", "Guide", &then, &other, 1).iter().all(|c| c.passed), "other words are another control");
         assert!(claims.iter().find(|c| c.title.contains("sits within")).unwrap().detail.contains("(72, 253)"));
         assert!((likeness(&claims) - 400.0 / 7.0).abs() < 0.01, "4 of 7 claims hold: {}", likeness(&claims));
         assert!(state_claims("s01", "Home", &original, &built, 2).iter().filter(|c| !c.passed).count() == 2, "2 dp is within a tolerance of 2");
