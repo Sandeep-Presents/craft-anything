@@ -1096,7 +1096,7 @@ room throughout: nothing is pulled off the device or decoded.
 - [x] Study for a device target: device facts, a question before the first key, the map into
       capture/, a README with the geometry rule (px ÷ density = dp, ±1 dp), and an optional pause
       so the person reviews capture/ before the builder reads it — claimed: rock-meister, branch feature/r2.12-device-study
-- [ ] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback
+- [x] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback
       launcher, no touchscreen required), a Gradle arm in `build_check`, JDK and Android SDK as
       engines `engines_list` reports — claimed: rock-meister, branch feature/r2.12-android-app-kind
 - [ ] A device check: install the debug APK on the build device, replay each mapped state's keys,

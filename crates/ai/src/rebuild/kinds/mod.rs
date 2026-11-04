@@ -3,6 +3,7 @@
 //! [`Check`]s that judge a build. A [`KindRegistry`] holds them; add a kind by implementing the
 //! trait and calling [`KindRegistry::register`].
 
+mod android;
 mod app;
 mod game;
 pub mod mechanics;
@@ -13,6 +14,7 @@ pub mod screenshot;
 pub mod self_test;
 pub mod website;
 
+pub use android::{AndroidAppKind, DEVICE_BRIEF, android_homes};
 pub use app::{AppKind, RUNS_BRIEF};
 pub use game::{CreditsCheck, GameKind};
 pub use mechanics::MechanicsCheck;
@@ -247,6 +249,12 @@ impl CheckCx<'_> {
         !self.worker.engine.session().clean_room()
     }
 
+    /// Where the JDK and Android SDK are, for a Gradle build (none when either is missing).
+    pub fn android_homes(&self) -> Option<super::check::AndroidHomes> {
+        let settings = self.worker.engine.session().settings.clone();
+        android_homes(&settings)
+    }
+
     /// The Godot installed on this computer, which opens a Godot project.
     pub fn godot(&self) -> Option<PathBuf> {
         let store = self.worker.engine.session().settings.engine_store_dir();
@@ -363,7 +371,8 @@ impl Check for BuildCheck {
         CheckResult::BUILD
     }
     fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
-        let (passed, note) = build_check(&cx.ws.app_dir(), cx.ws.app_place(), &cx.ws.manifest.stack, cx.editor(), &cx.stop());
+        let homes = cx.android_homes();
+        let (passed, note) = build_check(&cx.ws.app_dir(), cx.ws.app_place(), &cx.ws.manifest.stack, cx.editor(), homes.as_ref(), &cx.stop());
         // #736: a failed build of an empty app/ says first that nothing was written.
         let note = if !passed && app_is_empty(cx.ws) { format!("{} {note}", no_files_yet(cx.ws)) } else { note };
         Ok(CheckResult::new(self.id(), cx.round, passed, note))
@@ -389,9 +398,9 @@ impl Default for KindRegistry {
 }
 
 impl KindRegistry {
-    /// Website, game and app.
+    /// Website, game, an app on a phone or TV, and app (the fallback).
     pub fn built_in() -> KindRegistry {
-        KindRegistry { kinds: vec![Arc::new(WebsiteKind), Arc::new(GameKind), Arc::new(AppKind)] }
+        KindRegistry { kinds: vec![Arc::new(WebsiteKind), Arc::new(GameKind), Arc::new(AndroidAppKind), Arc::new(AppKind)] }
     }
 
     /// Add a kind, or replace the one with the same id.

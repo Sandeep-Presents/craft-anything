@@ -48,7 +48,7 @@ pub(super) fn own_build_check(app: &Path, place: &str, stack: &str, editor: Opti
     }
     match stacks::toolchain_in(app).filter(|_| engine.is_none()) {
         Some(tool) => own_build(app, tool, stop),
-        None if engine.is_some() || static_site(app) => build_check(app, place, stack, editor, stop),
+        None if engine.is_some() || static_site(app) => build_check(app, place, stack, editor, None, stop),
         None => (true, "Nothing was built: Craft Anything doesn't know how to build this kind of project.".into()),
     }
 }
@@ -109,7 +109,57 @@ fn last_lines(out: &str, n: usize) -> String {
 /// For non-website builds: run the project's build (its engine's own, for Unity, Unreal and
 /// Godot) and report whether it succeeded, with a note (the first error lines when it didn't).
 /// `place` says where `app` is, for messages (`Workspace::app_place`).
-pub(super) fn build_check(app: &Path, place: &str, stack: &str, editor: Option<&Path>, stop: &CheckStop) -> (bool, String) {
+/// Where a JDK and the Android SDK are, for Gradle (`JAVA_HOME`, `ANDROID_HOME`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AndroidHomes {
+    pub java_home: PathBuf,
+    pub android_home: PathBuf,
+}
+
+impl AndroidHomes {
+    /// From the engines as found on this computer: `javac` sits in `<JAVA_HOME>/bin`, `sdkmanager`
+    /// in `<ANDROID_HOME>/cmdline-tools/<version>/bin`.
+    pub fn from_tools(javac: &Path, sdkmanager: &Path) -> Option<AndroidHomes> {
+        let java_home = javac.ancestors().nth(2)?.to_path_buf();
+        let android_home = sdkmanager.ancestors().nth(4)?.to_path_buf();
+        Some(AndroidHomes { java_home, android_home })
+    }
+}
+
+/// The newest debug APK a Gradle build left under `app` (`**/build/outputs/apk/debug/*.apk`, a
+/// bounded walk), for the device check.
+pub fn debug_apk(app: &Path) -> Option<PathBuf> {
+    const SKIP: [&str; 6] = [".gradle", ".kotlin", ".git", "node_modules", "target", "intermediates"];
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    let mut stack = vec![(app.to_path_buf(), 0usize)];
+    let mut seen = 0usize;
+    while let Some((dir, depth)) = stack.pop() {
+        for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+            seen += 1;
+            if seen > 50_000 {
+                return best.map(|(_, p)| p);
+            }
+            let p = e.path();
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+            if p.is_dir() {
+                if depth < 8 && !SKIP.contains(&name) {
+                    stack.push((p, depth + 1));
+                }
+                continue;
+            }
+            let in_debug_output = p.parent().is_some_and(|d| d.ends_with("outputs/apk/debug") || d.ends_with("outputs\\apk\\debug"));
+            if in_debug_output && name.ends_with(".apk") {
+                let modified = e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                if best.as_ref().is_none_or(|(t, _)| modified > *t) {
+                    best = Some((modified, p));
+                }
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+pub(super) fn build_check(app: &Path, place: &str, stack: &str, editor: Option<&Path>, android: Option<&AndroidHomes>, stop: &CheckStop) -> (bool, String) {
     let run = |prog: &Path, args: &[String], minutes: u64| run_in(app, prog, args, minutes, stop).map_err(|e| format!("Couldn't run the build: {e}"));
     let app_s = app.display().to_string();
     let built = || packaged_program(&app.join("Build")).is_some();
@@ -165,6 +215,41 @@ pub(super) fn build_check(app: &Path, place: &str, stack: &str, editor: Option<&
                 let bad = out.lines().any(|l| l.contains("SCRIPT ERROR") || l.contains("Parse Error") || l.trim_start().starts_with("ERROR:"));
                 (ok && !bad, out)
             })
+        }
+        // A Gradle project (an Android app): its wrapper builds the debug APK the device check
+        // installs. The JDK and SDK found as engines are handed to it when the environment doesn't
+        // already say where they are.
+        _ if app.join("settings.gradle.kts").is_file() || app.join("settings.gradle").is_file() => {
+            let wrapper = app.join(if cfg!(windows) { "gradlew.bat" } else { "gradlew" });
+            if !wrapper.is_file() {
+                return (false, format!("No Gradle wrapper (gradlew) in {place} yet: add it, then build with ./gradlew assembleDebug."));
+            }
+            let (prog, mut args): (PathBuf, Vec<String>) =
+                if cfg!(windows) { (wrapper, vec![]) } else { (PathBuf::from("sh"), vec![wrapper.display().to_string()]) };
+            args.extend(["assembleDebug", "--console=plain", "--no-daemon", "-q"].map(String::from));
+            let s = stop.clone();
+            let limit = Duration::from_secs(30 * 60);
+            let mut proc = craft_anything_platform::Process::new(&prog)
+                .args(&args)
+                .cwd(app)
+                // The round's time limit cuts the build, as it does every other step (see `run_in`).
+                .timeout(stop.time_left().map_or(limit, |left| limit.min(left)))
+                .idle_timeout(Duration::from_secs(60 * 60))
+                .stdout_cap(8 << 20)
+                .cancel_when(move || s.paused());
+            if let Some(a) = android {
+                if std::env::var_os("JAVA_HOME").is_none() {
+                    proc = proc.env("JAVA_HOME", &a.java_home);
+                }
+                if std::env::var_os("ANDROID_HOME").is_none() {
+                    proc = proc.env("ANDROID_HOME", &a.android_home);
+                }
+            }
+            // Nothing starts once it's time to stop.
+            stop.check()
+                .and_then(|()| proc.run())
+                .map(|o| (o.success && debug_apk(app).is_some(), format!("{}{}", o.stdout_text(), o.stderr_text())))
+                .map_err(|e| format!("Couldn't run the build: {}", e.message))
         }
         _ if app.join("Cargo.toml").is_file() => run(Path::new("cargo"), &["build".into(), "--quiet".into()], 2 * 60),
         _ if app.join("package.json").is_file() => run(Path::new(if cfg!(windows) { "npm.cmd" } else { "npm" }), &["run".into(), "build".into()], 2 * 60),
@@ -435,7 +520,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let app = d.path();
         let stop = CheckStop::default();
-        let check = |place| build_check(app, place, "Rust + egui (eframe)", None, &stop);
+        let check = |place| build_check(app, place, "Rust + egui (eframe)", None, None, &stop);
         assert_eq!(check("app/"), (false, "No project to build found in app/ yet.".into()), "nothing anywhere");
         std::fs::create_dir(app.join("notes")).unwrap();
         assert_eq!(check("app/").1, "No project to build found in app/ yet.", "a folder without a project");
@@ -455,7 +540,7 @@ mod tests {
         );
         // The engines' own missing-project notes say it too.
         let unity = Path::new("C:/Engines/Unity/Editor/Unity.exe");
-        let note = build_check(app, "app/", "Unity", Some(unity), &stop).1;
+        let note = build_check(app, "app/", "Unity", Some(unity), None, &stop).1;
         assert!(note.starts_with("No Unity project found in app/ yet. There's a Cargo.toml one folder down, in app/app/"), "{note}");
     }
 
@@ -465,7 +550,7 @@ mod tests {
         let app = d.path();
         let stop = CheckStop::default();
         let passed = (true, "Nothing to build: a static site.".to_string());
-        let check = |stack, editor| build_check(app, "app/", stack, editor, &stop);
+        let check = |stack, editor| build_check(app, "app/", stack, editor, None, &stop);
         assert!(!check("Plain HTML and CSS", None).0, "nothing there yet");
 
         // #496: the page itself, with no manifest.
@@ -502,6 +587,31 @@ mod tests {
         let built = tempfile::tempdir().unwrap();
         std::fs::create_dir(built.path().join("dist")).unwrap();
         std::fs::write(built.path().join("dist").join("index.html"), "<h1>Hello</h1>").unwrap();
-        assert_eq!(build_check(built.path(), "app/", "Builder's choice", None, &stop), passed);
+        assert_eq!(build_check(built.path(), "app/", "Builder's choice", None, None, &stop), passed);
+    }
+
+    /// A Gradle project is built by its wrapper and passes only with a debug APK to show for it.
+    #[cfg(unix)]
+    #[test]
+    fn a_gradle_project_builds_with_its_wrapper_and_must_leave_a_debug_apk() {
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path();
+        let stop = CheckStop::default();
+        std::fs::write(app.join("settings.gradle.kts"), "include(\":tv\")\n").unwrap();
+        assert!(build_check(app, "app/", "Kotlin + Jetpack Compose (Android)", None, None, &stop).1.contains("No Gradle wrapper"));
+        // A wrapper that builds nothing: the build "succeeds" but there is no APK.
+        std::fs::write(app.join("gradlew"), "#!/bin/sh\nexit 0\n").unwrap();
+        let (ok, note) = build_check(app, "app/", "Kotlin + Jetpack Compose (Android)", None, None, &stop);
+        assert!(!ok, "{note}");
+        // One that writes the APK where Gradle does.
+        std::fs::write(app.join("gradlew"), "#!/bin/sh\nmkdir -p tv/build/outputs/apk/debug && echo apk > tv/build/outputs/apk/debug/tv-debug.apk\n").unwrap();
+        let homes = AndroidHomes::from_tools(Path::new("/opt/jdk/bin/javac"), Path::new("/opt/sdk/cmdline-tools/latest/bin/sdkmanager")).unwrap();
+        assert_eq!((homes.java_home.as_path(), homes.android_home.as_path()), (Path::new("/opt/jdk"), Path::new("/opt/sdk")));
+        assert_eq!(build_check(app, "app/", "Kotlin + Jetpack Compose (Android)", None, Some(&homes), &stop), (true, "Build succeeded.".into()));
+        assert!(debug_apk(app).unwrap().ends_with("tv-debug.apk"));
+        // One that fails says so with its output.
+        std::fs::write(app.join("gradlew"), "#!/bin/sh\necho 'e: Unresolved reference: Foo' >&2\nexit 1\n").unwrap();
+        let (ok, note) = build_check(app, "app/", "Kotlin + Jetpack Compose (Android)", None, None, &stop);
+        assert!(!ok && note.contains("Unresolved reference"), "{note}");
     }
 }
