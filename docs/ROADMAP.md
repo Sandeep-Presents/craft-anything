@@ -1090,7 +1090,7 @@ room throughout: nothing is pulled off the device or decoded.
       the dump reads the screen right after the last key), `adb_crash_log_read` — claimed: rock-meister, branch feature/r2.12-adb-screen-tools
 - [ ] `adb_ui_walkthrough_record` (scripted steps, a state per step) and `adb_app_map` (a bounded
       breadth-first map of an app's screens from its keys: screens.json and a dump and picture per
-      state; a screen whose text matches a skip list is a row with no details)
+      state; a screen whose text matches a skip list is a row with no details) — claimed: rock-meister, branch feature/r2.12-app-map
 - [ ] `TargetRef::Device { serial, package }` (`adb:<serial>/<package>`): the Make screen's third
       choice, the CLI's `rebuild` argument, the brief's wording
 - [ ] Study for a device target: device facts, a question before the first key, the map into
