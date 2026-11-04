@@ -1093,7 +1093,7 @@ room throughout: nothing is pulled off the device or decoded.
       state; a screen whose text matches a skip list is a row with no details) — claimed: rock-meister, branch feature/r2.12-app-map
 - [x] `TargetRef::Device { serial, package }` (`adb:<serial>/<package>`): the Make screen's third
       choice, the CLI's `rebuild` argument, the brief's wording — claimed: rock-meister, branch feature/r2.12-device-target. The Make screen takes it in its address box (`adb:…`), not a tile of its own yet
-- [ ] Study for a device target: device facts, a question before the first key, the map into
+- [x] Study for a device target: device facts, a question before the first key, the map into
       capture/, a README with the geometry rule (px ÷ density = dp, ±1 dp), and an optional pause
       so the person reviews capture/ before the builder reads it — claimed: rock-meister, branch feature/r2.12-device-study
 - [ ] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback

@@ -172,21 +172,9 @@ impl Worker {
                 craft_anything_engine::project::write_atomic(&capture.join("README.md"), notes.as_bytes())?;
             }
             // An app on a device is only ever watched from outside, in either mode: what the
-            // device says about itself now; the map of its screens comes with the device study.
-            TargetRef::Device { serial, package } => {
-                self.step(ws, Step::Study, Status::Inspecting, &format!("Looking at {package} on {serial}…"))?;
-                let capture = ws.capture_dir();
-                std::fs::create_dir_all(&capture).map_err(|e| ToolError::io(capture.display(), e))?;
-                let mut notes = format!(
-                    "# {package} on {serial}\n\nAn app on a device is watched as a person uses it: nothing inside it (its files, code or packages) is read, in Clean room or Deep mode.\n\n## The device\n\n"
-                );
-                notes.push_str(&match self.call("adb_device_show", json!({"serial": serial})) {
-                    Ok(out) => format!("{}\n", summary_of(&out)),
-                    Err(e) => format!("The device didn't answer: {}\n", e.message),
-                });
-                notes.push_str("\n## Its screens\n\nNot mapped yet: map them with adb_app_map into capture/map/ (screens.json and a folder per screen), then work from that.\n");
-                craft_anything_engine::project::write_atomic(&capture.join("README.md"), notes.as_bytes())?;
-            }
+            // device says about itself, then a map of the app's screens made with the remote's
+            // keys, into capture/map/, and a README the builder starts from.
+            TargetRef::Device { serial, package } => self.study_device(ws, &serial, &package)?,
             TargetRef::None => {
                 let capture = ws.capture_dir();
                 std::fs::create_dir_all(&capture).map_err(|e| ToolError::io(capture.display(), e))?;
@@ -195,6 +183,94 @@ impl Worker {
         }
         ws.manifest.capture_deep = Some(deep);
         ws.save()?;
+        Ok(())
+    }
+
+    /// An app on a device: the device's facts, a question before the first key (only when the
+    /// person answers questions; a project that decides for itself maps straight away), the map
+    /// with the settings' limits and skip list, the README, and an optional pause to review it.
+    fn study_device(&mut self, ws: &mut Workspace, serial: &str, package: &str) -> Result<(), ToolError> {
+        use craft_anything_engine::workspace::Questions;
+        self.step(ws, Step::Study, Status::Inspecting, &format!("Looking at {package} on {serial}…"))?;
+        let capture = ws.capture_dir();
+        if capture.exists() {
+            let _ = std::fs::remove_dir_all(&capture);
+        }
+        std::fs::create_dir_all(&capture).map_err(|e| ToolError::io(capture.display(), e))?;
+        let (build, questions) = {
+            let s = self.engine.session();
+            (s.settings.build.clone(), s.settings.questions_in(Some(&ws.manifest)))
+        };
+        let device = match self.call("adb_device_show", json!({"serial": serial})) {
+            Ok(ToolOutput::Evidence(e)) => e.result.clone(),
+            Ok(ToolOutput::Value(v)) => v,
+            Err(e) => json!({"error": e.message}),
+        };
+        // The map presses keys on the device for a while: a person who answers questions is
+        // asked first; a project that decides for itself goes ahead.
+        let mut map_note = None;
+        if questions == Questions::Ask {
+            self.step(ws, Step::Study, Status::Inspecting, "Asking whether to map its screens…")?;
+            let asked = self.call(
+                "core_person_ask",
+                json!({
+                    "question": format!("Map {package} on {serial} by pressing its remote keys? The app will be started many times and every key pressed on every screen it reaches, within the limits in Settings."),
+                    "choices": ["Yes, map its screens", "No, build from the request only"],
+                    "allow_text": false,
+                    "context": "Nothing inside the app is read. Screens whose text matches build.android_skip_texts are left alone.",
+                }),
+            );
+            if let Ok(ToolOutput::Value(v)) = asked
+                && v["choice"].as_u64() == Some(1)
+            {
+                map_note = Some("the person chose not to map it".to_string());
+            }
+        }
+        let mut screens = None;
+        if map_note.is_none() {
+            self.step(ws, Step::Study, Status::Inspecting, "Mapping its screens with the remote's keys (this takes a while)…")?;
+            let map_dir = capture.join("map");
+            let params = json!({
+                "serial": serial,
+                "package": package,
+                "max_states": build.android_max_states.clamp(1, 60),
+                "skip_texts": build.android_skip_texts,
+                "launch_wait_ms": build.android_launch_wait_ms,
+                "wait_ms": build.android_wait_ms,
+                "dump_lead_ms": build.android_dump_lead_ms,
+                "output_directory": map_dir.display().to_string(),
+            });
+            match self.call("adb_app_map", params) {
+                Ok(_) => {
+                    screens = std::fs::read(map_dir.join("screens.json")).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+                    if screens.is_none() {
+                        map_note = Some("the map wrote no screens.json".to_string());
+                    }
+                }
+                Err(e) => {
+                    self.step(ws, Step::Study, Status::Inspecting, &format!("Couldn't map its screens: {}", e.message))?;
+                    map_note = Some(e.message);
+                }
+            }
+        }
+        let notes = device::readme(package, serial, &device, screens.as_ref(), map_note.as_deref());
+        craft_anything_engine::project::write_atomic(&capture.join("README.md"), notes.as_bytes())?;
+        if build.review_capture && questions == Questions::Ask {
+            self.step(ws, Step::Study, Status::Inspecting, "Waiting for you to look at capture/…")?;
+            let asked = self.call(
+                "core_person_ask",
+                json!({
+                    "question": "capture/ is ready: the device's facts, the map of the app's screens and a picture of each. Look through it, remove anything that shouldn't be used, then continue.",
+                    "choices": ["Continue", "Stop here"],
+                    "allow_text": false,
+                }),
+            );
+            if let Ok(ToolOutput::Value(v)) = asked
+                && v["choice"].as_u64() == Some(1)
+            {
+                return Err(ToolError::cancelled());
+            }
+        }
         Ok(())
     }
 
@@ -378,14 +454,6 @@ fn remove_deep_only(capture: &Path) -> Result<(), ToolError> {
         Err(e) => return Err(ToolError::io(runs.display(), e)),
     }
     Ok(())
-}
-
-/// A tool result's one-line summary (its evidence summary, or the value's first line).
-pub(super) fn summary_of(out: &ToolOutput) -> String {
-    match out {
-        ToolOutput::Evidence(e) => e.summary.clone(),
-        ToolOutput::Value(v) => serde_json::to_string(v).unwrap_or_default().chars().take(400).collect(),
-    }
 }
 
 /// A short text view of a tool result for the study notes.
