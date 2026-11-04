@@ -179,6 +179,9 @@ impl DeviceCheck {
         let launch_wait = Duration::from_millis(timing.get("launch_wait_ms").and_then(Value::as_u64).unwrap_or(u64::from(build.android_launch_wait_ms)));
         let map_dir = cx.ws.capture_dir().join("map");
         let read = |p: &Path| std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+        // Each screen's capture makes its own folder and needs the parent to be there.
+        let states_dir = dir.join("states");
+        std::fs::create_dir_all(&states_dir).map_err(|e| ToolError::io(states_dir.display(), e))?;
         let mut states = Vec::new();
         let kept = screens.get("states").and_then(Value::as_array).into_iter().flatten().filter(|s| s.get("skipped").is_none_or(Value::is_null)).take(60);
         for state in kept {

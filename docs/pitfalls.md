@@ -639,6 +639,10 @@ a note, a log line), and test the success path end to end, not just the picking.
 The fix then made the check create `checks/round-N/routes/` first, which made `round-N` exist, and
 `web_site_capture` (which refuses an existing folder) stopped the run. Create a tool's output parent
 right before that tool runs, never a folder that another tool must create itself.
+It happened again in the Android device check: it made `checks/round-N/device/` but not
+`device/states/`, and `adb_screen_state_capture` refuses a folder whose parent is missing, so
+every screen came back "couldn't be read" and the first live round scored 0% (the build check
+had passed). A check's first live run is on a build known to match; a 0% there is the check.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
