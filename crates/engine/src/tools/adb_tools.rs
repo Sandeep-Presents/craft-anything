@@ -1772,6 +1772,11 @@ fn adb_for_wait(ctx: &Ctx<'_>, busy_ms: u64) -> Result<Adb, ToolError> {
 }
 
 /// The controls a dump describes; an empty answer is an error that says what to try.
+/// Whether a dump holds no controls at all (the screen was between frames, or still drawing).
+fn dump_is_empty(xml: &str, max_nodes: usize) -> bool {
+    adb_ui::parse_ui_dump(xml, max_nodes).is_empty()
+}
+
 fn nodes_of(xml: &str, max_nodes: usize) -> Result<Vec<adb_ui::UiNode>, ToolError> {
     let nodes = adb_ui::parse_ui_dump(xml, max_nodes);
     if nodes.is_empty() {
@@ -1972,10 +1977,19 @@ fn capture_state(adb: &Adb, serial: &str, spec: &CaptureSpec<'_>, outdir: &Path)
         if spec.wait_ms > 0 {
             cmds.push(format!("sleep {}", adb_ui::seconds(spec.wait_ms)));
         }
-        cmds.push(dump);
+        cmds.push(dump.clone());
     }
-    cmds.push(read);
-    let xml = shell_text(adb, serial, &join_commands(&cmds), "uiautomator dump")?;
+    cmds.push(read.clone());
+    let mut xml = shell_text(adb, serial, &join_commands(&cmds), "uiautomator dump")?;
+    // A dump between two frames, or of a screen still drawing, reads as no controls at all; one
+    // such reading failed a whole map. Read again after a moment, twice, before giving up.
+    for _ in 0..2 {
+        if !dump_is_empty(&xml, spec.max_nodes) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(2000));
+        xml = shell_text(adb, serial, &join_commands(&[dump.clone(), read.clone()]), "uiautomator dump")?;
+    }
     let nodes = nodes_of(&xml, spec.max_nodes)?;
     let density = density_of(adb, serial);
     let package = nodes.iter().map(|n| n.package.as_str()).find(|p| !p.is_empty());
@@ -2169,7 +2183,10 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
     ensure_online(&adb, serial)?;
     // The entry that starts the app, found once; every capture then relaunches it the same way.
     let (category, _) = launch_app(&adb, serial, package, p.category)?;
+    // A TV that fell asleep since it was last driven launches the app with its screen off and
+    // reads as empty: every capture wakes it first.
     let pre = vec![
+        "input keyevent WAKEUP".to_string(),
         format!("am force-stop {package}"),
         format!("{} >/dev/null 2>&1", launch_command(package, category)),
         format!("sleep {}", adb_ui::seconds(p.launch_wait_ms)),
@@ -2513,6 +2530,14 @@ mod tests {
     fn a_launch_command_names_the_entry() {
         assert_eq!(launch_command("com.example.tv", LaunchCategory::Leanback), "monkey -p com.example.tv -c android.intent.category.LEANBACK_LAUNCHER 1");
         assert_eq!(launch_command("com.example.tv", LaunchCategory::Launcher), "monkey -p com.example.tv -c android.intent.category.LAUNCHER 1");
+    }
+
+    #[test]
+    fn an_empty_dump_is_read_again() {
+        assert!(dump_is_empty("<?xml version='1.0'?><hierarchy rotation=\"0\"></hierarchy>", 100));
+        assert!(dump_is_empty("", 100));
+        let one = "<hierarchy><node index=\"0\" text=\"Home\" resource-id=\"\" class=\"android.widget.TextView\" package=\"p\" content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"false\" enabled=\"true\" focusable=\"true\" focused=\"true\" scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" visible-to-user=\"true\" bounds=\"[0,0][10,10]\" /></hierarchy>";
+        assert!(!dump_is_empty(one, 100));
     }
 
     #[test]

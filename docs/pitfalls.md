@@ -665,6 +665,9 @@ only when every claim it hands over holds, and the device check handed over all 
 claims, so the bar was 100%, whatever `good_enough` said, and the builder was told to fix all 50.
 A check with a likeness hands the run only what must hold (each screen read, no crash); its detail
 goes in its scorecard and its note. Read `CheckResult::good` before deciding what a check's claims are.
+And a second study failed in its first second: one dump of the original read as no controls
+(a screen between frames), the map gave up, and the builder went on without a map. A dump that
+reads empty is read again after a moment, twice, and every map capture wakes the device first.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
