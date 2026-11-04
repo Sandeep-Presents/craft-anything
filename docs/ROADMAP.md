@@ -1109,6 +1109,16 @@ room throughout: nothing is pulled off the device or decoded.
 - [x] A screen is known by its structure and the texts of its controls, not by every text on it:
       a live map of a TV guide made a new state of every scroll position and every minute of the
       clock (digits in a label are read as one) — claimed: rock-meister, branch feature/r2.12-map-fingerprint
+- [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so
+      "About" skipped a whole Settings list and "Recordings" a menu bar that merely listed them
+      (seen on the first real map). Skip a capture when the focused control or the state's name
+      matches, and never press OK on a focused control that matches.
+- [ ] A map that carries on: a second Study starts the map over from launch, so an app with more
+      screens than `android_max_states` never gets past the cap (a TV player's Settings pages
+      stayed unmapped at 24). Let a map continue from a kept screens.json, exploring only the
+      states whose keys were not all pressed.
+- [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
+      round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
