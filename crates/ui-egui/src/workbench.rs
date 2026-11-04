@@ -363,52 +363,64 @@ fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usiz
     let width = |ui: &Ui, title: &str, icon: &str| widgets::label_galley(ui, &tr(title), 11.0, t.text).size().x + if icon.is_empty() { 22.0 } else { 42.0 };
     let needed: f32 = tabs.iter().map(|(icon, title)| width(ui, title, icon) + 2.0).sum();
     let icons_only = needed > ui.available_width() && tabs.iter().all(|(icon, _)| !icon.is_empty());
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        for (i, (icon, title)) in tabs.iter().enumerate() {
-            let on = i == selected;
-            let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
-            let w = if icons_only { 34.0 } else { width(ui, title, icon) };
-            let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
-            let resp = if icons_only {
-                // The title on hover, and while the tab has keyboard focus (its ring is showing), so
-                // a keyboard user can read which tab it is.
-                if resp.has_focus() && !resp.hovered() {
-                    resp.show_tooltip_text(tr(title));
+    // Narrower than even the icons: the strip scrolls, so the last tabs can still be reached.
+    let scrolls = icons_only && tabs.len() as f32 * 36.0 > ui.available_width();
+    let mut row = |ui: &mut Ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            for (i, (icon, title)) in tabs.iter().enumerate() {
+                let on = i == selected;
+                let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
+                let w = if icons_only { 34.0 } else { width(ui, title, icon) };
+                let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
+                resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+                let resp = if icons_only {
+                    // The title on hover, and while the tab has keyboard focus (its ring is showing), so
+                    // a keyboard user can read which tab it is.
+                    if resp.has_focus() && !resp.hovered() {
+                        resp.show_tooltip_text(tr(title));
+                    }
+                    if scrolls && resp.gained_focus() {
+                        resp.scroll_to_me(None);
+                    }
+                    resp.on_hover_text(tr(title))
+                } else {
+                    resp
+                };
+                if !on {
+                    let h = widgets::hover_t(ui, &resp);
+                    ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
                 }
-                resp.on_hover_text(tr(title))
-            } else {
-                resp
-            };
-            if !on {
-                let h = widgets::hover_t(ui, &resp);
-                ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
+                widgets::focus_ring(ui, &resp, rect.shrink2(Vec2::new(0.0, 3.0)));
+                let col = if on { t.text } else { t.text_dim };
+                let mut x = rect.left() + 10.0;
+                if !icon.is_empty() {
+                    icons::paint(
+                        ui,
+                        egui::Rect::from_min_size(egui::pos2(x, rect.center().y - 7.0), Vec2::splat(14.0)),
+                        icon,
+                        14.0,
+                        if on { t.accent } else { t.text_faint },
+                    );
+                    x += 20.0;
+                }
+                if !icons_only {
+                    ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
+                }
+                if on {
+                    ui.painter().hline(rect.x_range().shrink(6.0), rect.bottom() - 1.0, egui::Stroke::new(2.0, t.accent));
+                }
+                if resp.clicked() && !on {
+                    picked = Some(i);
+                }
             }
-            widgets::focus_ring(ui, &resp, rect.shrink2(Vec2::new(0.0, 3.0)));
-            let col = if on { t.text } else { t.text_dim };
-            let mut x = rect.left() + 10.0;
-            if !icon.is_empty() {
-                icons::paint(
-                    ui,
-                    egui::Rect::from_min_size(egui::pos2(x, rect.center().y - 7.0), Vec2::splat(14.0)),
-                    icon,
-                    14.0,
-                    if on { t.accent } else { t.text_faint },
-                );
-                x += 20.0;
-            }
-            if !icons_only {
-                ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
-            }
-            if on {
-                ui.painter().hline(rect.x_range().shrink(6.0), rect.bottom() - 1.0, egui::Stroke::new(2.0, t.accent));
-            }
-            if resp.clicked() && !on {
-                picked = Some(i);
-            }
-        }
-    });
+        });
+    };
+    if scrolls {
+        egui::ScrollArea::horizontal().id_salt("tab_strip").show(ui, |ui| row(ui));
+    } else {
+        row(ui);
+    }
     picked
 }
 
@@ -1025,6 +1037,42 @@ mod tests {
         h.get_by_label("Evidence").focus();
         h.run_steps(3);
         assert_eq!(h.query_all_by_label("Evidence").count(), 2, "the tab and its title");
+    }
+
+    /// Narrower than even the icons, the strip scrolls: a tab past the edge comes into view and can be picked.
+    #[test]
+    fn a_strip_narrower_than_its_icons_still_reaches_the_last_tab() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let tabs = [
+            ("search", "Inspector"),
+            ("shield-check", "Evidence"),
+            ("circle-help", "Unknowns"),
+            ("search", "One"),
+            ("search", "Two"),
+            ("search", "Three"),
+            ("search", "Last"),
+        ];
+        let picked = std::rc::Rc::new(std::cell::Cell::new(None));
+        let seen = picked.clone();
+        let mut fonts = false;
+        let mut h = Harness::builder().with_size(egui::vec2(150.0, 80.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut fonts, true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            if let Some(i) = tab_strip(ui, &tabs, 0) {
+                seen.set(Some(i));
+            }
+        });
+        assert!(h.get_by_label("Last").rect().left() >= 150.0, "the last tab starts past the edge");
+        h.get_by_label("Last").focus();
+        h.run_steps(3);
+        // The focused tab also shows its title, so take the tab: it comes first.
+        let tab = || h.query_all_by_label("Last").next().expect("the tab");
+        assert!(tab().rect().right() <= 150.0, "focus scrolls it into view");
+        tab().click();
+        h.run_steps(2);
+        assert_eq!(picked.get(), Some(6));
     }
 
     #[test]
