@@ -19,24 +19,34 @@ fn key_of(label: &str) -> String {
 }
 
 /// A screen's controls as (key, label shown, dp bounds) for the ones a person can land on
-/// (focusable or clickable) that have a label, each label once, in order.
+/// (focusable or clickable) that have words: their own title, else the titles inside them (a
+/// Compose button is a wordless group with a text child). Each label once, in order.
 fn landable(tree: &Value) -> Vec<(String, String, Option<[i64; 4]>)> {
+    let nodes: Vec<&Value> = tree.get("nodes").and_then(Value::as_array).into_iter().flatten().collect();
+    let depth = |n: &Value| n.get("depth").and_then(Value::as_u64).unwrap_or(0);
+    let title = |n: &Value| n.get("title").and_then(Value::as_str).unwrap_or("").split_whitespace().collect::<Vec<_>>().join(" ");
     let mut seen = std::collections::BTreeSet::new();
-    tree.get("nodes")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter(|n| n["focusable"].as_bool() == Some(true) || n["clickable"].as_bool() == Some(true))
-        .filter_map(|n| {
-            let shown = n.get("title").and_then(Value::as_str)?.split_whitespace().collect::<Vec<_>>().join(" ");
-            let key = key_of(&shown);
-            if key.is_empty() || !seen.insert(key.clone()) {
-                return None;
+    let mut out = Vec::new();
+    for (i, n) in nodes.iter().enumerate() {
+        if !(n["focusable"].as_bool() == Some(true) || n["clickable"].as_bool() == Some(true)) {
+            continue;
+        }
+        let mut shown = title(n);
+        if shown.is_empty() {
+            let inside: Vec<String> = nodes.iter().skip(i + 1).take_while(|m| depth(m) > depth(n)).map(|m| title(m)).filter(|t| !t.is_empty()).collect();
+            shown = inside.join(" ");
+            if shown.len() > 80 {
+                shown.truncate(shown.floor_char_boundary(80));
             }
-            let dp = n.get("dp").and_then(|d| Some([d["x"].as_i64()?, d["y"].as_i64()?, d["width"].as_i64()?, d["height"].as_i64()?]));
-            Some((key, shown, dp))
-        })
-        .collect()
+        }
+        let key = key_of(&shown);
+        if key.is_empty() || !seen.insert(key.clone()) {
+            continue;
+        }
+        let dp = n.get("dp").and_then(|d| Some([d["x"].as_i64()?, d["y"].as_i64()?, d["width"].as_i64()?, d["height"].as_i64()?]));
+        out.push((key, shown, dp));
+    }
+    out
 }
 
 /// The claims for one screen: it was read; the same control has the focus; each control of the
@@ -371,6 +381,38 @@ mod tests {
         assert_eq!(empty.len(), 1);
         assert!(!empty[0].passed && empty[0].title.contains("read on the device"));
         assert_eq!(likeness(&[]), 0.0);
+    }
+
+    #[test]
+    fn a_wordless_control_is_known_by_the_words_inside_it() {
+        // Two Compose buttons: each a focusable group with no text and a text child.
+        let compose = |focus: &str, a: (&str, [i64; 4]), b: (&str, [i64; 4])| {
+            let group = |t: &str, dp: [i64; 4]| json!({"depth": 6, "title": "", "role": "group", "focusable": true, "focused": t == focus, "dp": {"x": dp[0], "y": dp[1], "width": dp[2], "height": dp[3]}});
+            let text = |t: &str| json!({"depth": 7, "title": t, "role": "text", "focusable": false});
+            let nodes = vec![
+                json!({"depth": 5, "title": "", "role": "group"}),
+                json!({"depth": 6, "title": "Trial home", "role": "text"}),
+                group(a.0, a.1),
+                text(a.0),
+                group(b.0, b.1),
+                text(b.0),
+            ];
+            json!({"count": nodes.len(), "focused_title": focus, "nodes": nodes})
+        };
+        let original = compose("Channels", ("Channels", [48, 112, 108, 48]), ("Settings", [48, 172, 101, 48]));
+        assert_eq!(landable(&original).iter().map(|(_, s, _)| s.as_str()).collect::<Vec<_>>(), ["Channels", "Settings"]);
+        let same = state_claims("s01", "Trial home", &original, &original, 1);
+        assert_eq!(same.len(), 1 + 1 + 2 + 2, "read, focus, 2 controls, 2 places: {same:?}");
+        assert!(same.iter().all(|c| c.passed));
+        // The second button moved down 3 dp and says something else.
+        let built = compose("Channels", ("Channels", [48, 112, 108, 48]), ("Options", [48, 175, 101, 48]));
+        let claims = state_claims("s01", "Trial home", &original, &built, 1);
+        let failed: Vec<&str> = claims.iter().filter(|c| !c.passed).map(|c| c.title.as_str()).collect();
+        assert_eq!(failed, ["s01 Trial home: it has \"Settings\""]);
+        let moved = compose("Channels", ("Channels", [48, 112, 108, 48]), ("Settings", [48, 175, 101, 48]));
+        let claims = state_claims("s01", "Trial home", &original, &moved, 1);
+        let failed: Vec<&str> = claims.iter().filter(|c| !c.passed).map(|c| c.title.as_str()).collect();
+        assert_eq!(failed, ["s01 Trial home: \"Settings\" sits within 1 dp"]);
     }
 
     #[test]
