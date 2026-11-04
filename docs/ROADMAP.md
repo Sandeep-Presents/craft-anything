@@ -1101,7 +1101,7 @@ room throughout: nothing is pulled off the device or decoded.
       engines `engines_list` reports — claimed: rock-meister, branch feature/r2.12-android-app-kind
 - [ ] A device check: install the debug APK on the build device, replay each mapped state's keys,
       claims per state (focused text, the original's focusable controls, paired bounds within the
-      tolerance, no crash), likeness from the claims
+      tolerance, no crash), likeness from the claims — claimed: rock-meister, branch feature/r2.12-device-check
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
