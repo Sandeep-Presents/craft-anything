@@ -620,6 +620,42 @@ pub struct MapState {
     pub count: usize,
     /// Where its dump and picture are, relative to the map folder (none when skipped).
     pub files: Option<Value>,
+    /// The focus positions walked on it, the landing one first: the keys that move the focus
+    /// and OK are pressed from each, so a control's own screen is found.
+    pub focuses: Vec<MapFocus>,
+}
+
+/// One focus position on a screen and the keys from the launch that put the focus there.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MapFocus {
+    pub title: String,
+    pub path: Vec<String>,
+}
+
+/// A key that left the app: what was on screen belonged to another package.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MapExit {
+    pub from: String,
+    pub key: String,
+    pub package: String,
+}
+
+/// The keys pressed from each further focus position of a known screen: the ones that act on
+/// the focused control or move the focus on. BACK and MENU act on the screen and were pressed
+/// from its first position already.
+pub const FOCUS_KEYS: [&str; 6] = ["DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT", "DPAD_CENTER", "ENTER"];
+
+/// Most focus positions walked on one screen.
+pub const MAX_MAP_FOCUS: usize = 30;
+
+/// The package whose controls fill the screen: the most common one among the nodes, leaving
+/// out the system bars. None when the dump has no package at all.
+pub fn foreground_package(nodes: &[UiNode]) -> Option<String> {
+    let mut counts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for n in nodes.iter().filter(|n| !n.package.is_empty() && n.package != "com.android.systemui") {
+        *counts.entry(n.package.as_str()).or_default() += 1;
+    }
+    counts.into_iter().max_by_key(|(_, c)| *c).map(|(p, _)| p.to_string())
 }
 
 /// A key pressed on one screen and where it led.
@@ -636,6 +672,7 @@ pub struct MapEdge {
 pub struct ScreenMap {
     states: Vec<MapState>,
     edges: Vec<MapEdge>,
+    exits: Vec<MapExit>,
     by_fingerprint: std::collections::BTreeMap<String, String>,
 }
 
@@ -685,6 +722,29 @@ impl ScreenMap {
         (id, new)
     }
 
+    /// A key from `from` that left the app for `package`: no state, an exit. Kept once.
+    pub fn leave(&mut self, from: &str, key: &str, package: &str) {
+        let exit = MapExit { from: from.to_string(), key: key.to_string(), package: package.to_string() };
+        if !self.exits.contains(&exit) {
+            self.exits.push(exit);
+        }
+    }
+
+    pub fn exits(&self) -> &[MapExit] {
+        &self.exits
+    }
+
+    /// A focus position seen on screen `id`, reached by `path`: true when it is new there and
+    /// the screen has fewer than `max` so far (so it is worth pressing keys from).
+    pub fn note_focus(&mut self, id: &str, title: &str, path: &[String], max: usize) -> bool {
+        let Some(s) = self.states.iter_mut().find(|s| s.id == id) else { return false };
+        if s.focuses.iter().any(|f| f.title == title) || s.focuses.len() >= max {
+            return false;
+        }
+        s.focuses.push(MapFocus { title: title.to_string(), path: path.to_vec() });
+        true
+    }
+
     /// Fill in a new state's files once its folder has its final name.
     pub fn set_files(&mut self, id: &str, files: Value) {
         if let Some(s) = self.states.iter_mut().find(|s| s.id == id) {
@@ -704,6 +764,7 @@ impl ScreenMap {
             o.insert("skipped".into(), json!(self.states.iter().filter(|s| s.skipped.is_some()).count()));
             o.insert("states".into(), json!(self.states));
             o.insert("edges".into(), json!(self.edges));
+            o.insert("exits".into(), json!(self.exits));
         }
         out
     }
@@ -764,6 +825,7 @@ mod map_tests {
                 focused_title: None,
                 count: 1,
                 files: None,
+                focuses: vec![],
             }
         };
         let (home, new) = map.arrive(None, None, "fp-home", mk("Home"));
@@ -784,6 +846,54 @@ mod map_tests {
         map.set_files("s02", json!({"ui": "states/s02/ui.json"}));
         assert_eq!(map.get("s02").unwrap().files.as_ref().unwrap()["ui"], "states/s02/ui.json");
         assert!(map.get("s09").is_none());
+    }
+
+    #[test]
+    fn a_key_that_leaves_the_app_is_an_exit_and_focus_positions_are_walked_once_each_up_to_a_cap() {
+        let mut map = ScreenMap::new();
+        let mk = move |id: String| MapState {
+            id,
+            name: "Home".into(),
+            fingerprint: String::new(),
+            path: vec![],
+            parent: None,
+            key: None,
+            skipped: None,
+            focused_title: None,
+            count: 3,
+            files: None,
+            focuses: vec![],
+        };
+        map.arrive(None, None, "fp-home", mk);
+        // BACK on the home screen showed the TV's launcher: an exit, not a screen, kept once.
+        map.leave("s01", "BACK", "com.android.tvlauncher");
+        map.leave("s01", "BACK", "com.android.tvlauncher");
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.exits().len(), 1);
+        // The focus walked down the home screen: each new position once, bounded.
+        assert!(map.note_focus("s01", "Channels", &["DPAD_DOWN".into()], 2));
+        assert!(!map.note_focus("s01", "Channels", &["DPAD_DOWN".into(), "DPAD_UP".into(), "DPAD_DOWN".into()], 2), "seen already");
+        assert!(map.note_focus("s01", "Settings", &["DPAD_DOWN".into(), "DPAD_DOWN".into()], 2));
+        assert!(!map.note_focus("s01", "About", &["DPAD_DOWN".into(), "DPAD_DOWN".into(), "DPAD_DOWN".into()], 2), "at the cap");
+        assert!(!map.note_focus("s07", "About", &[], 2), "no such screen");
+        let json = map.to_json(json!({}));
+        assert_eq!(json["exits"][0], json!({"from": "s01", "key": "BACK", "package": "com.android.tvlauncher"}));
+        assert_eq!(json["states"][0]["focuses"][1], json!({"title": "Settings", "path": ["DPAD_DOWN", "DPAD_DOWN"]}));
+    }
+
+    #[test]
+    fn the_foreground_package_is_the_one_most_controls_belong_to_without_the_system_bars() {
+        let mut nodes = screen(&["Home", "Apps", "Search"], 0);
+        for n in &mut nodes {
+            n.package = "com.android.tvlauncher".into();
+        }
+        nodes.push(UiNode { package: "com.android.systemui".into(), ..Default::default() });
+        nodes.push(UiNode { package: "com.android.systemui".into(), ..Default::default() });
+        nodes.push(UiNode { package: "com.android.systemui".into(), ..Default::default() });
+        nodes.push(UiNode { package: "com.android.systemui".into(), ..Default::default() });
+        assert_eq!(foreground_package(&nodes).as_deref(), Some("com.android.tvlauncher"));
+        assert_eq!(foreground_package(&screen(&["x"], 0)), None, "no package in the dump");
+        assert_eq!(foreground_package(&[]), None);
     }
 }
 

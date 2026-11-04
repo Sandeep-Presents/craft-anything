@@ -61,6 +61,24 @@ pub fn readme(package: &str, serial: &str, device: &Value, screens: Option<&Valu
                     )),
                 }
             }
+            let exits: Vec<String> = m
+                .get("exits")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .take(40)
+                .map(|x| {
+                    format!(
+                        "{} on {} (to {})",
+                        x.get("key").and_then(Value::as_str).unwrap_or("?"),
+                        x.get("from").and_then(Value::as_str).unwrap_or("?"),
+                        x.get("package").and_then(Value::as_str).unwrap_or("another app")
+                    )
+                })
+                .collect();
+            if !exits.is_empty() {
+                s.push_str(&format!("\nKeys that leave the app, which the rebuild should leave too: {}.\n", exits.join("; ")));
+            }
             let limits = &m["limits"];
             if let Some(by) = limits.get("stopped_by").and_then(Value::as_str) {
                 s.push_str(&format!(

@@ -807,8 +807,26 @@ struct MapParams {
     /// Most controls to keep per screen (1..5000, default 500).
     #[serde(default = "default_max_nodes")]
     max_nodes: usize,
+    /// Most focus positions walked on one screen (1..30, default 8): from each, the keys that move
+    /// the focus and OK are pressed, so the screen a control opens is found.
+    #[serde(default = "default_max_focus")]
+    max_focus_per_screen: usize,
     /// Absolute host folder that must not exist yet; it is created fresh.
     output_directory: String,
+}
+
+fn default_max_focus() -> usize {
+    8
+}
+
+/// Where one capture of the map landed.
+enum Arrived {
+    /// Another package was on screen: the key left the app.
+    Left,
+    /// A screen seen before; `new_focus` when the focus sits somewhere new on it.
+    Seen { id: String, new_focus: bool },
+    /// A screen not seen before, kept.
+    New(String),
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2129,6 +2147,9 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
     if !(60..=7200).contains(&p.time_budget_s) {
         return Err(ToolError::invalid("time_budget_s must be between 60 and 7200"));
     }
+    if !(1..=adb_ui::MAX_MAP_FOCUS).contains(&p.max_focus_per_screen) {
+        return Err(ToolError::invalid(format!("max_focus_per_screen must be between 1 and {}", adb_ui::MAX_MAP_FOCUS)));
+    }
     check_at_most(p.launch_wait_ms, 60_000, "launch_wait_ms")?;
     check_at_most(p.gap_ms, 10_000, "gap_ms")?;
     check_at_most(p.wait_ms, 60_000, "wait_ms")?;
@@ -2163,8 +2184,8 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
     let captures = std::cell::Cell::new(0u64);
     let mut stop = MapStop::Exhausted;
     // One capture: launch afresh, press `path`, read the screen into a temporary folder, then
-    // keep it under the state's id (new), drop it (seen before or skipped).
-    let capture = |map: &mut adb_ui::ScreenMap, from: Option<&str>, key: Option<&str>, path: &[String]| -> Result<(String, bool), ToolError> {
+    // keep it under the state's id (new), drop it (seen before, skipped, or not the app at all).
+    let capture = |map: &mut adb_ui::ScreenMap, from: Option<&str>, key: Option<&str>, path: &[String]| -> Result<Arrived, ToolError> {
         let keys = if path.is_empty() { Vec::new() } else { adb_ui::parse_keys(path)? };
         let spec = CaptureSpec { pre: pre.clone(), key_tokens: path, keys, gap_ms: p.gap_ms, wait_ms: p.wait_ms, dump_lead_ms: p.dump_lead_ms, max_nodes };
         presses.set(presses.get() + spec.presses());
@@ -2178,8 +2199,20 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
                 return Err(e);
             }
         };
+        // Another package on screen (the launcher after BACK on the home screen, a system
+        // dialog): the key left the app. Nothing of it is a screen of the app.
+        if let Some(other) = adb_ui::foreground_package(&got.nodes).filter(|f| f != package) {
+            let _ = std::fs::remove_dir_all(&tmp);
+            let (Some(from), Some(key)) = (from, key) else {
+                return Err(ToolError::new(ErrorCode::NotFound, format!("After its launch the screen showed {other}, not {package}."))
+                    .with_remediation("Give the app longer to start (launch_wait_ms), or close what is in front of it on the device."));
+            };
+            map.leave(from, key, &other);
+            return Ok(Arrived::Left);
+        }
         let skipped = adb_ui::matches_skip(&got.nodes, &p.skip_texts);
         let name = adb_ui::state_name(&got.nodes);
+        let focus = got.focused_title();
         let (id, new) = map.arrive(from, key, &got.fingerprint, |id| adb_ui::MapState {
             id,
             name,
@@ -2191,25 +2224,36 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
             focused_title: if skipped.is_some() { None } else { got.focused_title() },
             count: if skipped.is_some() { 0 } else { got.nodes.len() },
             files: None,
+            focuses: Vec::new(),
         });
-        if new && skipped.is_none() {
+        if skipped.is_some() {
+            let _ = std::fs::remove_dir_all(&tmp);
+            return Ok(if new { Arrived::New(id) } else { Arrived::Seen { id, new_focus: false } });
+        }
+        let new_focus = focus.as_deref().is_some_and(|t| map.note_focus(&id, t, path, p.max_focus_per_screen));
+        if new {
             let dir = states_dir.join(&id);
             std::fs::rename(&tmp, &dir).map_err(|e| ToolError::io(dir.display(), e))?;
             let rel = |p: &Path| {
                 p.file_name().map(|n| dir.join(n)).and_then(|q| q.strip_prefix(&outdir).ok().map(|r| r.to_string_lossy().to_string())).unwrap_or_default()
             };
             map.set_files(&id, json!({"ui": rel(&got.ui_file), "screen": got.screen_file.as_deref().map(rel), "keys": rel(&got.keys_file)}));
-        } else {
-            // Seen before, or a screen the person said to leave alone: nothing of it is kept.
-            let _ = std::fs::remove_dir_all(&tmp);
+            return Ok(Arrived::New(id));
         }
-        Ok((id, new && skipped.is_none()))
+        // Seen before: nothing of it is kept, but a new focus position on it is walked from.
+        let _ = std::fs::remove_dir_all(&tmp);
+        Ok(Arrived::Seen { id, new_focus })
     };
-    let (start, _) = capture(&mut map, None, None, &[])?;
-    let mut frontier = std::collections::VecDeque::from([start]);
-    'outer: while let Some(from) = frontier.pop_front() {
-        let path = map.get(&from).map(|s| s.path.clone()).unwrap_or_default();
-        for key in &explore {
+    let start = match capture(&mut map, None, None, &[])? {
+        Arrived::New(id) | Arrived::Seen { id, .. } => id,
+        Arrived::Left => return Err(ToolError::new(ErrorCode::NotFound, format!("The screen after launching {package} wasn't the app's."))),
+    };
+    // Breadth first over (screen, path): every key from a screen's first position, and from each
+    // further focus position on it the keys that act on the focus or move it on.
+    let mut frontier = std::collections::VecDeque::from([(start, Vec::<String>::new(), true)]);
+    'outer: while let Some((from, path, all_keys)) = frontier.pop_front() {
+        let keys: Vec<&String> = explore.iter().filter(|k| all_keys || adb_ui::FOCUS_KEYS.contains(&k.as_str())).collect();
+        for key in keys {
             if ctx.cancel.is_cancelled() {
                 stop = MapStop::Cancelled;
                 break 'outer;
@@ -2228,9 +2272,10 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
             }
             let mut next = path.clone();
             next.push(key.clone());
-            let (id, explore_it) = capture(&mut map, Some(&from), Some(key), &next)?;
-            if explore_it {
-                frontier.push_back(id);
+            match capture(&mut map, Some(&from), Some(key), &next)? {
+                Arrived::New(id) => frontier.push_back((id, next, true)),
+                Arrived::Seen { id, new_focus: true } => frontier.push_back((id, next, false)),
+                Arrived::Seen { .. } | Arrived::Left => {}
             }
         }
     }
@@ -2266,8 +2311,13 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         serial,
         json!({"serial": serial, "package": package, "category": p.category, "max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "keys": p.keys, "skip_texts": p.skip_texts, "output_directory": outdir.to_string_lossy()}),
     )
-    .result(json!({"file": file, "count": map.len(), "kept": kept, "skipped": skipped, "presses": presses.get(), "captures": captures.get(), "stopped_by": stop, "states": screens["states"], "edges": screens["edges"]}))
-    .summary(format!("Mapped {kept} screen(s) of {package} ({skipped} left alone) with {} key press(es) in {} s; {why}.", presses.get(), started.elapsed().as_secs()))
+    .result(json!({"file": file, "count": map.len(), "kept": kept, "skipped": skipped, "presses": presses.get(), "captures": captures.get(), "stopped_by": stop, "states": screens["states"], "edges": screens["edges"], "exits": screens["exits"]}))
+    .summary(format!(
+        "Mapped {kept} screen(s) of {package} ({skipped} left alone, {} key(s) that leave the app) with {} key press(es) in {} s; {why}.",
+        map.exits().len(),
+        presses.get(),
+        started.elapsed().as_secs()
+    ))
     .location(Location::new("path", file.to_string_lossy()))
     .limitation(Limitation::new("device_changed", "This started the app many times and pressed keys on the device."))
     .coverage(Coverage::complete(map.len() as u64));
@@ -2441,6 +2491,8 @@ mod tests {
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_states": 61, "output_directory": out})),
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "keys": ["DPAD_DOWN x3"], "output_directory": out})),
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "time_budget_s": 5, "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_focus_per_screen": 0, "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_focus_per_screen": 31, "output_directory": out})),
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "not a package", "output_directory": out})),
         ];
         for (id, params) in bad {

@@ -855,6 +855,16 @@ backends from older versions or found from a key got a new id on every run. A fa
 run is a workaround, not a fix: give each saved provider backend its id once, at startup, before
 any session lock is held (`AiHub::ensure_session_id`), and test a restart keeps the same id.
 
+**A map that walked out of the app, and a walk the screen's identity made blind.** The first
+map of a two-screen trial app pressed BACK on its home screen, landed in the TV's launcher, and
+mapped the launcher and the next app as screens of the target (6 of 6 states, none of them the
+app's second screen). And once a screen was known by its shape and controls rather than every
+text, moving the focus made no new state, so the walk never pressed OK on the second button:
+the settings screen was unreachable by construction. A capture that shows another package is
+an exit, never a screen; and what a walk explores (screen plus focus position) is not what it
+counts (screens). Try a new map on an app with two screens and a BACK that leaves it before
+one with fifty.
+
 **A device check that launched the original.** The Android device check installed the build's
 APK, then launched, drove and read the crash log of the *target's* package (the original app's),
 so a rebuild under its own id was never opened: the original was replayed against its own map
