@@ -940,7 +940,9 @@ fn form_ask(form: &ServerForm, service: &craft_anything_ai::providers::Service) 
         let web = address.split_once("://").is_some_and(|(scheme, rest)| matches!(scheme, "http" | "https") && !rest.is_empty());
         return web.then(|| Ask { kind: service.kind, base_url: Some(address.to_string()), key });
     }
-    (!key.is_empty()).then(|| Ask { kind: service.kind, base_url: service.base_url.map(str::to_string), key })
+    // A hosted service is asked only once the key looks whole, as on the key cards: a pause while
+    // typing never sends part of a key.
+    model_pick::key_looks_real(&key).then(|| Ask { kind: service.kind, base_url: service.base_url.map(str::to_string), key })
 }
 
 /// A field label painted in the form's left column (painted, so a screen reader gets each field's
@@ -1310,6 +1312,16 @@ mod tests {
     use super::*;
     use crate::{Done, builders::AgentModelPicker, demo, jobs::Finished};
     use craft_anything_ai::{BackendConfig, BackendKind};
+
+    /// A hosted service's models are listed only once its key looks whole, never on part of one.
+    #[test]
+    fn a_hosted_service_is_never_asked_with_part_of_a_key() {
+        let services = craft_anything_ai::providers::services();
+        let hosted = services.iter().find(|s| !s.needs_address).expect("a hosted service");
+        let ask = |key: &str| form_ask(&ServerForm { key: key.into(), ..Default::default() }, hosted);
+        assert!(ask("").is_none() && ask("sk-or").is_none(), "part of a key");
+        assert_eq!(ask(" sk-test-0000 ").map(|a| a.key), Some("sk-test-0000".to_string()));
+    }
 
     #[test]
     /// A non-Codex local agent gets the same Check action and result presentation.
