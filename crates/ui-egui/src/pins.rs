@@ -243,32 +243,26 @@ pub fn pin_modal(app: &mut CraftApp, ui: &mut Ui, close: &mut bool) {
     ui.add_space(4.0);
     ui.add(egui::Label::new(RichText::new(tr("Keep it in the sidebar to open any time, whatever later builds change.")).color(t.text_dim)).wrap());
     ui.add_space(12.0);
-    let size = Vec2::new(268.0, 150.0);
     let mode = app.state.pin_draft.mode;
-    ui.horizontal(|ui| {
-        let frozen = widgets::choice_tile(
-            ui,
-            size,
-            "lock",
-            "A frozen copy (recommended)",
-            "Keeps this version exactly as it is now. Later builds can't change or break it, and anything it saves stays with the copy.",
-            mode == PinMode::Frozen,
-        );
-        if frozen.clicked() {
-            app.state.pin_draft.mode = PinMode::Frozen;
-        }
-        let light = widgets::choice_tile(
-            ui,
-            size,
-            "layers",
-            "A light copy",
-            "Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.",
-            mode == PinMode::Light,
-        );
-        if light.clicked() {
-            app.state.pin_draft.mode = PinMode::Light;
-        }
-    });
+    let tiles = [
+        widgets::Tile {
+            icon: "lock",
+            label: "A frozen copy (recommended)",
+            blurb: "Keeps this version exactly as it is now. Later builds can't change or break it, and anything it saves stays with the copy.",
+            on: mode == PinMode::Frozen,
+        },
+        widgets::Tile {
+            icon: "layers",
+            label: "A light copy",
+            blurb: "Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.",
+            on: mode == PinMode::Light,
+        },
+    ];
+    match widgets::choice_tiles(ui, &tiles, 2, 72.0) {
+        Some(0) => app.state.pin_draft.mode = PinMode::Frozen,
+        Some(_) => app.state.pin_draft.mode = PinMode::Light,
+        None => {}
+    }
     ui.add_space(8.0);
     let (note, color) = match &app.state.pin_draft.size {
         None => (tr("Working out how much space a copy takes…"), t.text_faint),

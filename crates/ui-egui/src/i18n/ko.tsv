@@ -753,7 +753,7 @@ Nothing open yet	아직 열린 것 없음
 Nothing selected	선택한 것 없음
 Nothing to show	보여 줄 것 없음
 Nothing uses it until it's on again; it keeps its key.	다시 켤 때까지 어디에서도 쓰지 않습니다. 키는 그대로 남습니다.
-Nothing — start fresh	없음 — 처음부터 시작
+Start fresh	처음부터 시작
 Now	진행 중
 Now: {what} ({time})	진행 중: {what} ({time})
 Objective-C classes	Objective-C 클래스
@@ -1031,7 +1031,6 @@ Show the folder	폴더 보기
 Show the ones that are met	충족한 항목 보기
 Show the sidebar	사이드바 보기
 Show the welcome again	환영 화면 다시 보기
-Showing	보이는 항목
 Sign in and add the Unity Editor	로그인하고 Unity Editor 추가
 Sign in and install Unreal Engine	로그인하고 Unreal Engine 설치
 Simple	간단
@@ -1405,7 +1404,7 @@ your files there are the app, edited in place	그 파일이 곧 앱이며 그 �
 {}: {state}	{}: {state}
 {}h {:02}m	{}시간 {:02}분
 {}m {:02}s	{}분 {:02}초
-— use the filter to find the rest.	— 나머지는 필터로 찾을 수 있습니다.
+Showing {n}. Use the filter to find the rest.	{n}개 표시 중. 나머지는 필터로 찾을 수 있습니다.
 … {n} more	… 외 {n}개
 … {n} older	… 이전 항목 {n}개
 … {} more	… 외 {}개

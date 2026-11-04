@@ -753,7 +753,7 @@ Nothing open yet	尚未開啟任何內容
 Nothing selected	未選取任何內容
 Nothing to show	沒有可顯示的內容
 Nothing uses it until it's on again; it keeps its key.	重新啟用前不會使用它；金鑰會保留。
-Nothing — start fresh	不使用任何檔案，從頭開始
+Start fresh	從頭開始
 Now	現在
 Now: {what} ({time})	目前：{what} ({time})
 Objective-C classes	Objective-C 類別
@@ -1031,7 +1031,6 @@ Show the folder	顯示該資料夾
 Show the ones that are met	顯示已滿足的要求
 Show the sidebar	顯示側邊欄
 Show the welcome again	再次顯示歡迎畫面
-Showing	目前顯示
 Sign in and add the Unity Editor	登入並新增 Unity Editor
 Sign in and install Unreal Engine	登入並安裝 Unreal Engine
 Simple	簡易
@@ -1405,7 +1404,7 @@ your files there are the app, edited in place	該位置的檔案就是應用程�
 {}: {state}	{}：{state}
 {}h {:02}m	{}小時 {:02}分
 {}m {:02}s	{}分 {:02}秒
-— use the filter to find the rest.	— 使用篩選尋找其餘內容。
+Showing {n}. Use the filter to find the rest.	目前顯示 {n} 項。使用篩選尋找其餘內容。
 … {n} more	…另有 {n} 項
 … {n} older	…另有 {n} 筆較早記錄
 … {} more	…另有 {} 項

@@ -452,6 +452,7 @@ fn key_field(app: &mut CraftApp, ui: &mut Ui, provider: &dyn AssetProvider, save
                 .password(true)
                 .hint_text(trf("Paste your {name} key", &[("name", provider.name())]))
                 .desired_width(320.0)
+                .min_size(Vec2::new(0.0, widgets::primary_height(ui, save)))
                 .frame(widgets::text_field_frame_compact(&t)),
         );
         widgets::named(r, &trf("{name} key", &[("name", provider.name())]));

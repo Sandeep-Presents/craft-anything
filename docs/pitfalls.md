@@ -705,6 +705,14 @@ Its replacement nearly repeated it: hard-linking dependencies saved almost nothi
 projects, because 85% of a Rust pin was a `.pdb` nothing needs. Measure on real data before
 designing around where you assume the size is.
 
+**Tiles sized one by one, beside each other.** Each choice tile grew to fit its own words, and the
+start tiles were four columns at any width, so the start-fresh tile wrapped to two lines and
+stood taller than the three one-line tiles beside it (and German wrapped more). Siblings go through
+`widgets::choice_tiles`, which picks the columns from the widest title in the current language and
+gives the row one height; a test measures them in every language. The same held for rows that put a
+value after a caption, or a hint between two switches: place what can't move first and give the
+rest what's left, or a longer translation runs into it.
+
 **Long content above a fixed prompt box.** Answers to questions were cards between the feed and
 the prompt box, sized to their text; the feed got what was left, so a long answer squeezed it and
 pushed the box off the window. Content of any length belongs inside the scroll area. And an X on

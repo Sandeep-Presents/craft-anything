@@ -294,8 +294,7 @@ Filter the files	Filtrer les fichiers
 Nothing to show	Rien à afficher
 Nothing matches the filter.	Rien ne correspond au filtre.
 Save picture	Enregistrer l'image
-Showing	Affichage de
-— use the filter to find the rest.	— utilisez le filtre pour trouver le reste.
+Showing {n}. Use the filter to find the rest.	{n} affichés. Utilisez le filtre pour trouver le reste.
 Do you have permission?	Avez-vous l'autorisation ?
 Only take pictures out of games you made, or whose owner allows it. A game's art is usually protected by copyright and by the game's licence.	N'extrayez des images que des jeux que vous avez créés, ou dont le propriétaire l'autorise. Les graphismes d'un jeu sont généralement protégés par le droit d'auteur et par la licence du jeu.
 I have permission	J'ai l'autorisation
@@ -425,7 +424,7 @@ A game's files	Les fichiers d'un jeu
 See what a game packs, and save its pictures as PNG files.	Voyez ce que contient un jeu, et enregistrez ses images en PNG.
 An app	Une application
 A game	Un jeu
-Nothing — start fresh	Rien — partir de zéro
+Start fresh	Partir de zéro
 You chose:	Votre choix :
 Type the website's address:	Tapez l'adresse du site web :
 How closely may Craft Anything look at it?	Jusqu'où Craft Anything peut-il l'examiner ?

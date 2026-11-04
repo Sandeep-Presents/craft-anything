@@ -434,7 +434,7 @@ Nothing open yet	まだ何も開いていません
 Nothing selected	何も選択されていません
 Nothing to show	表示するものがありません
 Nothing uses it until it's on again; it keeps its key.	再びオンにするまで何も使いません。キーは保持されます。
-Nothing — start fresh	なし — 新規に始める
+Start fresh	新規に始める
 Now	実行中
 Now: {what} ({time})	実行中: {what} ({time})
 Of this, {cost} was charged to an API key.	このうち {cost} が API キーに請求されました。
@@ -621,7 +621,6 @@ Show the console	コンソールを表示
 Show the ones that are met	満たされた項目を表示
 Show the sidebar	サイドバーを表示
 Show the welcome again	ようこそ画面を再度表示
-Showing	表示中
 Sign in and add the Unity Editor	サインインして Unity Editor を追加
 Sign in and install Unreal Engine	サインインして Unreal Engine をインストール
 Simple	シンプル
@@ -846,7 +845,7 @@ your files there are the app, edited in place	そこにあるファイルがア�
 {n} step(s) didn't work and were retried or skipped.	{n} ステップが失敗し、再試行またはスキップされました。
 {n} tokens	{n} トークン
 {tool} finished	{tool} が完了
-— use the filter to find the rest.	— 残りは絞り込みで探してください。
+Showing {n}. Use the filter to find the rest.	{n} 件を表示中。残りは絞り込みで探してください。
 ← Back	← 戻る
 ↑↓ to move · Enter to run · Esc to close	↑↓ で移動 · Enter で実行 · Esc で閉じる
 Providers	プロバイダ

@@ -743,7 +743,7 @@ Nothing open yet	Пока ничего не открыто
 Nothing selected	Ничего не выбрано
 Nothing to show	Нечего показать
 Nothing uses it until it's on again; it keeps its key.	Пока оно снова не включено, ничего его не использует; ключ сохраняется.
-Nothing — start fresh	Ничего — начать заново
+Start fresh	Начать заново
 Now	Сейчас
 Now: {what} ({time})	Сейчас: {what} ({time})
 Objective-C classes	Классы Objective-C
@@ -1028,7 +1028,6 @@ Show the folder	Показать папку
 Show the ones that are met	Показать выполненные
 Show the sidebar	Показать боковую панель
 Show the welcome again	Показать приветствие снова
-Showing	Показано
 Sign in and add the Unity Editor	Войдите и добавьте Unity Editor
 Sign in and install Unreal Engine	Войдите и установите Unreal Engine
 Simple	Простой
@@ -1405,7 +1404,7 @@ your files there are the app, edited in place	ваши файлы там — э�
 {}: {state}	{}: {state}
 {}h {:02}m	{}ч {:02}м
 {}m {:02}s	{}м {:02}с
-— use the filter to find the rest.	— используйте фильтр, чтобы найти остальное.
+Showing {n}. Use the filter to find the rest.	Показано: {n}. Используйте фильтр, чтобы найти остальное.
 … {n} more	… ещё {n}
 … {n} older	… {n} старых
 … {} more	… ещё {}

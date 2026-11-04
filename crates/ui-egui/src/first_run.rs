@@ -230,17 +230,21 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
         let pastable = d.needs_key || d.suggestion.base_url.as_deref().is_some_and(craft_anything_ai::openai::is_opencode_go);
         if pastable && !configured {
             ui.add_space(6.0);
-            crate::settings_ui::key_controls(
-                app,
-                ui,
-                d,
-                crate::settings_ui::KeyCard {
-                    hint: "Paste your API key (kept in your system keychain)",
-                    width: (ui.available_width() - 140.0).max(160.0),
-                    compact: false,
-                    connect: "Connect",
-                },
-            );
+            // In the words' column, not centred in the card: the field starts under the name and
+            // ends where Connect does.
+            ui.horizontal_top(|ui| {
+                // The icon's 40 points and the gap after it, as in the row above.
+                ui.add_space(40.0 + ui.spacing().item_spacing.x);
+                ui.vertical(|ui| {
+                    let card = crate::settings_ui::KeyCard {
+                        hint: "Paste your API key (kept in your system keychain)",
+                        width: ui.available_width(),
+                        compact: false,
+                        connect: "Connect",
+                    };
+                    crate::settings_ui::key_controls(app, ui, d, card);
+                });
+            });
         }
     });
 }

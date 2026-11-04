@@ -1688,7 +1688,7 @@ fn claims_list(ui: &mut Ui, c: &CheckResult, t: &Tokens) {
         });
     };
     for claim in c.claims.iter().filter(|x| !x.passed) {
-        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{} — {}", claim.title, claim.detail) };
+        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{}: {}", claim.title, claim.detail) };
         row(ui, "triangle-alert", t.warning, text);
     }
     for u in &c.unknowns {

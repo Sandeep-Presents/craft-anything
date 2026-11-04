@@ -753,7 +753,7 @@ Nothing open yet	Noch nichts geöffnet
 Nothing selected	Nichts ausgewählt
 Nothing to show	Nichts anzuzeigen
 Nothing uses it until it's on again; it keeps its key.	Nichts nutzt es, bis es wieder an ist; der Schlüssel bleibt erhalten.
-Nothing — start fresh	Nichts: von vorn anfangen
+Start fresh	Von vorn anfangen
 Now	Jetzt
 Now: {what} ({time})	Jetzt: {what} ({time})
 Objective-C classes	Objective-C-Klassen
@@ -1031,7 +1031,6 @@ Show the folder	Den Ordner zeigen
 Show the ones that are met	Die erfüllten zeigen
 Show the sidebar	Die Seitenleiste zeigen
 Show the welcome again	Die Begrüßung noch einmal zeigen
-Showing	Angezeigt
 Sign in and add the Unity Editor	Melde dich an und füge den Unity Editor hinzu
 Sign in and install Unreal Engine	Melde dich an und installiere Unreal Engine
 Simple	Einfach
@@ -1405,7 +1404,7 @@ your files there are the app, edited in place	deine Dateien dort sind die App, d
 {}: {state}	{}: {state}
 {}h {:02}m	{}h {:02}m
 {}m {:02}s	{}m {:02}s
-— use the filter to find the rest.	— Nutze den Filter, um den Rest zu finden.
+Showing {n}. Use the filter to find the rest.	{n} angezeigt. Nutze den Filter, um den Rest zu finden.
 … {n} more	… {n} weitere
 … {n} older	… {n} ältere
 … {} more	… {} weitere

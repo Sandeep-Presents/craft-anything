@@ -358,14 +358,20 @@ fn targets_list(app: &mut CraftApp, ui: &mut Ui) {
 fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usize> {
     let t = Tokens::get(ui.ctx());
     let mut picked = None;
+    // Every title or none: when they don't all fit, every tab shows only its icon (the title on
+    // hover), so no tab is cut off at the panel's edge.
+    let width = |ui: &Ui, title: &str, icon: &str| widgets::label_galley(ui, &tr(title), 11.0, t.text).size().x + if icon.is_empty() { 22.0 } else { 42.0 };
+    let needed: f32 = tabs.iter().map(|(icon, title)| width(ui, title, icon) + 2.0).sum();
+    let icons_only = needed > ui.available_width() && tabs.iter().all(|(icon, _)| !icon.is_empty());
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         for (i, (icon, title)) in tabs.iter().enumerate() {
             let on = i == selected;
             let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
-            let w = g.size().x + if icon.is_empty() { 22.0 } else { 42.0 };
+            let w = if icons_only { 34.0 } else { width(ui, title, icon) };
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
             resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+            let resp = if icons_only { resp.on_hover_text(tr(title)) } else { resp };
             if !on {
                 let h = widgets::hover_t(ui, &resp);
                 ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
@@ -383,7 +389,9 @@ fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usiz
                 );
                 x += 20.0;
             }
-            ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
+            if !icons_only {
+                ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
+            }
             if on {
                 ui.painter().hline(rect.x_range().shrink(6.0), rect.bottom() - 1.0, egui::Stroke::new(2.0, t.accent));
             }
@@ -478,9 +486,10 @@ fn tool_view(app: &mut CraftApp, ui: &mut Ui, tab: CenterTab) {
         Fill::DeepNeeded => crate::engine_ui::deep_needed(app, ui),
         Fill::Error(msg, rem) => widgets::empty_state(ui, "triangle-alert", &msg, rem.as_deref().unwrap_or("")),
         Fill::Ready(e) => {
-            ui.horizontal(|ui| {
+            // The summary wraps beside its badge rather than running off the panel's edge.
+            ui.horizontal_top(|ui| {
                 widgets::confidence_badge(ui, Some(e.confidence));
-                ui.label(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim));
+                ui.add(egui::Label::new(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim)).wrap());
             });
             ui.add_space(6.0);
             render_result(ui, &e.result, tab);

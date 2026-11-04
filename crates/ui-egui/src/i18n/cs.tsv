@@ -753,7 +753,7 @@ Nothing open yet	Zatím není nic otevřeno
 Nothing selected	Nic není vybráno
 Nothing to show	Není co zobrazit
 Nothing uses it until it's on again; it keeps its key.	Do opětovného zapnutí se nepoužívá; klíč zůstane uložen.
-Nothing — start fresh	Nic — začít od nuly
+Start fresh	Začít od nuly
 Now	Nyní
 Now: {what} ({time})	Nyní: {what} ({time})
 Objective-C classes	Třídy Objective-C
@@ -1031,7 +1031,6 @@ Show the folder	Zobrazit tuto složku
 Show the ones that are met	Zobrazit splněné požadavky
 Show the sidebar	Zobrazit postranní panel
 Show the welcome again	Znovu zobrazit uvítání
-Showing	Zobrazeno
 Sign in and add the Unity Editor	Přihlásit se a přidat Unity Editor
 Sign in and install Unreal Engine	Přihlásit se a nainstalovat Unreal Engine
 Simple	Jednoduchý
@@ -1405,7 +1404,7 @@ your files there are the app, edited in place	vaše soubory ve složce jsou apli
 {}: {state}	{}: {state}
 {}h {:02}m	{} h {:02} min
 {}m {:02}s	{} min {:02} s
-— use the filter to find the rest.	— zbývající najdete pomocí filtru.
+Showing {n}. Use the filter to find the rest.	Zobrazeno: {n}. Zbývající najdete pomocí filtru.
 … {n} more	… další: {n}
 … {n} older	… starší: {n}
 … {} more	… další: {}

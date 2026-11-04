@@ -614,7 +614,7 @@ fn pictures_of_the_original_go_with_the_draft_then_into_the_project() {
 
     let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, true)));
     h.run_steps(3);
-    // "Nothing — start fresh" is picked: the request box offers pictures (not for websites).
+    // "Start fresh" is picked: the request box offers pictures (not for websites).
     h.get_by_label("Add pictures of the original (optional: screenshots help it look right)");
     h.state_mut().add_pictures(vec![pic.clone(), notes, pic.clone()]);
     // Their sizes are checked on a worker first (#720).
@@ -926,7 +926,7 @@ fn website_choice_stays_picked_while_the_address_is_empty() {
         // A website is looked at as a visitor sees it, or read in Deep mode: asked.
         h.get_by_label("How closely may Craft Anything look at it?");
     }
-    h.get_by_label("Nothing — start fresh").click();
+    h.get_by_label("Start fresh").click();
     h.run_steps(3);
     assert!(!h.state().state.make.editing_url);
     assert!(h.query_by_label("How closely may Craft Anything look at it?").is_none(), "nothing to look at");
@@ -1771,7 +1771,7 @@ fn a_check_shows_the_claims_that_dont_hold_and_the_rest_on_request() {
     });
     h.run_steps(3);
     h.get_by_label("2 of 3 requirements met");
-    h.get_by_label("/about doesn't scroll sideways at 390 px — it's 412 px wide");
+    h.get_by_label("/about doesn't scroll sideways at 390 px: it's 412 px wide");
     assert!(h.query_by_label("The start page loads every file it asks for").is_none(), "the ones that hold wait behind a click");
     h.get_by_label("Show the ones that are met").click();
     h.run_steps(3);
@@ -3388,6 +3388,25 @@ fn an_ais_status_chip_is_as_tall_as_its_buttons() {
     assert_eq!(chip.top(), test.top(), "chip {chip:?} vs button {test:?}");
 }
 
+/// A key field and the Save on its row: other key fields have a Save of their own.
+fn key_field_and_save(h: &Harness<'static, CraftApp>, label: &str) -> (egui::Rect, egui::Rect) {
+    let field = h.get_by_label(label).rect();
+    let dy = |r: &egui::Rect| (r.center().y - field.center().y).abs();
+    let save = h.get_all_by_label("Save").map(|n| n.rect()).min_by(|a, b| dy(a).total_cmp(&dy(b))).expect("a Save button");
+    (field, save)
+}
+
+/// Remove sits on an AI's name row, above its buttons, so it never wraps onto a line of its own;
+/// the fal.ai key field is as tall as its Save button.
+#[test]
+fn remove_sits_by_the_name_and_the_key_field_matches_save() {
+    let h = ai_settings();
+    let (remove, first) = (h.get_by_label("Remove Claude").rect(), h.get_by_label("In use").rect());
+    assert!(remove.bottom() <= first.top(), "Remove {remove:?} is above the buttons {first:?}");
+    let (field, save) = key_field_and_save(&h, "fal.ai key");
+    assert!((field.top() - save.top()).abs() < 0.5 && (field.bottom() - save.bottom()).abs() < 0.5, "field {field:?} vs Save {save:?}");
+}
+
 /// The row says what kind of AI it is in words.
 #[test]
 fn an_ais_row_names_its_kind() {
@@ -3476,6 +3495,24 @@ fn an_unnamed_server_in_the_custom_form_can_be_tested() {
     h.get_all_by_label("Test").last().expect("the form Test button").click_accesskit();
     h.run_steps(2);
     assert!(h.state().server_form.test.is_some(), "a test started with no name");
+}
+
+/// First run's key card: the key field starts under the AI's name, not centred in the card, and
+/// ends where Connect does.
+#[test]
+fn first_run_key_field_lines_up_with_its_card() {
+    let mut h = harness_sized(egui::vec2(1100.0, 780.0), || {
+        let mut a = demo::app(demo::engine(Mode::Beginner, false));
+        a.state.first_run = FirstRunStep::Brain;
+        a.detected = Some(demo::detected());
+        a.state.backend = Some("Claude Code".into());
+        a.backends.clear();
+        a
+    });
+    h.run_steps(3);
+    let (field, name, connect) = (h.get_by_label("OpenRouter key").rect(), h.get_by_label("OpenRouter").rect(), h.get_by_label("Connect").rect());
+    assert!((field.left() - name.left()).abs() < 1.0, "the field {field:?} starts under the name {name:?}");
+    assert!((field.right() - connect.right()).abs() < 1.0, "the field {field:?} ends where Connect {connect:?} does");
 }
 
 /// A key card lists the models its key offers once a key is pasted, and Connect uses the one chosen.
