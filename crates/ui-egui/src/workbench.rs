@@ -371,7 +371,16 @@ fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usiz
             let w = if icons_only { 34.0 } else { width(ui, title, icon) };
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
             resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
-            let resp = if icons_only { resp.on_hover_text(tr(title)) } else { resp };
+            let resp = if icons_only {
+                // The title on hover, and while the tab has keyboard focus (its ring is showing), so
+                // a keyboard user can read which tab it is.
+                if resp.has_focus() && !resp.hovered() {
+                    resp.show_tooltip_text(tr(title));
+                }
+                resp.on_hover_text(tr(title))
+            } else {
+                resp
+            };
             if !on {
                 let h = widgets::hover_t(ui, &resp);
                 ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
@@ -997,6 +1006,26 @@ fn log_view(app: &CraftApp, ui: &mut Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A narrow strip shows only icons; the focused tab shows its title without the pointer on it.
+    #[test]
+    fn an_icon_only_tab_shows_its_title_while_it_has_focus() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let tabs = [("search", "Inspector"), ("shield-check", "Evidence"), ("circle-help", "Unknowns")];
+        // Fonts installed in a pass bind from the next one: draw from the second pass.
+        let mut fonts = false;
+        let mut h = Harness::builder().with_size(egui::vec2(120.0, 80.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut fonts, true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            tab_strip(ui, &tabs, 0);
+        });
+        assert_eq!(h.query_all_by_label("Evidence").count(), 1, "the tab alone, no title shown yet");
+        h.get_by_label("Evidence").focus();
+        h.run_steps(3);
+        assert_eq!(h.query_all_by_label("Evidence").count(), 2, "the tab and its title");
+    }
 
     #[test]
     fn recorded_findings_render_even_without_evidence_rows() {
