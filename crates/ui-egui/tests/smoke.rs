@@ -1689,8 +1689,9 @@ fn settings_window_tabs_draw() {
     assert_eq!(h.state().settings.theme, "studio-light");
 
     // At the same window size, the same tab keeps its content bounds with and without scrolling.
+    // 800 tall: the Safety tab's rows are control height and fill 700 without the extra tools.
     let content_bounds = |overflow: bool| {
-        let mut h = harness_sized(egui::vec2(1000.0, 700.0), move || {
+        let mut h = harness_sized(egui::vec2(1000.0, 800.0), move || {
             let mut a = demo::app(demo::engine(Mode::Beginner, true));
             a.state.settings_open = true;
             a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Safety;
@@ -2890,14 +2891,14 @@ fn ai_discovery_controls_have_even_spacing() {
             [providers, harnesses, custom].iter().all(|tab| !tab.intersects(detect)),
             "controls overlap at {width}: {providers:?}, {harnesses:?}, {custom:?}, {detect:?}"
         );
-        let tab_gap = harnesses.left() - providers.right();
-        let custom_gap = custom.left() - harnesses.right();
-        assert!(tab_gap > 0.0 && (tab_gap - custom_gap).abs() <= 1.0, "tab spacing differs at {width}: {tab_gap} vs {custom_gap}");
+        // The tabs are one segmented switch: its segments meet, and Detect follows the whole switch.
+        let seams = [harnesses.left() - providers.right(), custom.left() - harnesses.right()];
+        assert!(seams.iter().all(|gap| gap.abs() <= 0.5), "the switch's segments part at {width}: {seams:?}");
         if detect.top() < custom.bottom() {
-            // Detect fits on the tabs' row: the same gap after the last tab.
+            // Detect fits on the switch's row: a visible gap after it, centred on it.
             let action_gap = detect.left() - custom.right();
             assert!(action_gap > 0.0, "controls need a visible gap at {width}");
-            assert!((tab_gap - action_gap).abs() <= 1.0, "spacing differs at {width}: {tab_gap} vs {action_gap}");
+            assert!((detect.center().y - custom.center().y).abs() <= 0.5, "Detect {detect:?} is off the switch's middle {custom:?}");
         } else {
             // It wraps with them: the next row starts where the tabs do.
             assert!((detect.left() - providers.left()).abs() <= 0.5, "Detect wrapped to {detect:?}, tabs start at {providers:?}");
@@ -3218,7 +3219,7 @@ fn a_project_is_renamed_duplicated_and_deleted_from_its_page() {
     h.get_by_label("Duplicate").click();
     assert!(wait(&mut h, |a| a.projects.iter().any(|w| w.manifest.name == "Snake II copy")), "the copy is listed");
 
-    h.get_by_label("Delete the project").click();
+    h.get_by_label("Delete…").click();
     h.run_steps(2);
     h.get_by_label("Delete Snake II?");
     h.get_by_label("Delete it").click();
@@ -3410,6 +3411,15 @@ fn remove_sits_by_the_name_and_the_key_field_matches_save() {
     let (remove, first) = (h.get_by_label("Remove Claude").rect(), h.get_by_label("In use").rect());
     assert!(remove.bottom() <= first.top(), "Remove {remove:?} is above the buttons {first:?}");
     let (field, save) = key_field_and_save(&h, "fal.ai key");
+    assert!((field.top() - save.top()).abs() < 0.5 && (field.bottom() - save.bottom()).abs() < 0.5, "field {field:?} vs Save {save:?}");
+}
+
+/// The open AI's key field in Settings is a control tall, like the Save beside it.
+#[test]
+fn an_apis_key_field_matches_its_save() {
+    let h = ai_settings();
+    let name = h.state().state.backend.clone().expect("an AI is open");
+    let (field, save) = key_field_and_save(&h, &format!("{name} key"));
     assert!((field.top() - save.top()).abs() < 0.5 && (field.bottom() - save.bottom()).abs() < 0.5, "field {field:?} vs Save {save:?}");
 }
 

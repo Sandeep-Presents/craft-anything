@@ -260,8 +260,10 @@ fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui
     let ir = egui::Rect::from_min_size(rect.min + Vec2::new(14.0, 12.0), Vec2::splat(40.0));
     ui.painter().rect_filled(ir, t.radius, t.raised);
     icons::paint(ui, ir, icon, 20.0, if on { t.accent_ink } else { t.icon });
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 14.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::BODY), t.text);
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 35.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
+    // The words start and size as in the detected AI cards above it: one column, one title size.
+    let x = ir.right() + ui.spacing().item_spacing.x;
+    ui.painter().text(egui::pos2(x, rect.top() + 10.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::CARD), t.text);
+    ui.painter().text(egui::pos2(x, rect.top() + 36.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
     if on {
         icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0)), "check", 18.0, t.accent);
     }

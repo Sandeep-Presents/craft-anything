@@ -41,31 +41,23 @@ pub fn resolve(chosen: Option<DetectTab>, providers: usize, harnesses: usize) ->
     }
 }
 
-/// Draw the tabs and return the one that is showing. An empty tab is dimmed, not disabled: it
-/// still opens, and says what is missing.
+/// Draw the tabs (the shared segmented switch, so they match every other switch) and return the
+/// one that is showing. An empty tab still opens, and says what is missing; its count says "(0)".
 pub fn bar(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
     ui.horizontal_wrapped(|ui| buttons(ui, chosen, detected)).inner
 }
 
 /// Draw the tab buttons in the caller's layout, so adjacent actions share its spacing and wrapping.
 pub fn buttons(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
+    use crate::i18n::tr;
     let (providers, harnesses) = counts(detected);
     let showing = resolve(*chosen, providers, harnesses);
-    for (tab, label, count) in [
-        (DetectTab::Providers, "Providers", Some(providers)),
-        (DetectTab::Harnesses, "Harnesses", Some(harnesses)),
-        (DetectTab::Custom, "Custom endpoint", None),
-    ] {
-        let mut text = match count {
-            Some(count) => egui::RichText::new(format!("{} ({count})", crate::i18n::tr(label))),
-            None => egui::RichText::new(crate::i18n::tr(label)),
-        };
-        if count == Some(0) {
-            text = text.weak();
-        }
-        if ui.selectable_label(showing == tab, text).clicked() {
-            *chosen = Some(tab);
-        }
+    let tabs = [DetectTab::Providers, DetectTab::Harnesses, DetectTab::Custom];
+    let labels = [format!("{} ({providers})", tr("Providers")), format!("{} ({harnesses})", tr("Harnesses")), tr("Custom endpoint")];
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let at = tabs.iter().position(|t| *t == showing).unwrap_or_default();
+    if let Some(i) = crate::widgets::segmented(ui, &labels, at) {
+        *chosen = tabs.get(i).copied();
     }
     showing
 }

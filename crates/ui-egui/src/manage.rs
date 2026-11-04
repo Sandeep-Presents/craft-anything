@@ -81,20 +81,7 @@ pub fn menu(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
     }
 }
 
-/// The same, as quiet links on the project's page.
-pub fn buttons(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
-    if widgets::secondary(ui, None, "Rename").clicked() {
-        ask_rename(app, ws);
-    }
-    if widgets::secondary(ui, Some("copy"), "Duplicate").on_hover_text(tr("A copy to try something else from here.")).clicked() {
-        app.duplicate_project(&ws.root);
-    }
-    if !app.runs.is_busy(&ws.root) && icons::button(ui, "trash-2", 30.0, false, "Delete the project").clicked() {
-        app.state.modal = Some(Modal::Delete(ws.root.clone()));
-    }
-}
-
-fn ask_rename(app: &mut CraftApp, ws: &Workspace) {
+pub(crate) fn ask_rename(app: &mut CraftApp, ws: &Workspace) {
     app.state.rename_input = ws.manifest.name.clone();
     app.state.modal = Some(Modal::Rename(ws.root.clone()));
 }

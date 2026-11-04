@@ -141,11 +141,12 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         }
         engine_choices(app, ui);
         ui.add_space(16.0);
-        ui.horizontal(|ui| {
+        // As tall as Start from the first item, so "Built by" and its picker centre on it.
+        widgets::tall_row(ui, START_H, |ui| {
             crate::builders::built_by(app, ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let ready = !app.state.make.request.trim().is_empty() && url_problem(&app.state.make.url).is_none() && app.creating.is_none();
-                let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, 50.0, 14.0);
+                let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, START_H, 14.0);
                 let start = if ready { start } else { start.on_disabled_hover_text(tr("Say what you want first.")) };
                 if (start.clicked() || submit) && ready {
                     app.start_make();
@@ -190,7 +191,7 @@ fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
                     ui.add_space(24.0);
                     ui.label(RichText::new(tr("your files there are the app, edited in place")).size(theme::SMALL).color(t.text_dim));
                     ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
-                    if widgets::link(ui, "Pick another folder…").clicked() {
+                    if widgets::link_sized(ui, "Pick another folder…", theme::SMALL).clicked() {
                         app.pick(Pick::OwnProject);
                     }
                 });
@@ -202,12 +203,13 @@ fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         let submit = request_box(app, ui, "For example: add a dark mode", Some("Attach pictures (or drop or paste them here)"));
         engine_choices(app, ui);
         ui.add_space(16.0);
-        ui.horizontal(|ui| {
+        // As tall as Start from the first item, so "Built by" and its picker centre on it.
+        widgets::tall_row(ui, START_H, |ui| {
             crate::builders::built_by(app, ui);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let said = !app.state.make.request.trim().is_empty();
                 let ready = folder.is_some() && said && app.creating.is_none();
-                let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, 50.0, 14.0);
+                let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, START_H, 14.0);
                 let start = if ready {
                     start
                 } else {
@@ -417,7 +419,7 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
             icons::show(ui, "cpu", 16.0, t.icon);
             let line = format!("{} {}", crate::engine_ui::ghidra_memory_words(app), tr("More makes a big program's first look faster."));
             ui.label(RichText::new(line).size(theme::SMALL).color(t.text_dim)).on_hover_text(crate::engine_ui::ghidra_memory_guide());
-            if widgets::link(ui, "Change").clicked() {
+            if widgets::link_sized(ui, "Change", theme::SMALL).clicked() {
                 app.state.settings_open = true;
                 app.state.settings_tab = crate::state::SettingsTab::Engines;
             }
@@ -425,7 +427,7 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
     }
     if app.settings.deep_mode && app.ghidra_missing() {
         ui.add_space(8.0);
-        ui.horizontal(|ui| {
+        widgets::control_line(ui, |ui| {
             icons::show(ui, "triangle-alert", 16.0, t.warning);
             ui.label(RichText::new(tr("Ghidra isn't on this computer yet, so the built-in decompiler stands in.")).size(theme::SMALL).color(t.text_dim));
             if app.ghidra.job.is_none() && widgets::secondary(ui, Some("download"), "Get Ghidra").clicked() {
@@ -443,7 +445,7 @@ fn suggestions(app: &mut CraftApp, ui: &mut Ui) {
         TargetRef::Local { .. } => SUGGESTIONS_APP,
         TargetRef::None => SUGGESTIONS_NONE,
     };
-    ui.horizontal_wrapped(|ui| {
+    widgets::control_row(ui, |ui| {
         ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
         ui.label(RichText::new(tr("Ideas:")).size(theme::BODY).color(t.text_dim));
         for s in list.iter().take(2) {
@@ -504,6 +506,9 @@ pub fn project_icon(m: &craft_anything_engine::workspace::Manifest) -> &'static 
         TargetRef::None => "sparkles",
     }
 }
+
+/// How tall the big Start button is, and the row it ends.
+const START_H: f32 = 50.0;
 
 #[cfg(test)]
 mod tests {

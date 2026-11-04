@@ -38,17 +38,17 @@ pub fn make_line(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(22.0);
         if let Some(how) = how {
             ui.label(RichText::new(how).size(theme::SMALL).color(t.text_dim));
-            if widgets::link(ui, "Change").clicked() {
+            if widgets::link_sized(ui, "Change", theme::SMALL).clicked() {
                 app.state.modal = Some(Modal::ExistingFiles);
             }
             ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
         }
-        if widgets::link(ui, if picked { "Pick another folder…" } else { "Choose a folder…" }).clicked() {
+        if widgets::link_sized(ui, if picked { "Pick another folder…" } else { "Choose a folder…" }, theme::SMALL).clicked() {
             app.pick(Pick::ProjectFolder);
         }
         if picked {
             ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
-            if widgets::link(ui, "Use the projects folder").clicked() {
+            if widgets::link_sized(ui, "Use the projects folder", theme::SMALL).clicked() {
                 clear(app);
             }
         }

@@ -982,32 +982,54 @@ fn side(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
     // Pictures of the original: the look the builder matches (websites are photographed for it).
     if !matches!(m.target, TargetRef::Website { .. }) {
         let n = app.facts.references;
-        if widgets::secondary(ui, Some("paperclip"), "Add pictures of the original")
-            .on_hover_text(tr("Screenshots of how it should look. The builder opens each one and matches it."))
-            .clicked()
-        {
+        let full = ui.available_width();
+        let add = ui.scope(|ui| {
+            ui.spacing_mut().interact_size.x = full;
+            widgets::secondary(ui, Some("paperclip"), "Add pictures of the original")
+        });
+        if add.inner.on_hover_text(tr("Screenshots of how it should look. The builder opens each one and matches it.")).clicked() {
             app.pick(crate::Pick::Pictures);
         }
         let note = if n == 0 { tr("None yet. Screenshots help it look right.") } else { trf("{n} picture(s) to match.", &[("n", &n.to_string())]) };
         ui.label(RichText::new(note).color(Tokens::get(ui.ctx()).text_dim).size(theme::SMALL));
         ui.add_space(8.0);
     }
+    // The page's actions, all one width: two to a row when every label fits half, else one.
+    let mut actions: Vec<(&str, &str, &str)> =
+        vec![("folder-open", "Open folder", ""), ("pencil", "Rename", ""), ("copy", "Duplicate", "A copy to try something else from here.")];
+    if !app.runs.is_busy(&ws.root) {
+        actions.push(("trash-2", "Delete…", "Delete the project"));
+    }
+    if matches!(outcome(app), Some(Outcome::Program)) {
+        actions.push(("pin", "Pin this build", "Keep this version in the sidebar to open any time."));
+    }
+    if !app.beginner() {
+        actions.push(("microscope", "Open in the workbench", "The full toolset, evidence and logs."));
+    }
+    let gap = ui.spacing().item_spacing.x;
+    let full = ui.available_width();
+    let half = ((full - gap) / 2.0).floor();
+    let width = if actions.iter().all(|(icon, label, _)| widgets::secondary_width(ui, Some(icon), label) <= half) { half } else { full };
+    let mut clicked = None;
     ui.horizontal_wrapped(|ui| {
-        if widgets::secondary(ui, Some("folder-open"), "Open folder").clicked() {
-            open_folder(app, ws);
-        }
-        if matches!(outcome(app), Some(Outcome::Program))
-            && widgets::secondary(ui, Some("pin"), "Pin this build").on_hover_text(tr("Keep this version in the sidebar to open any time.")).clicked()
-        {
-            app.ask_pin(&ws.root);
-        }
-        crate::manage::buttons(app, ui, ws);
-        if !app.beginner()
-            && widgets::secondary(ui, Some("microscope"), "Open in the workbench").on_hover_text(tr("The full toolset, evidence and logs.")).clicked()
-        {
-            app.state.screen = Screen::Workbench;
+        ui.spacing_mut().interact_size.x = width;
+        for (icon, label, tip) in actions {
+            let r = widgets::secondary(ui, Some(icon), label);
+            let r = if tip.is_empty() { r } else { r.on_hover_text(tr(tip)) };
+            if r.clicked() {
+                clicked = Some(label);
+            }
         }
     });
+    match clicked {
+        Some("Open folder") => open_folder(app, ws),
+        Some("Rename") => crate::manage::ask_rename(app, ws),
+        Some("Duplicate") => app.duplicate_project(&ws.root),
+        Some("Delete…") => app.state.modal = Some(crate::state::Modal::Delete(ws.root.clone())),
+        Some("Pin this build") => app.ask_pin(&ws.root),
+        Some("Open in the workbench") => app.state.screen = Screen::Workbench,
+        _ => {}
+    }
 }
 
 /// How to see what was made: open the built site, or start the built program.
@@ -1061,7 +1083,8 @@ fn open_questions(app: &CraftApp, ui: &mut Ui) {
         ui.add_space(6.0);
         const SHOWN: usize = 5;
         for q in app.facts.open_questions.iter().take(SHOWN) {
-            ui.horizontal_wrapped(|ui| {
+            // Top-aligned so a long question wraps beside the icon, not under it.
+            ui.horizontal_top(|ui| {
                 icons::show(ui, "info", 14.0, t.text_dim);
                 ui.add(egui::Label::new(RichText::new(q).size(theme::SMALL).color(t.text)).wrap());
             });
@@ -1636,12 +1659,8 @@ fn ask_card(app: &mut CraftApp, ui: &mut Ui, r: &Request, answered: Option<&str>
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 let text = app.state.answers.entry(r.id.clone()).or_default();
-                let resp = ui.add(
-                    egui::TextEdit::singleline(text)
-                        .hint_text(tr("Or type your answer…"))
-                        .desired_width(ui.available_width() - 120.0)
-                        .frame(widgets::text_field_frame(&t)),
-                );
+                let w = ui.available_width() - 120.0;
+                let resp = ui.add(widgets::field(ui, text, "Or type your answer…").desired_width(w));
                 let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 let ready = !text.trim().is_empty();
                 if (widgets::primary_icon(ui, Some("send"), "Send", ready).clicked() || enter) && ready {
@@ -1778,7 +1797,10 @@ fn waiting_notes(app: &mut CraftApp, ui: &mut Ui, waiting: &[Note], t: &Tokens) 
                 }
                 // Said once, under the last note.
                 if i + 1 == waiting.len() {
-                    if widgets::link(ui, "Send now").on_hover_text(tr("Stops the current step and sends your notes straight away.")).clicked() {
+                    if widgets::link_sized(ui, "Send now", theme::SMALL)
+                        .on_hover_text(tr("Stops the current step and sends your notes straight away."))
+                        .clicked()
+                    {
                         app.pause();
                     }
                     let line = if waiting.len() == 1 {
@@ -1952,7 +1974,7 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
     let right = egui::Layout::right_to_left(egui::Align::Center);
     ui.horizontal(|ui| {
         // What sending does: ask for a change, or just ask about the build.
-        if let Some(i) = widgets::segmented(ui, &sending, usize::from(app.state.just_ask), 24.0) {
+        if let Some(i) = widgets::segmented_sized(ui, &sending, usize::from(app.state.just_ask), 24.0, widgets::CONTROL_TEXT) {
             app.state.just_ask = i == 1;
         }
         if fits {
@@ -1982,7 +2004,7 @@ fn questions_controls(app: &mut CraftApp, ui: &mut Ui, now: craft_anything_engin
     ui.add_space(8.0);
     {
         let sel = usize::from(now == Questions::Decide);
-        if let Some(i) = widgets::segmented(ui, &["Ask me", "Decide yourself"], sel, 24.0) {
+        if let Some(i) = widgets::segmented_sized(ui, &["Ask me", "Decide yourself"], sel, 24.0, widgets::CONTROL_TEXT) {
             let mode = if i == 0 { Questions::Ask } else { Questions::Decide };
             app.set_questions(root, mode);
         }

@@ -323,7 +323,13 @@ pub fn ghidra_memory_setting(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let set = ghidra_memory(app);
     ui.vertical(|ui| {
-        if let Some(i) = widgets::segmented(ui, &["Automatic", "Custom"], usize::from(set.is_some()), 30.0) {
+        // As wide as the other settings' controls, and the line under it wraps to that width.
+        ui.set_max_width(crate::settings_ui::CONTROL_W);
+        let pick = ui.scope(|ui| {
+            ui.spacing_mut().interact_size.x = crate::settings_ui::CONTROL_W;
+            widgets::segmented(ui, &["Automatic", "Custom"], usize::from(set.is_some()))
+        });
+        if let Some(i) = pick.inner {
             // Custom starts from what a program of a few hundred MB wants.
             app.settings.engines.ghidra.memory_gb = (i == 1).then(|| ghidra::suggested_heap_gb(500 << 20));
             app.settings_changed();
@@ -443,18 +449,10 @@ impl CraftApp {
 
 /// A provider's key field and its Save button; returns the key when Save is pressed.
 fn key_field(app: &mut CraftApp, ui: &mut Ui, provider: &dyn AssetProvider, save: &str) -> Option<String> {
-    let t = Tokens::get(ui.ctx());
     let mut out = None;
     ui.horizontal(|ui| {
         let key = app.key_inputs.entry(provider.id().into()).or_default();
-        let r = ui.add(
-            egui::TextEdit::singleline(key)
-                .password(true)
-                .hint_text(trf("Paste your {name} key", &[("name", provider.name())]))
-                .desired_width(320.0)
-                .min_size(Vec2::new(0.0, widgets::primary_height(ui, save)))
-                .frame(widgets::text_field_frame_compact(&t)),
-        );
+        let r = ui.add(widgets::field(ui, key, &trf("Paste your {name} key", &[("name", provider.name())])).password(true).desired_width(320.0));
         widgets::named(r, &trf("{name} key", &[("name", provider.name())]));
         let k = key.trim().to_string();
         if widgets::primary_icon(ui, None, save, !k.is_empty()).clicked() && !k.is_empty() {
@@ -563,7 +561,7 @@ impl AssetPrices {
 /// "Get a key at …" for a provider that says where.
 fn keys_link(ui: &mut Ui, provider: &dyn AssetProvider) {
     if let Some(page) = provider.keys_page()
-        && widgets::link(ui, &trf("Get a key at {name}", &[("name", provider.name())])).clicked()
+        && widgets::link_sized(ui, &trf("Get a key at {name}", &[("name", provider.name())]), theme::SMALL).clicked()
     {
         ui.ctx().open_url(egui::OpenUrl::new_tab(page));
     }
@@ -644,12 +642,12 @@ pub fn build_with(app: &mut CraftApp, ui: &mut Ui) {
         }
         ui.add_space(8.0);
     }
-    ui.horizontal(|ui| {
+    widgets::control_line(ui, |ui| {
         ui.label(RichText::new(tr("Build with")).size(theme::BODY).color(t.text_dim));
         let names: Vec<&str> = Builder::ALL.iter().map(|b| b.name()).collect();
         // Nothing is selected while the request names another way to build.
         let sel = b.and_then(|b| Builder::ALL.iter().position(|x| *x == b)).unwrap_or(usize::MAX);
-        if let Some(i) = widgets::segmented(ui, &names, sel, 32.0) {
+        if let Some(i) = widgets::segmented(ui, &names, sel) {
             app.state.make.builder = Builder::ALL.get(i).copied();
         }
     });

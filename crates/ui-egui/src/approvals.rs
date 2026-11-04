@@ -141,7 +141,7 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
                 let sel = CHOICES.iter().position(|(_, c)| *c == now).unwrap_or(0);
                 // Every row has the same labels, which `segmented` makes its ids from.
                 ui.push_id(row.name, |ui| {
-                    if let Some(c) = widgets::segmented(ui, &names, sel, 24.0).and_then(|i| CHOICES.get(i)) {
+                    if let Some(c) = widgets::segmented_sized(ui, &names, sel, 24.0, widgets::CONTROL_TEXT).and_then(|i| CHOICES.get(i)) {
                         picked = Some((row.kind, c.1));
                     }
                 });

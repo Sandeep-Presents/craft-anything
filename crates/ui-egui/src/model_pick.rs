@@ -188,9 +188,8 @@ pub(crate) fn drive(app: &mut CraftApp, ui: &Ui, slot: &Slot, ask: Option<Ask>, 
 /// id (the list and the typing field then share the width); with no list, the typing field alone.
 /// Read [`ModelChoice::chosen`]. Returns the first control's rect, for lining a label up with it.
 pub(crate) fn model_picker(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug, choice: &mut ModelChoice, width: f32) -> egui::Rect {
-    let t = Tokens::get(ui.ctx());
     let field = |ui: &mut Ui, text: &mut String, name: &str, hint: &str, w: f32| {
-        let r = ui.add(egui::TextEdit::singleline(text).hint_text(tr(hint)).desired_width(w).frame(widgets::text_field_frame_compact(&t)));
+        let r = ui.add(widgets::field(ui, text, hint).desired_width(w));
         widgets::named(r, name).rect
     };
     if choice.models.is_empty() {
@@ -200,20 +199,16 @@ pub(crate) fn model_picker(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt
     let combo_w = if choice.custom { ((width - gap) / 2.0).max(60.0) } else { width };
     let shown = if choice.custom { tr(CUSTOM) } else { choice.picked.clone() };
     let (mut pick, mut custom) = (None, false);
-    let r = egui::ComboBox::from_id_salt((&id_salt, "model"))
-        .icon(widgets::combo_icon)
-        .width(combo_w)
-        .selected_text(egui::RichText::new(shown).size(crate::theme::CAPTION + 1.0))
-        .show_ui(ui, |ui| {
-            for m in &choice.models {
-                if ui.selectable_label(!choice.custom && *m == choice.picked, m).clicked() {
-                    pick = Some(m.clone());
-                }
+    let r = widgets::combo(ui, egui::ComboBox::from_id_salt((&id_salt, "model")).width(combo_w).selected_text(shown), |ui| {
+        for m in &choice.models {
+            if ui.selectable_label(!choice.custom && *m == choice.picked, m).clicked() {
+                pick = Some(m.clone());
             }
-            if ui.selectable_label(choice.custom, tr(CUSTOM)).clicked() {
-                custom = true;
-            }
-        });
+        }
+        if ui.selectable_label(choice.custom, tr(CUSTOM)).clicked() {
+            custom = true;
+        }
+    });
     let rect = widgets::named(r.response, "Model").rect;
     if let Some(m) = pick {
         choice.picked = m;

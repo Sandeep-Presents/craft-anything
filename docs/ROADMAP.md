@@ -1413,7 +1413,7 @@ Gaps found while using the app for real projects.
 - [x] Choice tiles in a row keep every title on one line and the same height as their neighbours
       (the start-fresh tile wrapped to two lines beside one-line tiles), in every language
       (claimed: ghzgod, branch bugfix/r2.9-sibling-tiles-one-line)
-- [ ] Every control (button, switch, drop-down, field, chip, link) is one height and one font, and
+- [x] Every control (button, switch, drop-down, field, chip, link) is one height and one font, and
       Settings rows line their title up with the control's middle; checked in both modes and German
       (claimed: ghzgod, branch bugfix/r2.9-one-control-size)
 - [ ] macOS: an Edit menu (Undo, Cut, Copy, Paste, Select All). The keys work in text boxes, but

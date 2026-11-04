@@ -31,6 +31,49 @@ pub fn text_field_frame_compact(t: &Tokens) -> Frame {
     text_field_frame(t).inner_margin(Margin::symmetric(8, 6))
 }
 
+/// A wrapping row of labels and controls that is a control tall from its first item, so a label
+/// placed before a drop-down or button is centred on it rather than on egui's shorter default row.
+pub fn control_row<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
+    let h = control_height(ui);
+    row_from(ui, h, true, add)
+}
+
+/// [`control_row`] on one line, for a row that never wraps.
+pub fn control_line<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
+    let h = control_height(ui);
+    row_from(ui, h, false, add)
+}
+
+/// A row that is `height` tall from its first item: everything in it centres on its tallest
+/// control (a big Start button), not on egui's shorter default row.
+pub fn tall_row<R>(ui: &mut Ui, height: f32, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
+    row_from(ui, height, false, add)
+}
+
+fn row_from<R>(ui: &mut Ui, height: f32, wrap: bool, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<R> {
+    let saved = ui.spacing().interact_size.y;
+    ui.spacing_mut().interact_size.y = height;
+    let inner = |ui: &mut Ui| {
+        ui.spacing_mut().interact_size.y = saved;
+        add(ui)
+    };
+    let r = if wrap { ui.horizontal_wrapped(inner) } else { ui.horizontal(inner) };
+    ui.spacing_mut().interact_size.y = saved;
+    r
+}
+
+/// A one-line text field drawn like the controls beside it: [`control_height`] tall, its text and
+/// its hint in the control size, centred. Chain `.desired_width`, `.password` and the rest on as usual.
+pub fn field<'t>(ui: &Ui, text: &'t mut dyn egui::TextBuffer, hint: &str) -> egui::TextEdit<'t> {
+    let font = egui::FontId::proportional(CONTROL_TEXT + 1.5);
+    egui::TextEdit::singleline(text)
+        .font(font.clone())
+        .hint_text(RichText::new(tr(hint)).font(font))
+        .vertical_align(egui::Align::Center)
+        .min_size(Vec2::new(0.0, control_height(ui)))
+        .frame(text_field_frame_compact(&Tokens::get(ui.ctx())))
+}
+
 /// A switch with a label, in place of a checkbox. Flips `on` when clicked.
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
     let t = Tokens::get(ui.ctx());
@@ -84,7 +127,7 @@ pub fn suggestion(ui: &mut Ui, text: &str) -> Response {
     let max_w = ui.available_width().max(60.0);
     let g = ui.painter().layout(tr(text), egui::FontId::proportional(theme::SMALL), t.text, max_w - 26.0);
     let w = if ui.layout().horizontal_justify() { max_w } else { (g.size().x + 26.0).min(max_w) };
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, (g.size().y + 14.0).max(32.0)), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, (g.size().y + 14.0).max(control_height(ui))), Sense::click());
     let h = hover_t(ui, &resp);
     ui.painter().rect(
         rect,
@@ -234,7 +277,44 @@ pub fn primary(ui: &mut Ui, label: &str) -> Response {
 }
 
 pub fn primary_icon(ui: &mut Ui, icon: Option<&str>, label: &str, enabled: bool) -> Response {
-    primary_sized(ui, icon, label, enabled, 32.0, 12.5)
+    primary_sized(ui, icon, label, enabled, control_height(ui), CONTROL_TEXT)
+}
+
+/// The label size of every control (buttons, switches, drop-downs, chips), in the
+/// [`label_galley`] style, so a row of mixed controls reads as one size.
+pub const CONTROL_TEXT: f32 = 12.0;
+
+/// How tall every control is drawn: buttons, switches, drop-downs and the chips beside them.
+pub fn control_height(ui: &Ui) -> f32 {
+    let line = label_galley(ui, "Ag", CONTROL_TEXT, Color32::PLACEHOLDER).size().y;
+    (line + ui.spacing().button_padding.y * 2.0 + 6.0).max(30.0).round()
+}
+
+/// A drop-down drawn like the buttons beside it: [`control_height`] tall, its text in the control
+/// font, centred, with the chevron. Every combo box goes through here.
+pub fn combo<R>(ui: &mut Ui, combo: egui::ComboBox, add: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<Option<R>> {
+    let h = control_height(ui);
+    let line = label_galley(ui, "Ag", CONTROL_TEXT, Color32::PLACEHOLDER).size().y;
+    // egui's combo box measures from the top of its slot, and in a centred layout it then lands a
+    // padding lower. So it gets a slot of exactly its height, centred in a row that is taller.
+    let slot = ui.available_rect_before_wrap();
+    let layout = ui.layout();
+    let top = if layout.is_horizontal() && layout.vertical_align() == egui::Align::Center && slot.height() > h {
+        slot.top() + ((slot.height() - h) / 2.0).round()
+    } else {
+        slot.top()
+    };
+    let rect = egui::Rect::from_min_max(egui::pos2(slot.left(), top), egui::pos2(slot.right(), top + h));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::left_to_right(egui::Align::Min)), |ui| {
+        ui.style_mut().text_styles.insert(egui::TextStyle::Button, theme::medium(CONTROL_TEXT + 1.5));
+        // egui grows a short combo box downward only, so the padding does the centring.
+        ui.spacing_mut().button_padding.y = ((h - line) / 2.0).max(0.0);
+        // A caption-sized override around it (a card's fine print) would shrink its text.
+        ui.style_mut().override_text_style = None;
+        ui.style_mut().override_font_id = None;
+        combo.icon(combo_icon).show_ui(ui, add)
+    })
+    .inner
 }
 
 /// The main button at a given height and label size (Simple mode's Start is a big one).
@@ -243,7 +323,7 @@ pub fn primary_sized(ui: &mut Ui, icon: Option<&str>, label: &str, enabled: bool
     let galley = label_galley(ui, &tr(label), text, t.canvas);
     let icon_w = if icon.is_some() { BUTTON_ICON_W } else { 0.0 };
     let pad = ui.spacing().button_padding;
-    let size = Vec2::new(galley.size().x + icon_w + pad.x * 2.0 + 8.0 + (height - 32.0).max(0.0), (galley.size().y + pad.y * 2.0 + 8.0).max(height));
+    let size = Vec2::new(galley.size().x + icon_w + pad.x * 2.0 + 8.0 + (height - 32.0).max(0.0), (galley.size().y + pad.y * 2.0 + 6.0).max(height));
     let sense = if enabled { Sense::click() } else { Sense::hover() };
     let (rect, resp) = ui.allocate_exact_size(size, sense);
     let fill = if !enabled {
@@ -261,24 +341,23 @@ pub fn primary_sized(ui: &mut Ui, icon: Option<&str>, label: &str, enabled: bool
     if enabled { resp.on_hover_cursor(egui::CursorIcon::PointingHand) } else { resp }
 }
 
-/// How tall [`primary`] draws `label`, so a field beside it can match.
-pub fn primary_height(ui: &Ui, label: &str) -> f32 {
-    let galley = label_galley(ui, &tr(label), 12.5, Color32::PLACEHOLDER);
-    (galley.size().y + ui.spacing().button_padding.y * 2.0 + 8.0).max(32.0)
-}
-
 /// Secondary button: a card-coloured box with a soft edge and an optional icon.
 pub fn secondary(ui: &mut Ui, icon: Option<&str>, label: &str) -> Response {
-    secondary_min(ui, icon, label, 30.0)
+    secondary_min(ui, icon, label, 0.0)
+}
+
+/// How wide [`secondary`] draws `label` with `icon`, before any minimum width.
+pub fn secondary_width(ui: &Ui, icon: Option<&str>, label: &str) -> f32 {
+    let galley = label_galley(ui, &tr(label), CONTROL_TEXT, Color32::PLACEHOLDER);
+    galley.size().x + if icon.is_some() { BUTTON_ICON_W } else { 0.0 } + ui.spacing().button_padding.x * 2.0 + 6.0
 }
 
 /// [`secondary`] at least `min_height` tall, to match a button beside it that is taller.
 pub fn secondary_min(ui: &mut Ui, icon: Option<&str>, label: &str, min_height: f32) -> Response {
     let t = Tokens::get(ui.ctx());
-    let galley = label_galley(ui, &tr(label), 12.0, t.text);
-    let icon_w = if icon.is_some() { BUTTON_ICON_W } else { 0.0 };
-    let pad = ui.spacing().button_padding;
-    let size = Vec2::new(galley.size().x + icon_w + pad.x * 2.0 + 6.0, (galley.size().y + pad.y * 2.0 + 6.0).max(min_height));
+    let galley = label_galley(ui, &tr(label), CONTROL_TEXT, t.text);
+    // `interact_size.x` is the narrowest a control may be, so a column of them can share one width.
+    let size = Vec2::new(secondary_width(ui, icon, label).max(ui.spacing().interact_size.x), control_height(ui).max(min_height));
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let h = hover_t(ui, &resp);
     let fill = if resp.is_pointer_button_down_on() { t.pressed } else { theme::mix(t.card, t.hover, h) };
@@ -306,8 +385,17 @@ const BUTTON_ICON_W: f32 = 22.0;
 
 /// A borderless text button in the accent colour.
 pub fn link(ui: &mut Ui, label: &str) -> Response {
+    link_text(ui, RichText::new(tr(label)))
+}
+
+/// [`link`] at the size of the text beside it, so a link closing a line reads as part of it.
+pub fn link_sized(ui: &mut Ui, label: &str, size: f32) -> Response {
+    link_text(ui, RichText::new(tr(label)).size(size))
+}
+
+fn link_text(ui: &mut Ui, text: RichText) -> Response {
     let t = Tokens::get(ui.ctx());
-    let r = ui.add(egui::Label::new(RichText::new(tr(label)).color(t.accent_ink)).sense(Sense::click()));
+    let r = ui.add(egui::Label::new(text.color(t.accent_ink)).sense(Sense::click()));
     let r = r.on_hover_cursor(egui::CursorIcon::PointingHand);
     if r.hovered() {
         let y = r.rect.bottom();
@@ -318,8 +406,9 @@ pub fn link(ui: &mut Ui, label: &str) -> Response {
 
 /// A segmented switch; the selected segment is a raised card on a sunken track. Returns the newly
 /// picked index when it changes.
-pub fn segmented(ui: &mut Ui, options: &[&str], selected: usize, height: f32) -> Option<usize> {
-    segmented_sized(ui, options, selected, height, 12.0)
+pub fn segmented(ui: &mut Ui, options: &[&str], selected: usize) -> Option<usize> {
+    let h = control_height(ui);
+    segmented_sized(ui, options, selected, h, CONTROL_TEXT)
 }
 
 /// [`segmented`] with a given label size (in the [`label_galley`] style), for a bigger switch.
@@ -335,7 +424,10 @@ pub fn segmented_scaled(ui: &mut Ui, options: &[&str], selected: usize, height: 
     let label = (text + 1.5) * scale - 1.5;
     let (height, pad) = (height * scale, 2.0 * scale);
     let galleys: Vec<_> = options.iter().map(|o| label_galley(ui, &tr(o), label, t.text)).collect();
-    let widths: Vec<f32> = galleys.iter().map(|g| g.size().x + (text * 2.0 + 2.0) * scale).collect();
+    let natural: Vec<f32> = galleys.iter().map(|g| g.size().x + (text * 2.0 + 2.0) * scale).collect();
+    // Stretched to `interact_size.x` like the other controls, the room shared out evenly.
+    let spare = (ui.spacing().interact_size.x - natural.iter().sum::<f32>() - 2.0 * pad).max(0.0) / natural.len().max(1) as f32;
+    let widths: Vec<f32> = natural.iter().map(|w| w + spare).collect();
     let total: f32 = widths.iter().sum::<f32>() + 2.0 * pad;
     let (rect, _) = ui.allocate_exact_size(Vec2::new(total, height), Sense::hover());
     ui.painter().rect(rect, t.radius, t.raised, Stroke::new(scale, t.card_border), egui::StrokeKind::Inside);
@@ -397,9 +489,9 @@ pub fn pill_sized(ui: &mut Ui, text: &str, fg: Color32, bg: Color32, text_size: 
 pub fn status_chip(ui: &mut Ui, text: &str, fg: Color32, bg: Color32) -> Response {
     let t = Tokens::get(ui.ctx());
     let label = tr(text);
-    let g = label_galley(ui, &label, 12.0, fg);
+    let g = label_galley(ui, &label, CONTROL_TEXT, fg);
     let pad = ui.spacing().button_padding;
-    let size = Vec2::new(g.size().x + pad.x * 2.0 + 6.0, (g.size().y + pad.y * 2.0 + 6.0).max(30.0));
+    let size = Vec2::new(g.size().x + pad.x * 2.0 + 6.0, control_height(ui));
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
     ui.painter().rect_filled(rect, t.radius, bg);
     ui.painter().galley_with_override_text_color(rect.center() - g.size() / 2.0, g, fg);

@@ -346,6 +346,42 @@ fn main() {
             a
         });
     }
+    for (name, tab) in [
+        ("settings-builds", craft_anything_ui_egui::state::SettingsTab::Builds),
+        ("settings-plugins", craft_anything_ui_egui::state::SettingsTab::Plugins),
+        ("settings-safety", craft_anything_ui_egui::state::SettingsTab::Safety),
+    ] {
+        if want(name) {
+            render(&out, name, w, h, scale, move || {
+                let mut a = engine_app(None, false);
+                a.state.settings_open = true;
+                a.state.settings_tab = tab;
+                a
+            });
+        }
+    }
+    // Every settings tab in Advanced mode, the denser type the people who live in Settings see.
+    {
+        use craft_anything_ui_egui::state::SettingsTab as T;
+        for (name, tab) in [
+            ("advanced-settings", T::General),
+            ("advanced-settings-engines", T::Engines),
+            ("advanced-settings-ai", T::Ai),
+            ("advanced-settings-builds", T::Builds),
+            ("advanced-settings-plugins", T::Plugins),
+            ("advanced-settings-safety", T::Safety),
+        ] {
+            if want(name) {
+                render(&out, name, w, h, scale, move || {
+                    let mut a = demo::app(demo::engine(Mode::Experienced, true));
+                    demo::fill_projects(&mut a);
+                    a.state.settings_open = true;
+                    a.state.settings_tab = tab;
+                    a
+                });
+            }
+        }
+    }
     // Settings → AI: each asset provider's key (none saved yet), and three AIs: one in use, one
     // building, one extracting a game's files; settings-ai-error adds a save that failed.
     let ai_app = move |error: bool| {

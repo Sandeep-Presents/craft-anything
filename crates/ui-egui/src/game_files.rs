@@ -84,7 +84,7 @@ fn about(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     let mut ask = false;
     widgets::card(&t).show(ui, |ui| {
         ui.set_width(w - 34.0);
-        ui.horizontal(|ui| {
+        widgets::control_line(ui, |ui| {
             icons::show(ui, "puzzle", 20.0, t.accent_ink);
             ui.label(theme::heading(g["engine"].as_str().unwrap_or_default(), theme::CARD));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -212,12 +212,7 @@ fn contents(app: &mut CraftApp, ui: &mut Ui) {
         ui.label(RichText::new(tr("Pictures can't be saved from IoStore containers yet; you can see what's inside.")).color(t.text_faint).size(theme::CAPTION));
         ui.add_space(6.0);
     }
-    let r = ui.add(
-        egui::TextEdit::singleline(&mut app.state.game.filter)
-            .hint_text(tr("Filter by name"))
-            .desired_width(320.0)
-            .frame(widgets::text_field_frame_compact(&t)),
-    );
+    let r = ui.add(widgets::field(ui, &mut app.state.game.filter, "Filter by name").desired_width(320.0));
     widgets::named(r, "Filter the files");
     ui.add_space(8.0);
     let needle = app.state.game.filter.trim().to_lowercase();
@@ -229,7 +224,7 @@ fn contents(app: &mut CraftApp, ui: &mut Ui) {
     }
     let mut save = None;
     for r in &rows {
-        ui.horizontal(|ui| {
+        widgets::control_line(ui, |ui| {
             ui.label(RichText::new(row_name(r)).size(theme::SMALL));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if saves && widgets::secondary(ui, Some("download"), "Save picture").clicked() {

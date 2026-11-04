@@ -40,22 +40,19 @@ pub fn agent_model_picker(ui: &mut Ui, picker: &mut AgentModelPicker) -> bool {
     }
     let default = if picker.context.backend.config.model == "opencode" { tr("OpenCode default") } else { tr("Model default") };
     let selected = picker.model.as_deref().unwrap_or(&default);
-    let response = egui::ComboBox::from_id_salt(("agent-model", &picker.context.backend.config.name))
-        .icon(widgets::combo_icon)
-        .selected_text(selected)
-        .show_ui(ui, |ui| {
-            if ui.selectable_label(picker.model.is_none(), &default).clicked() {
-                picker.model = None;
+    let response = widgets::combo(ui, egui::ComboBox::from_id_salt(("agent-model", &picker.context.backend.config.name)).selected_text(selected), |ui| {
+        if ui.selectable_label(picker.model.is_none(), &default).clicked() {
+            picker.model = None;
+            picker.thinking = None;
+        }
+        for model in models {
+            let label = if model.name == model.id { model.name.clone() } else { format!("{} · {}", model.name, model.id) };
+            if ui.selectable_label(picker.model.as_ref() == Some(&model.id), label).clicked() && picker.model.as_ref() != Some(&model.id) {
+                picker.model = Some(model.id.clone());
                 picker.thinking = None;
             }
-            for model in models {
-                let label = if model.name == model.id { model.name.clone() } else { format!("{} · {}", model.name, model.id) };
-                if ui.selectable_label(picker.model.as_ref() == Some(&model.id), label).clicked() && picker.model.as_ref() != Some(&model.id) {
-                    picker.model = Some(model.id.clone());
-                    picker.thinking = None;
-                }
-            }
-        });
+        }
+    });
     widgets::named(response.response, if picker.context.backend.config.model == "opencode" { "OpenCode model" } else { "Model" });
     let model = models.iter().find(|m| picker.model.as_ref() == Some(&m.id));
     let missing = picker.model.is_some() && model.is_none();
@@ -67,10 +64,11 @@ pub fn agent_model_picker(ui: &mut Ui, picker: &mut AgentModelPicker) -> bool {
     let depths = model.map(|m| m.thinking.as_slice()).unwrap_or_default();
     ui.label(tr("Thinking depth"));
     let default_depth = tr("Model default");
-    let response = egui::ComboBox::from_id_salt(("agent-thinking", &picker.context.backend.config.name))
-        .icon(widgets::combo_icon)
-        .selected_text(picker.thinking.map(|d| d.title()).unwrap_or(&default_depth))
-        .show_ui(ui, |ui| {
+    let response = widgets::combo(
+        ui,
+        egui::ComboBox::from_id_salt(("agent-thinking", &picker.context.backend.config.name))
+            .selected_text(picker.thinking.map(|d| d.title()).unwrap_or(&default_depth)),
+        |ui| {
             if ui.selectable_label(picker.thinking.is_none(), &default_depth).clicked() {
                 picker.thinking = None;
             }
@@ -79,7 +77,8 @@ pub fn agent_model_picker(ui: &mut Ui, picker: &mut AgentModelPicker) -> bool {
                     picker.thinking = Some(*depth);
                 }
             }
-        });
+        },
+    );
     widgets::named(response.response, "Thinking depth");
     let unsupported = picker.thinking.is_some_and(|d| !depths.contains(&d));
     if unsupported {
@@ -381,7 +380,7 @@ pub fn built_by(app: &mut CraftApp, ui: &mut Ui) {
     let shown = app.state.make.ai.clone().unwrap_or_else(|| automatic.clone());
     ui.label(RichText::new(tr("Built by")).size(theme::BODY).color(t.text_dim));
     let mut pick = None;
-    let r = egui::ComboBox::from_id_salt("built-by").icon(widgets::combo_icon).selected_text(shown).width(220.0).show_ui(ui, |ui| {
+    let r = widgets::combo(ui, egui::ComboBox::from_id_salt("built-by").selected_text(shown).width(220.0), |ui| {
         if ui.selectable_label(app.state.make.ai.is_none(), automatic).on_hover_text(tr("Whatever Settings → AI builds with.")).clicked() {
             pick = Some(None);
         }
