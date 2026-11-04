@@ -541,18 +541,27 @@ pub fn ui_tree_json(nodes: &[UiNode], density_dpi: Option<u32>, package: Option<
 /// a new minute on the clock is still the same screen; a different set of buttons or menu
 /// entries is not.
 pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
-    use std::hash::{Hash, Hasher};
     // Pass 1: which run of same-shaped consecutive siblings each node belongs to. Same-shaped
-    // means the whole subtree (classes and ids, texts left out), not the class alone: the rows
-    // of a list share a shape, the layers an activity stacks as sibling FrameLayouts don't. The
-    // one sibling that holds the focus joins the run of its class and id whatever its shape: a
-    // focused control often carries a highlight view of its own, and a moved focus is the same
-    // screen.
+    // means the whole subtree (classes and ids, texts left out, lists inside counted once), not
+    // the class alone: the rows of a list share a shape, the layers an activity stacks as
+    // sibling FrameLayouts don't. Plain leaves (texts, pictures, progress bars) shape nothing:
+    // they come and go with the data on screen. The one sibling that holds the focus joins the
+    // run of its class and id whatever its shape, and a run is read through a member without
+    // the focus: a focused control often carries a highlight view of its own, and a moved focus
+    // is the same screen.
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for item in fingerprint_items(nodes) {
+        item.hash(&mut h);
+    }
+    format!("{:016x}", h.finish())
+}
+
+/// What the fingerprint hashes, one item per run: depth, class, id and the words of a landable
+/// control (or a short run of them).
+fn fingerprint_items(nodes: &[UiNode]) -> Vec<(usize, String, String, String)> {
     let shapes = subtree_shapes(nodes);
     let mut run_of = vec![0usize; nodes.len()];
-    // Per run: its members in order, and the member whose subtree stands for it: the first,
-    // unless that one holds the focus and a later member is shaped otherwise (the focus's
-    // decoration), when it is the first such member.
     let mut runs: Vec<Vec<usize>> = Vec::new();
     let mut run_rep: Vec<usize> = Vec::new();
     let mut prev: Vec<Option<(usize, u64, bool)>> = Vec::new();
@@ -569,9 +578,8 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
                 if let Some(members) = runs.get_mut(r) {
                     members.push(i);
                 }
-                let first = seen_run_first(&runs, r);
-                let decorated_first = first_focused && !n.focused && shape != first_shape;
-                if let Some(rep) = run_rep.get_mut(r).filter(|rep| decorated_first && Some(**rep) == first) {
+                let rep_focused = run_rep.get(r).and_then(|&j| nodes.get(j)).is_some_and(|m| m.focused);
+                if let Some(rep) = run_rep.get_mut(r).filter(|_| rep_focused && !n.focused) {
                     *rep = i;
                 }
             }
@@ -584,9 +592,9 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
             }
         }
     }
-    // Pass 2: hash each run once, through its representative's subtree; a short run (a button,
-    // a pair of them, a menu entry) speaks with every member's words, a list with none.
-    let mut h = std::collections::hash_map::DefaultHasher::new();
+    // Pass 2: each run once, through its representative's subtree; a short run (a button, a
+    // pair of them, a menu entry) speaks with every member's words, a list with none.
+    let mut items = Vec::new();
     let mut skip_below: Option<usize> = None;
     for (i, n) in nodes.iter().enumerate() {
         if skip_below.is_some_and(|d| n.depth > d) {
@@ -599,14 +607,19 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
             skip_below = Some(n.depth);
             continue;
         }
+        // Plain text, a picture, a progress bar: what a screen shows changes with its data and is
+        // no part of what the screen is.
+        if is_quiet_leaf(nodes, i) {
+            continue;
+        }
         // A control's words count when it is one (a button, a menu entry), not a list; a
         // container with controls inside is shape only, its controls speak for themselves.
         let container = nodes.iter().skip(i + 1).take_while(|m| m.depth > n.depth).any(|m| m.focusable || m.clickable);
-        let landable = (n.focusable || n.clickable) && members.len() < 3 && !container;
+        let landable = (n.focusable || n.clickable) && members.len() < 3 && !container && !is_list(n);
         let text = if landable { members.iter().map(|&m| digits_as_one(&control_words(nodes, m))).collect::<Vec<_>>().join("\u{1f}") } else { String::new() };
-        (n.depth, n.class.as_str(), n.resource_id.as_str(), text).hash(&mut h);
+        items.push((n.depth, n.class.clone(), n.resource_id.clone(), text));
     }
-    format!("{:016x}", h.finish())
+    items
 }
 
 /// The first member of run `r`.
@@ -619,33 +632,82 @@ fn seen_as(first: Option<usize>, same: impl Fn(usize) -> bool) -> bool {
     first.is_some_and(same)
 }
 
-/// Each node's subtree shape: its class and id and its children's shapes, in order; texts, bounds
-/// and states left out. Walked backwards, so a node's children (one level below it) are known
-/// when it is reached; a child whose parent is missing from a cut-off dump is dropped.
+/// A list: what it holds is data, however it is reached. Its own focus (a row of a guide takes
+/// the focus for its cells) makes it no control, and its cells' words are no part of the screen.
+fn is_list(n: &UiNode) -> bool {
+    n.scrollable || ["RecyclerView", "ListView", "GridView", "ScrollView", "ViewPager", "ViewPager2"].iter().any(|c| n.class.ends_with(c))
+}
+
+/// A node nobody can land on with nothing inside it: a plain text, a picture, a progress bar.
+/// What such a node shows changes with the data on screen, not with the screen.
+fn is_quiet_leaf(nodes: &[UiNode], i: usize) -> bool {
+    let Some(n) = nodes.get(i) else { return false };
+    !(n.focusable || n.clickable) && nodes.get(i + 1).is_none_or(|m| m.depth <= n.depth)
+}
+
+/// Each node's subtree shape: its class and id and its children's shapes in order, a run of
+/// equal shapes among them counted once (a row of four cells is shaped like one of three);
+/// texts, bounds and states left out. The control that holds the focus takes the shape of a
+/// sibling of its class and id, so a highlight of its own makes neither it, its row nor its
+/// screen another; its ancestors are shaped with it.
 fn subtree_shapes(nodes: &[UiNode]) -> Vec<u64> {
     use std::hash::{Hash, Hasher};
-    let mut shapes = vec![0u64; nodes.len()];
-    let mut pending: Vec<Vec<u64>> = Vec::new();
-    for (i, n) in nodes.iter().enumerate().rev() {
-        let below = n.depth.saturating_add(1);
-        if pending.len() <= below {
-            pending.resize(below + 1, Vec::new());
+    // Parent and children of every node, from the depths; a child whose parent a cut-off dump
+    // lacks hangs from the nearest shallower node before it.
+    let mut parent: Vec<Option<usize>> = vec![None; nodes.len()];
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
+    let mut open: Vec<usize> = Vec::new();
+    for (i, n) in nodes.iter().enumerate() {
+        open.truncate(n.depth);
+        if let Some(&p) = open.last() {
+            parent[i] = Some(p);
+            if let Some(c) = children.get_mut(p) {
+                c.push(i);
+            }
         }
-        let children = pending.get_mut(below).map(std::mem::take).unwrap_or_default();
-        pending.truncate(below + 1);
+        let fill = open.last().copied().unwrap_or(i);
+        open.resize(n.depth, fill);
+        open.push(i);
+    }
+    let shape_of = |i: usize, shapes: &[u64]| -> u64 {
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        n.class.hash(&mut h);
-        n.resource_id.hash(&mut h);
-        children.len().hash(&mut h);
-        for c in children.iter().rev() {
-            c.hash(&mut h);
+        if let Some(n) = nodes.get(i) {
+            n.class.hash(&mut h);
+            n.resource_id.hash(&mut h);
         }
-        let shape = h.finish();
-        if let Some(slot) = shapes.get_mut(i) {
-            *slot = shape;
+        let mut last = None;
+        for c in children.get(i).into_iter().flatten().filter(|c| !is_quiet_leaf(nodes, **c)) {
+            let s = shapes.get(*c).copied().unwrap_or_default();
+            if last != Some(s) {
+                s.hash(&mut h);
+                last = Some(s);
+            }
         }
-        if let Some(level) = pending.get_mut(n.depth) {
-            level.push(shape);
+        h.finish()
+    };
+    // Children come after their parent, so a backward walk shapes them first.
+    let mut shapes = vec![0u64; nodes.len()];
+    for i in (0..nodes.len()).rev() {
+        let s = shape_of(i, &shapes);
+        shapes[i] = s;
+    }
+    if let Some(f) = nodes.iter().position(|n| n.focused) {
+        let siblings = parent.get(f).copied().flatten().and_then(|p| children.get(p));
+        let like = |j: &&usize| **j != f && nodes.get(**j).zip(nodes.get(f)).is_some_and(|(m, n)| m.class == n.class && m.resource_id == n.resource_id);
+        let borrowed = siblings.and_then(|s| s.iter().filter(|j| **j < f).rfind(like).or_else(|| s.iter().find(like)));
+        if let Some(&j) = borrowed {
+            let s = shapes.get(j).copied().unwrap_or_default();
+            if let Some(slot) = shapes.get_mut(f) {
+                *slot = s;
+            }
+            let mut up = parent.get(f).copied().flatten();
+            while let Some(a) = up {
+                let s = shape_of(a, &shapes);
+                if let Some(slot) = shapes.get_mut(a) {
+                    *slot = s;
+                }
+                up = parent.get(a).copied().flatten();
+            }
         }
     }
     shapes
@@ -1292,5 +1354,112 @@ mod tests {
         let two = |a: &str, b: &str, focused: usize| bar(&[a, b], focused);
         assert_eq!(screen_fingerprint(&two("OK", "Cancel", 0)), screen_fingerprint(&two("OK", "Cancel", 1)), "two buttons, either focused");
         assert_ne!(screen_fingerprint(&two("OK", "Cancel", 0)), screen_fingerprint(&two("Yes", "No", 0)), "other buttons are another screen");
+    }
+
+    /// A TV guide: rows with three or four programme cells each, the focused cell with a
+    /// highlight of its own. Wherever the cursor is, and however it is scrolled, it is one screen.
+    #[test]
+    fn a_guide_is_the_same_screen_wherever_its_cursor_is() {
+        let guide = |cells_per_row: &[usize], focus: (usize, usize)| -> Vec<UiNode> {
+            let mut n = vec![UiNode { class: "android.widget.FrameLayout".into(), visible: true, ..Default::default() }];
+            for (r, &cells) in cells_per_row.iter().enumerate() {
+                n.push(UiNode { depth: 1, class: "android.widget.LinearLayout".into(), resource_id: "app:id/row".into(), visible: true, ..Default::default() });
+                n.push(UiNode { depth: 2, class: "android.widget.TextView".into(), text: format!("Channel {r}"), visible: true, ..Default::default() });
+                for c in 0..cells {
+                    let focused = (r, c) == focus;
+                    n.push(UiNode {
+                        depth: 2,
+                        class: "android.widget.FrameLayout".into(),
+                        resource_id: "app:id/cell".into(),
+                        focusable: true,
+                        focused,
+                        visible: true,
+                        ..Default::default()
+                    });
+                    if focused {
+                        n.push(UiNode { depth: 3, class: "android.view.View".into(), visible: true, ..Default::default() });
+                    }
+                    n.push(UiNode {
+                        depth: 3,
+                        class: "android.widget.TextView".into(),
+                        text: format!("Programme {r}{c}"),
+                        visible: true,
+                        ..Default::default()
+                    });
+                }
+            }
+            n
+        };
+        let first = screen_fingerprint(&guide(&[3, 4, 3, 4, 2], (0, 0)));
+        assert_eq!(first, screen_fingerprint(&guide(&[3, 4, 3, 4, 2], (2, 1))), "the cursor in a middle row");
+        // The detail panel above shows a picture for one programme, a progress bar and a time
+        // for the one on now, and the playing channel's row carries two icons: still the guide.
+        let dressed = |cells: &[usize], focus: (usize, usize), on_now: bool, playing_row: usize| {
+            let mut n = guide(cells, focus);
+            let leaf = |class: &str| UiNode { depth: 2, class: class.into(), visible: true, ..Default::default() };
+            let mut header = vec![UiNode {
+                depth: 1,
+                class: "android.widget.LinearLayout".into(),
+                resource_id: "app:id/detail".into(),
+                visible: true,
+                ..Default::default()
+            }];
+            if on_now {
+                header.push(leaf("android.widget.ProgressBar"));
+                header.push(leaf("android.widget.TextView"));
+            } else {
+                header.push(leaf("android.widget.ImageView"));
+            }
+            n.splice(1..1, header);
+            let row_start = n.iter().enumerate().filter(|(_, m)| m.resource_id == "app:id/row").nth(playing_row).map(|(i, _)| i + 2).unwrap_or(n.len());
+            n.splice(row_start..row_start, [leaf("android.widget.ImageView"), leaf("android.widget.ImageView")]);
+            screen_fingerprint(&n)
+        };
+        assert_eq!(
+            dressed(&[3, 4, 3, 4, 2], (0, 0), false, 1),
+            dressed(&[3, 4, 3, 4, 2], (3, 2), true, 2),
+            "the detail panel and the playing row follow the data"
+        );
+        assert_ne!(first, dressed(&[3, 4, 3, 4, 2], (0, 0), false, 1), "the detail panel itself is part of the screen");
+        assert_eq!(first, screen_fingerprint(&guide(&[3, 4, 3, 4, 2], (4, 1))), "the cursor in the last row");
+        assert_eq!(first, screen_fingerprint(&guide(&[4, 2, 3, 3, 3, 4], (3, 2))), "scrolled: other rows, other cell counts");
+    }
+
+    /// A guide whose rows take the focus for their cells: each row is a focusable list of plain
+    /// texts. A list is no control, so its cells' words, which change with the programmes on,
+    /// are no part of the screen.
+    #[test]
+    fn a_focusable_list_of_texts_speaks_no_words() {
+        let rows = |cells: &[&[&str]], focused: usize| -> Vec<UiNode> {
+            let mut n = vec![UiNode { class: "android.widget.FrameLayout".into(), visible: true, ..Default::default() }];
+            for (r, texts) in cells.iter().enumerate() {
+                n.push(UiNode {
+                    depth: 1,
+                    class: "android.widget.FrameLayout".into(),
+                    focusable: true,
+                    focused: r == focused,
+                    visible: true,
+                    ..Default::default()
+                });
+                n.push(UiNode { depth: 2, class: "android.widget.TextView".into(), text: format!("Channel {r}"), visible: true, ..Default::default() });
+                n.push(UiNode {
+                    depth: 2,
+                    class: "androidx.recyclerview.widget.RecyclerView".into(),
+                    resource_id: "app:id/h".into(),
+                    focusable: true,
+                    visible: true,
+                    ..Default::default()
+                });
+                for t in *texts {
+                    n.push(UiNode { depth: 3, class: "android.widget.TextView".into(), text: (*t).into(), visible: true, ..Default::default() });
+                }
+            }
+            n
+        };
+        let a = rows(&[&["News at six", "Weather"], &["Film", "Film", "Film"]], 0);
+        let b = rows(&[&["Quiz"], &["Film", "News", "Sport", "Late show"]], 1);
+        assert_eq!(screen_fingerprint(&a), screen_fingerprint(&b), "other programmes, the cursor on another row");
+        assert!(is_list(&UiNode { scrollable: true, ..Default::default() }));
+        assert!(!is_list(&UiNode { class: "android.widget.Button".into(), ..Default::default() }));
     }
 }

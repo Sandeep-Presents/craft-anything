@@ -877,6 +877,18 @@ The same map then made a screen of every focus position on the player's menu bar
 item carries a highlight view of its own, so its shape broke it out of the bar's run and its words
 counted as one control's. The focused sibling joins its run whatever its shape. Check a bar with
 the focus on its first, a middle and its last item before trusting a map of it.
+And the next map spent its 24 states on the guide at 20 cursor positions: its rows have three or
+four programme cells each, so their subtree shapes differed and the row fold broke, and the
+focused cell's highlight did the same inside its row. A shape counts a run of equal children
+once, and the focused control takes a sibling's shape. Before the real map, capture the busiest
+list at five cursor positions and scrolled, and check the fingerprints agree.
+Even then the guide hashed apart: its detail panel shows a picture for one programme and a
+progress bar for the one on now, and the playing channel's row carries two icons. Plain leaves
+(texts, pictures, progress bars) are what a screen shows, not what it is: they shape nothing.
+And once more: each guide row takes the focus for its cells, a focusable `RecyclerView` of plain
+texts, so it was read as a control and spoke with its cells' words, which change with the
+programmes on. A list (scrollable, or a list class) is a container whatever its focus. Each of
+these four rules was found by one more live capture: budget for that, not for one.
 
 **A device check that launched the original.** The Android device check installed the build's
 APK, then launched, drove and read the crash log of the *target's* package (the original app's),
