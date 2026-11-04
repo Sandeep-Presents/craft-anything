@@ -2778,7 +2778,7 @@ fn a_saved_asset_key_gets_an_api_builders_tool_past_the_key_check() {
 }
 
 /// The person's own ComfyUI server makes pictures with no key, so a run with only that set up
-/// offers assets in its brief, and one with only its address and another picture model doesn't.
+/// offers assets in its brief; an address with another picture model, or no checkpoint, doesn't.
 #[test]
 fn a_comfyui_server_alone_gives_a_run_its_assets() {
     if std::env::var_os("FAL_KEY").is_some() {
@@ -2793,7 +2793,10 @@ fn a_comfyui_server_alone_gives_a_run_its_assets() {
     assert!(!worker.assets, "an address alone, with another picture model");
     worker.engine.session().settings.assets.image_model = Some(craft_anything_engines::assets::comfyui::ID.into());
     worker.load_asset_keys(&store);
-    assert!(worker.assets, "ComfyUI picked, with its address, and no key anywhere");
+    assert!(!worker.assets, "no checkpoint, so the asset tools would refuse every picture");
+    worker.engine.session().settings.assets.comfyui.checkpoint = "sd_xl_base_1.0.safetensors".into();
+    worker.load_asset_keys(&store);
+    assert!(worker.assets, "ComfyUI picked, with its address and checkpoint, and no key anywhere");
 }
 
 /// A worker over a test session and the workspace's feed, for check tests.

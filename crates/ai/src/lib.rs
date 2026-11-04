@@ -175,9 +175,12 @@ fn kind_env_key_with(kind: BackendKind, base: Option<&str>, get: impl Fn(&str) -
     keys::env_var(kind).and_then(get).filter(|k| !k.trim().is_empty())
 }
 
-/// Pictures come from the person's own ComfyUI server: it's the picture model and has an address.
+/// Pictures come from the person's own ComfyUI server: it's the picture model, with the same two
+/// fields the asset tools need before they send anything (an address and a checkpoint).
 pub(crate) fn comfyui_ready(a: &craft_anything_engine::settings::AssetSettings) -> bool {
-    a.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID) && !a.comfyui.address.trim().is_empty()
+    a.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID)
+        && !a.comfyui.address.trim().is_empty()
+        && !a.comfyui.checkpoint.trim().is_empty()
 }
 
 /// The OpenCode Go key from the environment, when the base URL is its own. A blank value counts as
