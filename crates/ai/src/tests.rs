@@ -1789,3 +1789,19 @@ fn openrouter_asks_again_for_an_answer_the_key_can_afford() {
     assert!(other.turn(&request, &mut |_| {}, &Stop::default()).is_err());
     assert_eq!(seen.lock().unwrap().len(), 1);
 }
+
+/// A ComfyUI server picked as the picture model lets builds make assets with no key of any kind.
+#[test]
+fn a_comfyui_server_lets_builds_make_assets_without_a_key() {
+    if std::env::var_os("FAL_KEY").is_some() {
+        return; // a real key in the environment answers yes on its own
+    }
+    let (h, _d) = hub();
+    assert!(!h.can_make_assets(), "no key and no server");
+    h.engine.session().settings.assets.image_model = Some("comfyui".into());
+    assert!(!h.can_make_assets(), "ComfyUI picked but no address");
+    h.engine.session().settings.assets.comfyui.address = "http://192.168.1.20:8188".into();
+    assert!(h.can_make_assets());
+    h.engine.session().settings.assets.image_model = Some("flux-dev".into());
+    assert!(!h.can_make_assets(), "an address alone doesn't count when another model is picked");
+}

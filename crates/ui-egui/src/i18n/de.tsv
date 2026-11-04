@@ -1495,3 +1495,17 @@ Gemini API	Gemini-API
 Coding agent	Coding-Agent
 Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Noch nichts gefunden. Wir suchen nach API-Schlüsseln, lokalen Modellservern (llama.cpp, LM Studio) und Agent-Apps, die Sie schon haben. Ein Server auf einem anderen Port oder Computer lässt sich im Tab Eigener Endpunkt hinzufügen.
 You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Einen Claude-, ChatGPT- oder OpenRouter-Schlüssel, ein lokales Modell (llama.cpp, LM Studio) oder einen Agenten, den Sie schon nutzen, können Sie später unter Einstellungen → KI hinzufügen. Ein Server per Adresse gehört in den Tab Eigener Endpunkt.
+Checkpoint	Checkpoint
+Workflow	Workflow
+ComfyUI address	ComfyUI-Adresse
+ComfyUI workflow	ComfyUI-Workflow
+e.g. http://192.168.1.20:8188	z. B. http://192.168.1.20:8188
+API-format workflow JSON, optional	Workflow-JSON im API-Format, optional
+on your server	auf Ihrem Server
+No key needed; pictures are made on your server.	Kein Schlüssel nötig; die Bilder entstehen auf Ihrem Server.
+List ComfyUI's checkpoints	Checkpoints von ComfyUI auflisten
+Test ComfyUI	ComfyUI testen
+Check a ComfyUI server	ComfyUI-Server prüfen
+Looking for checkpoints…	Suche Checkpoints…
+{n} checkpoints found	{n} Checkpoints gefunden
+1 checkpoint found	1 Checkpoint gefunden

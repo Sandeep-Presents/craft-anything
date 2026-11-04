@@ -181,6 +181,11 @@ pub enum Done {
         seq: u64,
         result: Result<craft_anything_ai::TestReport, ToolError>,
     },
+    /// The ComfyUI server answered the check in Settings → Builds (or didn't), in words.
+    ComfyTested {
+        seq: u64,
+        result: Result<String, ToolError>,
+    },
     /// A saved AI answered a tiny request (or didn't).
     BackendTested {
         name: String,
@@ -521,6 +526,8 @@ pub struct CraftApp {
     pub card_models: model_pick::CardModels,
     /// Counts listings and tests, so a late answer never replaces a newer one.
     pub model_seq: u64,
+    /// Settings → Builds: ComfyUI's checkpoints and last test.
+    pub comfy_form: model_pick::ComfyForm,
     /// The last test of each saved AI, shown under its row.
     pub row_tests: std::collections::BTreeMap<String, model_pick::RowTest>,
     /// Settings → AI's "Custom endpoint" form. Not kept with the UI state: its key goes
@@ -658,6 +665,7 @@ impl CraftApp {
             key_inputs: Default::default(),
             card_models: Default::default(),
             model_seq: 0,
+            comfy_form: model_pick::ComfyForm::default(),
             row_tests: Default::default(),
             server_form: ServerForm::default(),
             runs: craft_anything_ai::rebuild::RunSet::new(craft_anything_engine::settings::BuildSettings::default().parallel),
@@ -1668,6 +1676,7 @@ impl CraftApp {
             }
             Done::ModelsListed { slot, seq, result } => model_pick::listed(self, &slot, seq, result),
             Done::EndpointTested { seq, result } => model_pick::endpoint_tested(self, seq, result),
+            Done::ComfyTested { seq, result } => model_pick::comfy_tested(self, seq, result),
             Done::BackendTested { name, result } => model_pick::backend_tested(self, name, result),
             Done::ModelChoices { name, result } => match result {
                 // Kept only while the picker is still open for that AI.

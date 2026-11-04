@@ -1495,3 +1495,17 @@ Gemini API	API Gemini
 Coding agent	Programovací agent
 Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Zatím nic nenalezeno. Hledáme klíče API, místní servery modelů (llama.cpp, LM Studio) a aplikace agentů, které už máte. Server na jiném portu nebo jiném počítači můžete přidat na kartě Vlastní koncový bod.
 You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Klíč Claude, ChatGPT nebo OpenRouter, místní model (llama.cpp, LM Studio) či agenta, kterého již používáte, můžete později přidat v Nastavení → AI. Server podle adresy patří na kartu Vlastní koncový bod.
+Checkpoint	Checkpoint
+Workflow	Workflow
+ComfyUI address	Adresa ComfyUI
+ComfyUI workflow	Workflow ComfyUI
+e.g. http://192.168.1.20:8188	např. http://192.168.1.20:8188
+API-format workflow JSON, optional	Workflow JSON ve formátu API, volitelné
+on your server	na vašem serveru
+No key needed; pictures are made on your server.	Klíč není potřeba; obrázky vznikají na vašem serveru.
+List ComfyUI's checkpoints	Vypsat checkpointy ComfyUI
+Test ComfyUI	Vyzkoušet ComfyUI
+Check a ComfyUI server	Zkontrolovat server ComfyUI
+Looking for checkpoints…	Hledám checkpointy…
+{n} checkpoints found	Nalezeno checkpointů: {n}
+1 checkpoint found	Nalezen 1 checkpoint

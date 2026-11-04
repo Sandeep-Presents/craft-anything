@@ -1495,3 +1495,17 @@ Gemini API	Gemini API
 Coding agent	编码代理
 Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	尚未找到。我们会查找 API 密钥、本地模型服务器(llama.cpp、LM Studio)以及你已有的代理应用。其他端口或其他电脑上的服务器可在“自定义端点”标签页添加。
 You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	你可以稍后在 设置 → AI 中添加 Claude、ChatGPT 或 OpenRouter 密钥、本地模型(llama.cpp、LM Studio)或你已在用的代理。按地址添加的服务器放在“自定义端点”标签页。
+Checkpoint	检查点
+Workflow	工作流
+ComfyUI address	ComfyUI 地址
+ComfyUI workflow	ComfyUI 工作流
+e.g. http://192.168.1.20:8188	例如: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 格式的工作流 JSON,可选
+on your server	在你的服务器上
+No key needed; pictures are made on your server.	无需密钥;图片在你的服务器上生成。
+List ComfyUI's checkpoints	列出 ComfyUI 的检查点
+Test ComfyUI	测试 ComfyUI
+Check a ComfyUI server	检查 ComfyUI 服务器
+Looking for checkpoints…	正在查找检查点…
+{n} checkpoints found	找到 {n} 个检查点
+1 checkpoint found	找到 1 个检查点

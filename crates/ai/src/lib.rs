@@ -175,6 +175,11 @@ fn kind_env_key_with(kind: BackendKind, base: Option<&str>, get: impl Fn(&str) -
     keys::env_var(kind).and_then(get).filter(|k| !k.trim().is_empty())
 }
 
+/// Pictures come from the person's own ComfyUI server: it's the picture model and has an address.
+pub(crate) fn comfyui_ready(a: &craft_anything_engine::settings::AssetSettings) -> bool {
+    a.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID) && !a.comfyui.address.trim().is_empty()
+}
+
 /// The OpenCode Go key from the environment, when the base URL is its own. A blank value counts as
 /// unset, so the other name is still tried.
 fn go_env_key(base: &str) -> Option<String> {
@@ -826,10 +831,12 @@ impl AiHub {
         Ok(removed)
     }
 
-    /// Some built-in asset provider has a key, so builds can generate assets.
-    pub fn has_asset_keys(&self) -> bool {
+    /// Builds can generate assets: some built-in asset provider has a key, or pictures come from
+    /// the person's own ComfyUI server (the picture model, with an address), which needs none.
+    pub fn can_make_assets(&self) -> bool {
+        let comfy = comfyui_ready(&self.engine.session().settings.assets);
         let providers = craft_anything_engines::assets::AssetProviders::built_in();
-        providers.ids().into_iter().any(|id| self.has_asset_key(&providers, id))
+        comfy || providers.ids().into_iter().any(|id| self.has_asset_key(&providers, id))
     }
 
     /// Save an asset provider's key (keychain first). Returns where it went.

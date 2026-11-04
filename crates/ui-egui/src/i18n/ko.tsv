@@ -1495,3 +1495,17 @@ Gemini API	Gemini API
 Coding agent	코딩 에이전트
 Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	아직 찾은 것이 없습니다. API 키, 로컬 모델 서버(llama.cpp, LM Studio), 이미 있는 에이전트 앱을 찾습니다. 다른 포트나 다른 컴퓨터에 있는 서버는 사용자 지정 엔드포인트 탭에서 추가할 수 있습니다.
 You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Claude, ChatGPT, OpenRouter 키나 로컬 모델(llama.cpp, LM Studio), 이미 쓰는 에이전트는 나중에 설정 → AI에서 추가할 수 있습니다. 주소로 지정하는 서버는 사용자 지정 엔드포인트 탭에 추가합니다.
+Checkpoint	체크포인트
+Workflow	워크플로
+ComfyUI address	ComfyUI 주소
+ComfyUI workflow	ComfyUI 워크플로
+e.g. http://192.168.1.20:8188	예: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 형식 워크플로 JSON, 선택 사항
+on your server	내 서버에서
+No key needed; pictures are made on your server.	키가 필요 없습니다. 그림은 내 서버에서 만들어집니다.
+List ComfyUI's checkpoints	ComfyUI 체크포인트 목록
+Test ComfyUI	ComfyUI 테스트
+Check a ComfyUI server	ComfyUI 서버 확인
+Looking for checkpoints…	체크포인트를 찾는 중…
+{n} checkpoints found	체크포인트 {n}개를 찾았습니다
+1 checkpoint found	체크포인트 1개를 찾았습니다

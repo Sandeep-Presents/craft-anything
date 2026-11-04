@@ -117,6 +117,7 @@ const ACTIONS: &[Action] = &[
     a("remove_backend_key",  "forget an API key saved in the app",             Cli("ai key <name> --forget")),
     a("list_models_for",     "look up the models an address or key offers",    Cli("ai models --kind --base-url --key-env --key-stdin")),
     a("test_endpoint",       "try an AI by its address before adding it",      Cli("ai test --kind --base-url --model --key-env --key-stdin")),
+    a("test_comfyui",        "try the ComfyUI server: its version, card and checkpoints", Tool(&["assets_comfyui_check"])),
     a("test_backend",        "try a connected AI with a short question",       Cli("ai test <name>")),
     a("pick_model",          "list the models an AI can use",                  Cli("ai model <name>")),
     a("set_model",           "change the model an AI uses",                    Cli("ai model <name> <model>")),

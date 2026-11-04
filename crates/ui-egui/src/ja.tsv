@@ -979,3 +979,17 @@ Server address	サーバーのアドレス
 AI name	AI の名前
 Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	まだ見つかっていません。API キー、ローカルのモデルサーバー(llama.cpp、LM Studio)、すでにあるエージェントアプリを探します。別のポートや別のコンピュータにあるサーバーは、「カスタムエンドポイント」タブで追加できます。
 You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Claude、ChatGPT、OpenRouter のキー、ローカルモデル(llama.cpp、LM Studio)、すでに使っているエージェントは、後から 設定 → AI で追加できます。アドレスで指定するサーバーは「カスタムエンドポイント」タブに追加します。
+Checkpoint	チェックポイント
+Workflow	ワークフロー
+ComfyUI address	ComfyUI のアドレス
+ComfyUI workflow	ComfyUI のワークフロー
+e.g. http://192.168.1.20:8188	例: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 形式のワークフロー JSON（任意）
+on your server	お使いのサーバーで
+No key needed; pictures are made on your server.	キーは不要です。画像はお使いのサーバーで作られます。
+List ComfyUI's checkpoints	ComfyUI のチェックポイントを一覧表示
+Test ComfyUI	ComfyUI をテスト
+Check a ComfyUI server	ComfyUI サーバーを確認
+Looking for checkpoints…	チェックポイントを探しています…
+{n} checkpoints found	{n} 件のチェックポイントが見つかりました
+1 checkpoint found	チェックポイントが 1 件見つかりました

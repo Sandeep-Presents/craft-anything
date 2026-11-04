@@ -1053,7 +1053,7 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
         add = added.clicked() && addable;
         test = ui.add_enabled_ui(can_test, |ui| widgets::secondary_min(ui, Some("activity"), "Test", added.rect.height())).inner.clicked() && can_test;
         let width = ui.available_width() - label_w - gap;
-        model_pick::status_line_w(ui, &form.choice, line.as_ref(), width);
+        model_pick::status_line_w(ui, &form.choice, line.as_ref(), width, false);
     });
     // A server still starting or loading a model may take up to a minute to answer: say it's being
     // asked and for how long, so the form doesn't look like nothing happened (#1429).
@@ -1139,8 +1139,12 @@ fn builds(app: &mut CraftApp, ui: &mut Ui) {
         let current = table.image_model(a.image_model.as_deref()).or_else(|_| table.image_model(None)).map(|m| m.name.clone()).unwrap_or_default();
         egui::ComboBox::from_id_salt("image-model").icon(widgets::combo_icon).selected_text(current).show_ui(ui, |ui| {
             for m in table.images() {
-                let price = crate::usage::asset_cost_words(m.cost(craft_anything_engines::assets::Shape::Square));
-                let label = format!("{} · {} {}", m.name, price, tr("a picture"));
+                let cost = m.cost(craft_anything_engines::assets::Shape::Square);
+                let label = if cost > 0.0 {
+                    format!("{} · {} {}", m.name, crate::usage::asset_cost_words(cost), tr("a picture"))
+                } else {
+                    format!("{} · {}", m.name, tr("on your server"))
+                };
                 let on = a.image_model.as_deref() == Some(m.id.as_str());
                 if ui.selectable_label(on, label).on_hover_text(&m.licence).clicked() && !on {
                     a.image_model = Some(m.id.clone());
@@ -1149,9 +1153,82 @@ fn builds(app: &mut CraftApp, ui: &mut Ui) {
             }
         });
     });
+    if table.image_model(app.settings.assets.image_model.as_deref()).is_ok_and(|m| m.id == craft_anything_engines::assets::comfyui::ID) {
+        changed |= comfy_rows(app, ui);
+    }
     if changed {
         app.settings_changed();
     }
+}
+
+/// The picture model is ComfyUI: where the server is, which checkpoint, an optional workflow, and
+/// a Test. Fields share the label column and the width; the checkpoints come on their own once the
+/// address is a web address. Returns true when a setting changed.
+fn comfy_rows(app: &mut CraftApp, ui: &mut Ui) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let mut changed = false;
+    let label_w = ["Address", "Checkpoint", "Workflow"]
+        .iter()
+        .map(|l| widgets::label_galley(ui, &tr(l), theme::CAPTION, t.text_dim).size().x)
+        .fold(0.0_f32, f32::max)
+        .ceil()
+        + 12.0;
+    ui.add_space(6.0);
+    ui.scope(|ui| {
+        ui.set_max_width(480.0);
+        let field = |ui: &mut Ui, w: f32, text: &mut String, hint: &str, name: &str| {
+            let r = ui.add(egui::TextEdit::singleline(text).hint_text(tr(hint)).desired_width(w).frame(widgets::text_field_frame_compact(&t)));
+            (widgets::named(r.clone(), name).rect, r.changed())
+        };
+        // The saved checkpoint is what the picker starts on, before any list has come.
+        let saved = app.settings.assets.comfyui.checkpoint.clone();
+        let choice = &mut app.comfy_form.choice;
+        if choice.typed_model.is_empty() && choice.picked.is_empty() && !saved.is_empty() {
+            choice.typed_model.clone_from(&saved);
+            choice.picked = saved.clone();
+        }
+        let address = &mut app.settings.assets.comfyui.address;
+        form_row(ui, label_w, "Address", |ui, w| {
+            let (rect, edited) = field(ui, w, address, "e.g. http://192.168.1.20:8188", "ComfyUI address");
+            changed |= edited;
+            rect
+        });
+        let ask = model_pick::comfy_ask(&app.settings.assets.comfyui.address);
+        let mut choice = std::mem::take(&mut app.comfy_form.choice);
+        form_row(ui, label_w, "Checkpoint", |ui, w| model_pick::model_picker(ui, "comfy-checkpoint", &mut choice, w));
+        app.comfy_form.choice = choice;
+        let c = &mut app.settings.assets.comfyui;
+        let mut workflow = c.workflow.clone().unwrap_or_default();
+        form_row(ui, label_w, "Workflow", |ui, w| {
+            let (rect, edited) = field(ui, w, &mut workflow, "API-format workflow JSON, optional", "ComfyUI workflow");
+            if edited {
+                c.workflow = (!workflow.trim().is_empty()).then_some(workflow);
+                changed = true;
+            }
+            rect
+        });
+        model_pick::drive(app, ui, &Slot::Comfy, ask.clone(), "");
+        let picked = app.comfy_form.choice.chosen().to_string();
+        if picked != app.settings.assets.comfyui.checkpoint && !(picked.is_empty() && app.comfy_form.choice.loading()) {
+            app.settings.assets.comfyui.checkpoint = picked;
+            changed = true;
+        }
+        let signature = model_pick::comfy_signature(&app.settings.assets.comfyui.address);
+        let line = app.comfy_form.test.as_ref().filter(|x| x.signature == signature).map(|x| x.line.clone());
+        let mut test = false;
+        ui.add_space(4.0);
+        let gap = ui.spacing().item_spacing.x;
+        ui.allocate_ui_with_layout(Vec2::new(ui.available_width(), 30.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            test = widgets::secondary_min(ui, Some("activity"), "Test", 30.0).clicked() && ask.is_some();
+            let width = ui.available_width() - label_w - gap;
+            model_pick::status_line_w(ui, &app.comfy_form.choice, line.as_ref(), width, true);
+        });
+        if test {
+            app.test_comfyui();
+        }
+        ui.label(RichText::new(tr("No key needed; pictures are made on your server.")).color(t.text_faint).size(theme::CAPTION));
+    });
+    changed
 }
 
 /// Plugins: external MCP servers (`[[plugins.mcp]]`) and WASM components (`[[plugins.wasm]]`),

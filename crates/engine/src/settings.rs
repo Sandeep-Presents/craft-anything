@@ -177,12 +177,27 @@ pub struct AssetSettings {
     /// The picture model, by its id in the asset table (`nano-banana-pro`, `flux-dev`…); `None` = the
     /// table's default.
     pub image_model: Option<String>,
+    /// The ComfyUI server pictures are made on when the picture model is `comfyui`.
+    pub comfyui: ComfyUiSettings,
 }
 
 impl Default for AssetSettings {
     fn default() -> Self {
-        AssetSettings { budget_usd: crate::workspace::ASSET_BUDGET_USD, image_model: None }
+        AssetSettings { budget_usd: crate::workspace::ASSET_BUDGET_USD, image_model: None, comfyui: ComfyUiSettings::default() }
     }
+}
+
+/// A ComfyUI server of the person's own: where it is, which checkpoint makes the pictures, and
+/// an optional API-format workflow file that replaces the built-in graph.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ComfyUiSettings {
+    /// `http://host:port`. Empty = not set up.
+    pub address: String,
+    /// The checkpoint's file name as the server lists it.
+    pub checkpoint: String,
+    /// A workflow exported in API format; `None` = the built-in text-to-image graph.
+    pub workflow: Option<String>,
 }
 
 impl AssetSettings {

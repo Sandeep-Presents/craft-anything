@@ -174,9 +174,9 @@ pub(super) fn start_files_note(m: &craft_anything_engine::workspace::Manifest) -
     })
 }
 
-/// Realistic assets with fal.ai: what each tool makes and costs (prices from the asset table,
-/// for the picture model `image_model` names), the budget, where the engine loads them from, and
-/// that every design is original.
+/// Realistic assets with fal.ai, or pictures from the person's ComfyUI server: what each tool makes
+/// and costs (prices from the asset table, for the picture model `image_model` names), the budget,
+/// where the engine loads them from, and that every design is original.
 pub(super) fn assets_note(ws: &Workspace, image_model: Option<&str>) -> String {
     let folder = match game::Builder::from_stack(&ws.manifest.stack) {
         Some(game::Builder::Unity) => "Unity loads them from Assets/, e.g. Assets/Generated/",
@@ -188,13 +188,24 @@ pub(super) fn assets_note(ws: &Workspace, image_model: Option<&str>) -> String {
     let spent = ws.assets_spent();
     let table = Catalogue::built_in();
     // An unknown picture model is reported by the tool itself; the note quotes the default's price.
-    let picture = table.image_model(image_model).or_else(|_| table.image_model(None)).map(|m| m.cost(Shape::Square));
+    let picture = table.image_model(image_model).or_else(|_| table.image_model(None));
+    let local = picture.as_ref().is_ok_and(|m| m.provider == craft_anything_engines::assets::comfyui::ID);
+    let picture = picture.map(|m| m.cost(Shape::Square));
     let (model_cost, picture_cost) = match (table.model_3d(None).map(|m| m.cost(true)), picture) {
         (Ok(model), Ok(picture)) => (format!(" ({} each)", about_usd(model + picture)), format!(" ({})", about_usd(picture))),
         _ => (String::new(), String::new()),
     };
+    let (opening, picture_cost, credits) = if local {
+        (
+            "Realistic assets: pictures come from the person's own ComfyUI server at no cost; 3D models come from fal.ai and need a fal.ai key (without one, assets_model_generate says so, and simple shapes do instead).",
+            " on that server (free)".to_string(),
+            "List each generated file in app/CREDITS.md with what made it: ComfyUI for pictures, fal.ai for 3D models.",
+        )
+    } else {
+        ("Realistic assets: you can make them with fal.ai.", picture_cost, "List each generated file in app/CREDITS.md as made with fal.ai.")
+    };
     format!(
-        "Realistic assets: you can make them with fal.ai. assets_model_generate makes a textured, game-ready low-poly 3D model (GLB) of one object from a description{model_cost}; set faces to the fewest that still look right (about 500-1500 for small props, 2000-5000 for weapons and vehicles, 6000-15000 for main characters) so the game stays fast; assets_image_generate makes a picture{picture_cost} for textures, skies, backgrounds and menu art. This project's asset budget is ${budget:.2} (${spent:.2} used), so spend it on what the player sees most (the main characters, weapons, vehicles and the level's key props) and use simple shapes for the rest. Save each one inside app/ where the engine loads it ({folder}). Every asset is an original design in the original's style: describe what it is, its shape, materials and colours, never a recognisable character, logo or brand artwork. List each generated file in app/CREDITS.md as made with fal.ai."
+        "{opening} assets_model_generate makes a textured, game-ready low-poly 3D model (GLB) of one object from a description{model_cost}; set faces to the fewest that still look right (about 500-1500 for small props, 2000-5000 for weapons and vehicles, 6000-15000 for main characters) so the game stays fast; assets_image_generate makes a picture{picture_cost} for textures, skies, backgrounds and menu art. This project's asset budget is ${budget:.2} (${spent:.2} used), so spend it on what the player sees most (the main characters, weapons, vehicles and the level's key props) and use simple shapes for the rest. Save each one inside app/ where the engine loads it ({folder}). Every asset is an original design in the original's style: describe what it is, its shape, materials and colours, never a recognisable character, logo or brand artwork. {credits}"
     )
 }
 

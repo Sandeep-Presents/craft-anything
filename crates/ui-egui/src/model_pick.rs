@@ -27,6 +27,9 @@ pub enum Slot {
     Form,
     /// A card that asks for a key, by the AI's name.
     Card(String),
+    /// Settings → Builds: the checkpoints of the ComfyUI server. Its [`Ask`] holds the address in
+    /// `base_url` and an empty key (the kind is not used for it).
+    Comfy,
 }
 
 /// What a listing is asked about.
@@ -160,6 +163,7 @@ pub(crate) fn choice_mut<'a>(app: &'a mut CraftApp, slot: &Slot) -> &'a mut Mode
     match slot {
         Slot::Form => &mut app.server_form.choice,
         Slot::Card(name) => app.card_models.entry(name.clone()).or_default(),
+        Slot::Comfy => &mut app.comfy_form.choice,
     }
 }
 
@@ -228,11 +232,12 @@ pub(crate) fn model_picker(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt
 /// why not; `test` (a test's outcome) takes the line when there is one.
 pub(crate) fn status_line(ui: &mut Ui, choice: &ModelChoice, test: Option<&TestLine>) {
     let width = ui.available_width();
-    status_line_w(ui, choice, test, width);
+    status_line_w(ui, choice, test, width, false);
 }
 
-/// [`status_line`] in a given width, so it can share a row with buttons.
-pub(crate) fn status_line_w(ui: &mut Ui, choice: &ModelChoice, test: Option<&TestLine>, width: f32) {
+/// [`status_line`] in a given width, so it can share a row with buttons. `checkpoints` counts what
+/// was found as ComfyUI checkpoints rather than models.
+pub(crate) fn status_line_w(ui: &mut Ui, choice: &ModelChoice, test: Option<&TestLine>, width: f32, checkpoints: bool) {
     let t = Tokens::get(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(Vec2::new(width.max(0.0), STATUS_H), egui::Sense::hover());
     let mut line = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::left_to_right(egui::Align::Center)));
@@ -243,20 +248,24 @@ pub(crate) fn status_line_w(ui: &mut Ui, choice: &ModelChoice, test: Option<&Tes
     };
     match test {
         Some(TestLine::Running) => loading(&mut line, "Testing… a model that isn't loaded yet can take a minute"),
+        Some(TestLine::Said(words)) => {
+            line.add(small(words.clone(), t.success)).on_hover_text(words);
+        }
         Some(TestLine::Answered(s)) => {
             line.add(small(trf("Answered in {seconds} s", &[("seconds", &format!("{s:.1}"))]), t.success));
         }
         Some(TestLine::Failed(e)) => {
             line.add(small(e.clone(), t.danger)).on_hover_text(e);
         }
-        None if choice.loading() => loading(&mut line, "Looking for models…"),
+        None if choice.loading() => loading(&mut line, if checkpoints { "Looking for checkpoints…" } else { "Looking for models…" }),
         None => {
             if let Some(e) = &choice.error {
                 line.add(small(e.clone(), t.danger)).on_hover_text(e);
             } else if choice.models.len() == 1 {
-                line.add(small(tr("1 model found"), t.text_faint));
+                line.add(small(tr(if checkpoints { "1 checkpoint found" } else { "1 model found" }), t.text_faint));
             } else if !choice.models.is_empty() {
-                line.add(small(trf("{n} models found", &[("n", &choice.models.len().to_string())]), t.text_faint));
+                let words = if checkpoints { "{n} checkpoints found" } else { "{n} models found" };
+                line.add(small(trf(words, &[("n", &choice.models.len().to_string())]), t.text_faint));
             }
         }
     }
@@ -267,7 +276,17 @@ pub(crate) fn status_line_w(ui: &mut Ui, choice: &ModelChoice, test: Option<&Tes
 pub enum TestLine {
     Running,
     Answered(f64),
+    /// Passed, in these words (the ComfyUI check: its version, card and checkpoints).
+    Said(String),
     Failed(String),
+}
+
+/// What Settings → Builds holds for ComfyUI: the checkpoints its server lists (picked or typed)
+/// and the last Test.
+#[derive(Debug, Clone, Default)]
+pub struct ComfyForm {
+    pub choice: ModelChoice,
+    pub test: Option<FormTest>,
 }
 
 /// A test of the form's endpoint: which request it is, what it was for, and how it went.
@@ -308,6 +327,14 @@ impl CraftApp {
         let choice = choice_mut(self, &slot);
         choice.awaiting = Some(seq);
         choice.error = None;
+        if slot == Slot::Comfy {
+            let (engine, address) = (self.engine.clone(), ask.base_url.unwrap_or_default());
+            self.jobs.spawn(tr("List ComfyUI's checkpoints"), false, move |_| {
+                let result = comfy_check(&engine, &address).map(|v| strings(&v["checkpoints"]));
+                Ok(Done::ModelsListed { slot, seq, result })
+            });
+            return;
+        }
         let hub = self.hub.clone();
         self.jobs.spawn(tr("List an AI's models"), false, move |_| {
             let key = Some(ask.key.clone()).filter(|k| !k.trim().is_empty());
@@ -330,6 +357,20 @@ impl CraftApp {
         });
     }
 
+    /// Ask the ComfyUI server in Settings → Builds for its version, card and checkpoints; the line
+    /// beside the Test button shows the answer.
+    pub fn test_comfyui(&mut self) {
+        let address = self.settings.assets.comfyui.address.trim().to_string();
+        self.model_seq = self.model_seq.wrapping_add(1);
+        let seq = self.model_seq;
+        self.comfy_form.test = Some(FormTest { seq, signature: comfy_signature(&address), line: TestLine::Running });
+        let engine = self.engine.clone();
+        self.jobs.spawn(tr("Test ComfyUI"), false, move |_| {
+            let result = comfy_check(&engine, &address).map(|v| v["words"].as_str().unwrap_or_default().to_string());
+            Ok(Done::ComfyTested { seq, result })
+        });
+    }
+
     /// Try a saved AI with a tiny request; its row shows the answer.
     pub fn test_backend(&mut self, name: &str) {
         self.row_tests.insert(name.to_string(), RowTest::Running);
@@ -338,6 +379,41 @@ impl CraftApp {
             let result = hub.test_backend(&name);
             Ok(Done::BackendTested { name, result })
         });
+    }
+}
+
+/// What a ComfyUI test is for, so its line hides once the address changes.
+pub(crate) fn comfy_signature(address: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    address.trim().hash(&mut h);
+    h.finish()
+}
+
+/// What Settings → Builds asks the ComfyUI server for its checkpoints with: only a web address
+/// with a host is worth asking.
+pub(crate) fn comfy_ask(address: &str) -> Option<Ask> {
+    let address = craft_anything_engines::assets::comfyui::clean_address(address).ok()?;
+    Some(Ask { kind: BackendKind::OpenaiCompatible, base_url: Some(address), key: String::new() })
+}
+
+/// The engine's `assets_comfyui_check` tool, called off the UI thread.
+fn comfy_check(engine: &craft_anything_engine::Engine, address: &str) -> Result<serde_json::Value, ToolError> {
+    let opts = craft_anything_engine::CallOptions::new(craft_anything_engine::Caller::Ui);
+    engine.call("assets_comfyui_check", serde_json::json!({"address": address}), opts).map(|o| o.to_json().get("result").cloned().unwrap_or_default())
+}
+
+fn strings(v: &serde_json::Value) -> Vec<String> {
+    v.as_array().map(|a| a.iter().filter_map(|s| s.as_str().map(str::to_string)).collect()).unwrap_or_default()
+}
+
+/// The ComfyUI test finished.
+pub(crate) fn comfy_tested(app: &mut CraftApp, seq: u64, result: Result<String, ToolError>) {
+    if let Some(test) = app.comfy_form.test.as_mut().filter(|t| t.seq == seq) {
+        test.line = match result {
+            Ok(words) => TestLine::Said(words),
+            Err(e) => TestLine::Failed(e.message),
+        };
     }
 }
 

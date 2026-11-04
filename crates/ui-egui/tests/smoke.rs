@@ -3548,3 +3548,71 @@ fn the_first_run_form_caption_is_left_aligned() {
     assert!(caption.left() < service.left() - 40.0, "caption {caption:?} vs fields {service:?}");
     assert!((service.left() - field.left()).abs() < 0.5 && (service.right() - field.right()).abs() < 0.5);
 }
+
+/// A stand-in ComfyUI server: its version and card, and two checkpoints. Its address.
+fn comfy_server() -> String {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        for mut s in listener.incoming().flatten() {
+            let mut buf = [0u8; 4096];
+            let n = s.read(&mut buf).unwrap_or(0);
+            let head = String::from_utf8_lossy(&buf[..n]).to_string();
+            let body = if head.starts_with("GET /system_stats") {
+                r#"{"system":{"comfyui_version":"0.3.10"},"devices":[{"name":"cuda:0 NVIDIA GeForce RTX 3060 : cudaMallocAsync"}]}"#
+            } else {
+                r#"{"CheckpointLoaderSimple":{"input":{"required":{"ckpt_name":[["flux.safetensors","sdxl.safetensors"],{}]}}}}"#
+            };
+            let _ = write!(s, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+        }
+    });
+    url
+}
+
+/// Choosing ComfyUI for pictures shows its address, checkpoint and workflow, lined up with each
+/// other, lists the server's checkpoints by itself, and Test says what the server is.
+#[test]
+fn picking_comfyui_shows_its_settings_lined_up_and_tests_the_server() {
+    let url = comfy_server();
+    let mut h = harness(|| {
+        let mut a = demo::app(demo::engine(Mode::Beginner, true));
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Builds;
+        a
+    });
+    h.run_steps(3);
+    assert!(h.query_by_label("ComfyUI address").is_none(), "only when ComfyUI is the picture model");
+    h.state_mut().settings.assets.image_model = Some("comfyui".into());
+    h.state_mut().settings.assets.comfyui.address = url;
+    h.run_steps(3);
+    h.get_by_label("ComfyUI address").scroll_to_me();
+    h.run_steps(3);
+    let start = Instant::now();
+    while h.query_by_label("2 checkpoints found").is_none() && start.elapsed() < Duration::from_secs(10) {
+        h.run_steps(2);
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let _ = h.get_by_label("2 checkpoints found");
+    h.get_by_label("Model").scroll_to_me();
+    h.run_steps(3);
+    let edges = ["ComfyUI address", "Model", "ComfyUI workflow"].map(|l| {
+        let r = h.get_by_label(l).rect();
+        (l, r.left(), r.right())
+    });
+    for (l, left, right) in edges {
+        assert!((left - edges[0].1).abs() < 0.5, "{l} starts at {left}, the address at {}", edges[0].1);
+        assert!((right - edges[0].2).abs() < 0.5, "{l} ends at {right}, the address at {}", edges[0].2);
+    }
+    assert_eq!(h.state().settings.assets.comfyui.checkpoint, "flux.safetensors", "the first checkpoint is chosen and kept");
+    let _ = h.get_by_label("No key needed; pictures are made on your server.");
+    h.get_by_label("Test").scroll_to_me();
+    h.run_steps(3);
+    h.get_by_label("Test").click();
+    let start = Instant::now();
+    while h.query_by_label("ComfyUI 0.3.10 · NVIDIA GeForce RTX 3060 · 2 checkpoints").is_none() && start.elapsed() < Duration::from_secs(10) {
+        h.run_steps(2);
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let _ = h.get_by_label("ComfyUI 0.3.10 · NVIDIA GeForce RTX 3060 · 2 checkpoints");
+}

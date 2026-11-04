@@ -1047,3 +1047,9 @@ child. Preserve ordinary output paths and put collisions in an independent input
 directory; keep complete source identities in the manifest. Check both prefix orders and
 same-named input scripts through the real recovery tool, and retain the writer's symlink and
 exclusive-creation checks after selecting a name.
+
+**A key check in front of every provider locked out the one that needs none.** The asset tools
+refused to start unless some provider had a key, so a ComfyUI server on the person's own network
+could not make a picture until they pasted a key they had no use for. The check belongs per
+provider, at the point the key is read (`AssetProvider::needs_key`), not once up front for all of
+them. A test for it must run with no key of any kind and must fail when the check is put back.
