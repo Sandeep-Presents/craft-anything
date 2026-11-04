@@ -873,6 +873,10 @@ so nothing after the player counted. The two-screen trial app had no such stack.
 of siblings with the same subtree shape, not the same class; and before the real map, capture the
 original by hand on three screens that differ (`adb_screen_state_capture` with keys) and check
 that their fingerprints differ.
+The same map then made a screen of every focus position on the player's menu bar: the focused
+item carries a highlight view of its own, so its shape broke it out of the bar's run and its words
+counted as one control's. The focused sibling joins its run whatever its shape. Check a bar with
+the focus on its first, a middle and its last item before trusting a map of it.
 
 **A device check that launched the original.** The Android device check installed the build's
 APK, then launched, drove and read the crash log of the *target's* package (the original app's),

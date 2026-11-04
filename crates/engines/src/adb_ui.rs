@@ -544,33 +544,49 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
     use std::hash::{Hash, Hasher};
     // Pass 1: which run of same-shaped consecutive siblings each node belongs to. Same-shaped
     // means the whole subtree (classes and ids, texts left out), not the class alone: the rows
-    // of a list share a shape, the layers an activity stacks as sibling FrameLayouts don't.
+    // of a list share a shape, the layers an activity stacks as sibling FrameLayouts don't. The
+    // one sibling that holds the focus joins the run of its class and id whatever its shape: a
+    // focused control often carries a highlight view of its own, and a moved focus is the same
+    // screen.
     let shapes = subtree_shapes(nodes);
     let mut run_of = vec![0usize; nodes.len()];
-    let mut run_size: Vec<usize> = Vec::new();
-    let mut prev: Vec<Option<(usize, u64)>> = Vec::new();
+    // Per run: its members in order, and the member whose subtree stands for it: the first,
+    // unless that one holds the focus and a later member is shaped otherwise (the focus's
+    // decoration), when it is the first such member.
+    let mut runs: Vec<Vec<usize>> = Vec::new();
+    let mut run_rep: Vec<usize> = Vec::new();
+    let mut prev: Vec<Option<(usize, u64, bool)>> = Vec::new();
     for (i, n) in nodes.iter().enumerate() {
         let shape = shapes.get(i).copied().unwrap_or_default();
         prev.truncate(n.depth + 1);
         prev.resize(n.depth + 1, None);
+        let same_control = |j: usize| nodes.get(j).is_some_and(|m| m.class == n.class && m.resource_id == n.resource_id);
         match prev[n.depth] {
-            Some((r, seen)) if seen == shape => {
+            Some((r, first_shape, first_focused))
+                if seen_as(seen_run_first(&runs, r), same_control) && (shape == first_shape || n.focused || first_focused) =>
+            {
                 run_of[i] = r;
-                if let Some(size) = run_size.get_mut(r) {
-                    *size += 1;
+                if let Some(members) = runs.get_mut(r) {
+                    members.push(i);
+                }
+                let first = seen_run_first(&runs, r);
+                let decorated_first = first_focused && !n.focused && shape != first_shape;
+                if let Some(rep) = run_rep.get_mut(r).filter(|rep| decorated_first && Some(**rep) == first) {
+                    *rep = i;
                 }
             }
             _ => {
-                let r = run_size.len();
-                run_size.push(1);
+                let r = runs.len();
+                runs.push(vec![i]);
+                run_rep.push(i);
                 run_of[i] = r;
-                prev[n.depth] = Some((r, shape));
+                prev[n.depth] = Some((r, shape, n.focused));
             }
         }
     }
-    // Pass 2: hash each node once per run, its subtree with it.
+    // Pass 2: hash each run once, through its representative's subtree; a short run (a button,
+    // a pair of them, a menu entry) speaks with every member's words, a list with none.
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    let mut seen = vec![0usize; run_size.len()];
     let mut skip_below: Option<usize> = None;
     for (i, n) in nodes.iter().enumerate() {
         if skip_below.is_some_and(|d| n.depth > d) {
@@ -578,20 +594,29 @@ pub fn screen_fingerprint(nodes: &[UiNode]) -> String {
         }
         skip_below = None;
         let r = run_of[i];
-        let (Some(size), Some(count)) = (run_size.get(r), seen.get_mut(r)) else { continue };
-        *count += 1;
-        if *count > 1 {
+        let (Some(members), Some(rep)) = (runs.get(r), run_rep.get(r)) else { continue };
+        if *rep != i {
             skip_below = Some(n.depth);
             continue;
         }
         // A control's words count when it is one (a button, a menu entry), not a list; a
         // container with controls inside is shape only, its controls speak for themselves.
         let container = nodes.iter().skip(i + 1).take_while(|m| m.depth > n.depth).any(|m| m.focusable || m.clickable);
-        let landable = (n.focusable || n.clickable) && *size < 3 && !container;
-        let text = if landable { digits_as_one(&control_words(nodes, i)) } else { String::new() };
+        let landable = (n.focusable || n.clickable) && members.len() < 3 && !container;
+        let text = if landable { members.iter().map(|&m| digits_as_one(&control_words(nodes, m))).collect::<Vec<_>>().join("\u{1f}") } else { String::new() };
         (n.depth, n.class.as_str(), n.resource_id.as_str(), text).hash(&mut h);
     }
     format!("{:016x}", h.finish())
+}
+
+/// The first member of run `r`.
+fn seen_run_first(runs: &[Vec<usize>], r: usize) -> Option<usize> {
+    runs.get(r).and_then(|m| m.first().copied())
+}
+
+/// Whether a run's first member (if any) satisfies `same`.
+fn seen_as(first: Option<usize>, same: impl Fn(usize) -> bool) -> bool {
+    first.is_some_and(same)
 }
 
 /// Each node's subtree shape: its class and id and its children's shapes, in order; texts, bounds
@@ -1234,5 +1259,38 @@ mod tests {
         let five = stack(vec![layer(None), layer(None), layer(None), layer(None), layer(None)]);
         assert_eq!(screen_fingerprint(&three), screen_fingerprint(&five), "rows of one shape are a list");
         assert_eq!(screen_fingerprint(&player), screen_fingerprint(&three), "a list's length is not part of the screen");
+    }
+
+    /// A menu bar whose focused item carries a highlight view of its own: the focus on any item,
+    /// the first included, is the same screen, and the bar's words never count as one control's.
+    #[test]
+    fn a_focused_item_with_its_own_highlight_stays_in_its_row() {
+        let bar = |labels: &[&str], focused: usize| {
+            let mut n = vec![UiNode { class: "android.widget.LinearLayout".into(), visible: true, ..Default::default() }];
+            for (i, l) in labels.iter().enumerate() {
+                n.push(UiNode {
+                    depth: 1,
+                    class: "android.widget.FrameLayout".into(),
+                    focusable: true,
+                    focused: i == focused,
+                    visible: true,
+                    ..Default::default()
+                });
+                if i == focused {
+                    n.push(UiNode { depth: 2, class: "android.view.View".into(), visible: true, ..Default::default() });
+                }
+                n.push(UiNode { depth: 2, class: "android.widget.ImageView".into(), visible: true, ..Default::default() });
+                n.push(UiNode { depth: 2, class: "android.widget.TextView".into(), text: (*l).into(), visible: true, ..Default::default() });
+            }
+            n
+        };
+        let items = ["Search", "Channels list", "Recordings", "Multiview", "Settings"];
+        let first = screen_fingerprint(&bar(&items, 0));
+        assert_eq!(first, screen_fingerprint(&bar(&items, 2)), "the focus on another item is the same bar");
+        assert_eq!(first, screen_fingerprint(&bar(&items, 4)), "the focus on the last item is the same bar");
+        assert_eq!(first, screen_fingerprint(&bar(&["Off", "Add to Favorites", "Channel options", "Settings"], 3)), "a scrolled bar is the same bar");
+        let two = |a: &str, b: &str, focused: usize| bar(&[a, b], focused);
+        assert_eq!(screen_fingerprint(&two("OK", "Cancel", 0)), screen_fingerprint(&two("OK", "Cancel", 1)), "two buttons, either focused");
+        assert_ne!(screen_fingerprint(&two("OK", "Cancel", 0)), screen_fingerprint(&two("Yes", "No", 0)), "other buttons are another screen");
     }
 }
