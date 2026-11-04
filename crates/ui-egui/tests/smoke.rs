@@ -3401,6 +3401,26 @@ fn the_custom_form_keeps_its_buttons_level_and_its_status_line_put() {
     assert_eq!(add.top(), after.top(), "typing an address moved the buttons");
 }
 
+/// Another service in the form drops the last one's model list and pick, so Add can't save a model
+/// from one server with another's address.
+#[test]
+fn a_new_service_in_the_custom_form_drops_the_old_models() {
+    let mut h = ai_settings();
+    h.state_mut().state.detect_tab = Some(craft_anything_ui_egui::detect_tabs::DetectTab::Custom);
+    h.state_mut().server_form.choice.models = vec!["qwen3:8b".into()];
+    h.state_mut().server_form.choice.picked = "qwen3:8b".into();
+    h.run_steps(3);
+    h.get_by_label("Add").scroll_to_me();
+    h.run_steps(3);
+    h.get_by_label("Service").click();
+    h.run_steps(2);
+    h.get_by_label("OpenRouter").click();
+    h.run_steps(2);
+    let form = &h.state().server_form;
+    assert_eq!(craft_anything_ai::providers::services()[form.service].name, "OpenRouter");
+    assert!(form.choice.models.iter().all(|m| m != "qwen3:8b") && form.choice.picked != "qwen3:8b", "{:?}", form.choice);
+}
+
 /// A key card lists the models its key offers once a key is pasted, and Connect uses the one chosen.
 #[test]
 fn a_key_card_picks_a_model() {

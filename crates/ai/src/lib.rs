@@ -159,6 +159,20 @@ fn give_session_id(cfg: &mut AiConfig) -> bool {
     false
 }
 
+/// The kind's own environment key (`OPENAI_API_KEY`…), only for the service's own address: with
+/// another address given, it would go to whoever runs the server there.
+fn kind_env_key(kind: BackendKind, base: Option<&str>) -> Option<String> {
+    kind_env_key_with(kind, base, |v| std::env::var(v).ok())
+}
+
+/// [`kind_env_key`] with the environment passed in, so tests need no process state.
+fn kind_env_key_with(kind: BackendKind, base: Option<&str>, get: impl Fn(&str) -> Option<String>) -> Option<String> {
+    if base.is_some_and(|b| !b.trim().is_empty()) {
+        return None;
+    }
+    keys::env_var(kind).and_then(get).filter(|k| !k.trim().is_empty())
+}
+
 /// The OpenCode Go key from the environment, when the base URL is its own. A blank value counts as
 /// unset, so the other name is still tried.
 fn go_env_key(base: &str) -> Option<String> {
@@ -921,12 +935,14 @@ impl AiHub {
     }
 
     /// The key for an API backend: one given outright wins, then the stored key, then the environment.
-    fn key_for(&self, e: &BackendEntry, explicit: Option<String>) -> Result<String, ToolError> {
+    /// An AI that isn't saved (`stored` false) never gets a stored key by its name: a form that reuses
+    /// a saved AI's name with another address would send that key there.
+    fn key_for(&self, e: &BackendEntry, explicit: Option<String>, stored: bool) -> Result<String, ToolError> {
         let base = e.config.base_url.as_deref().unwrap_or("");
         explicit
             .map(|k| k.trim().to_string())
             .filter(|k| !k.is_empty())
-            .or_else(|| self.keys.resolve(&e.config.name, e.config.kind))
+            .or_else(|| if stored { self.keys.resolve(&e.config.name, e.config.kind) } else { kind_env_key(e.config.kind, e.config.base_url.as_deref()) })
             .or_else(|| go_env_key(base).or_else(|| providers::env_key(base)))
             .ok_or_else(|| {
                 let var = if openai::is_opencode_go(base) {
@@ -943,11 +959,12 @@ impl AiHub {
 
     /// Build the model for an API backend (not agent CLIs).
     pub fn build_model(&self, e: &BackendEntry) -> Result<ModelSlot, ToolError> {
-        self.build_model_with_key(e, None)
+        self.build_model_with_key(e, None, true)
     }
 
-    /// [`AiHub::build_model`] with a key given outright (an AI that isn't saved yet).
-    fn build_model_with_key(&self, e: &BackendEntry, explicit: Option<String>) -> Result<ModelSlot, ToolError> {
+    /// [`AiHub::build_model`] with a key given outright; `stored` false for an AI that isn't saved,
+    /// which gets no stored key (see [`AiHub::key_for`]).
+    fn build_model_with_key(&self, e: &BackendEntry, explicit: Option<String>, stored: bool) -> Result<ModelSlot, ToolError> {
         let c = &e.config;
         let base = c.base_url.as_deref().filter(|b| !b.trim().is_empty());
         let mut tunnel = None;
@@ -979,20 +996,20 @@ impl AiHub {
         };
         let model: Box<dyn ChatModel> = match c.kind {
             BackendKind::Anthropic => {
-                let mut a = anthropic::Anthropic::new(base, self.key_for(e, explicit)?, &c.model);
+                let mut a = anthropic::Anthropic::new(base, self.key_for(e, explicit, stored)?, &c.model);
                 a.fallbacks = e.options.fallbacks_enabled.unwrap_or(true);
                 a.stream_limit = limit;
                 Box::new(a)
             }
-            BackendKind::Openai => with_limit(openai::OpenAi::official(base, self.key_for(e, explicit)?, &c.model)),
-            BackendKind::Openrouter => with_limit(openai::OpenAi::openrouter(base, self.key_for(e, explicit)?, &c.model)),
-            BackendKind::Gemini => with_limit(openai::OpenAi::gemini(base, self.key_for(e, explicit)?, &c.model)),
+            BackendKind::Openai => with_limit(openai::OpenAi::official(base, self.key_for(e, explicit, stored)?, &c.model)),
+            BackendKind::Openrouter => with_limit(openai::OpenAi::openrouter(base, self.key_for(e, explicit, stored)?, &c.model)),
+            BackendKind::Gemini => with_limit(openai::OpenAi::gemini(base, self.key_for(e, explicit, stored)?, &c.model)),
             BackendKind::OpenaiCompatible => {
                 let base = base.unwrap_or("http://127.0.0.1:11434/v1");
                 let key = explicit
                     .map(|k| k.trim().to_string())
                     .filter(|k| !k.is_empty())
-                    .or_else(|| self.keys.get(&c.name))
+                    .or_else(|| stored.then(|| self.keys.get(&c.name)).flatten())
                     .or_else(|| go_env_key(base).or_else(|| providers::env_key(base)));
                 let mut o = compatible_client(&c.name, base, key, &c.model, &self.session_id());
                 o.react = e.options.react_fallback.unwrap_or(false);
@@ -1119,7 +1136,7 @@ impl AiHub {
                 }
                 self.list_models_at(e.config.kind, Some(base.unwrap_or("http://127.0.0.1:11434/v1")), self.keys.get(&e.config.name))
             }
-            kind => self.list_models_at(kind, base, Some(self.key_for(&e, None)?)),
+            kind => self.list_models_at(kind, base, Some(self.key_for(&e, None, true)?)),
         }
     }
 
@@ -1137,12 +1154,10 @@ impl AiHub {
         let key = key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
         let t = Duration::from_secs(10);
         let need = |key: Option<String>| {
-            key.or_else(|| keys::env_var(kind).and_then(|v| std::env::var(v).ok()).filter(|k| !k.trim().is_empty()))
-                .or_else(|| base.and_then(|b| go_env_key(b).or_else(|| providers::env_key(b))))
-                .ok_or_else(|| {
-                    ToolError::new(ErrorCode::BadSettings, "No API key was given.")
-                        .with_remediation(format!("Paste the key, or set {}.", keys::env_var(kind).unwrap_or("an API key")))
-                })
+            key.or_else(|| kind_env_key(kind, base)).or_else(|| base.and_then(|b| go_env_key(b).or_else(|| providers::env_key(b)))).ok_or_else(|| {
+                ToolError::new(ErrorCode::BadSettings, "No API key was given.")
+                    .with_remediation(format!("Paste the key, or set {}.", keys::env_var(kind).unwrap_or("an API key")))
+            })
         };
         match kind {
             BackendKind::Anthropic => anthropic::Anthropic::new(base, need(key)?, "").list_models(t),
@@ -1179,7 +1194,7 @@ impl AiHub {
     /// Send a tiny request and time it; a coding agent checks its version and, when its local
     /// adapter can tell, sign-in, without a prompt (`version_only`). Blocking; run off the UI thread.
     pub fn test_backend(&self, name: &str) -> Result<TestReport, ToolError> {
-        self.test_entry(&self.entry(name)?, None)
+        self.test_entry(&self.entry(name)?, None, true)
     }
 
     /// The same tiny request for an AI that isn't saved, with the key given. Blocking (bounded).
@@ -1191,10 +1206,10 @@ impl AiHub {
             let models = self.list_models_at(BackendKind::OpenaiCompatible, Some(&address), key.clone())?;
             config.model = chat_model_of(&config.name, config.kind, &address, key.clone(), &models)?;
         }
-        self.test_entry(&BackendEntry { config, options: BackendOptions::default() }, key)
+        self.test_entry(&BackendEntry { config, options: BackendOptions::default() }, key, false)
     }
 
-    fn test_entry(&self, e: &BackendEntry, key: Option<String>) -> Result<TestReport, ToolError> {
+    fn test_entry(&self, e: &BackendEntry, key: Option<String>, stored: bool) -> Result<TestReport, ToolError> {
         let name = e.config.name.as_str();
         let start = Instant::now();
         if e.config.kind == BackendKind::AgentCli {
@@ -1226,7 +1241,7 @@ impl AiHub {
                 program: Some(program),
             });
         }
-        let mut slot = self.build_model_with_key(e, key)?;
+        let mut slot = self.build_model_with_key(e, key, stored)?;
         let stop = Stop::default();
         let (tx, rx) = std::sync::mpsc::channel();
         // A hard bound even if the server trickles bytes forever.

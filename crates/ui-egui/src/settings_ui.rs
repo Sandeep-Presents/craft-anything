@@ -1001,6 +1001,8 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
                     }
                     form.service = i;
                     form.test = None;
+                    // The old service's list and pick would otherwise be saved with the new one's address.
+                    form.choice = Default::default();
                 }
             }
         });
