@@ -6,6 +6,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod adb;
+pub mod adb_ui;
 pub mod assets;
 pub mod cdp;
 pub mod cutter;

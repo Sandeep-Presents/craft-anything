@@ -1082,7 +1082,7 @@ Owner: open · Status: in progress
 Study an app installed on an Android phone or TV the way a person uses it (the remote's keys, the
 screen, its controls), build an Android app from that, and judge each build on a device. Clean
 room throughout: nothing is pulled off the device or decoded.
-- [ ] Screen tools over adb, all Clean room: `adb_app_launch` starts a TV app (`category`:
+- [x] Screen tools over adb, all Clean room: `adb_app_launch` starts a TV app (`category`:
       leanback), `adb_device_show` says whether the device is a TV and its density,
       `adb_keys_press` (allowlisted keys, repeats, gaps), `adb_text_type`, `adb_ui_read`
       (`uiautomator dump` in the node shape `runtime_ui_read` gives, bounds in px and dp),
