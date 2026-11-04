@@ -1119,6 +1119,11 @@ room throughout: nothing is pulled off the device or decoded.
       states whose keys were not all pressed.
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
+- [ ] A gate that can't be checked says so where the person looks: on the first real run the test
+      device still held an older build of the same package under another key, the install failed
+      (INSTALL_FAILED_UPDATE_INCOMPATIBLE), and the reason reached only the builder's tool result;
+      the CLI printed the score alone and device.json kept `gate: null`. Put the gate's note in the
+      feed and the scorecard, and name the fix (uninstall the old build, or sign with the same key).
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress

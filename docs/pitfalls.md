@@ -653,6 +653,10 @@ second pass reused `round-0/device/states/<id>` from the first, the capture refu
 that was already there, and the scorecard went from 70% to 4% with every screen "couldn't be
 read"; the builder then went off reading our source for the reason. A check empties its own output
 folder before a pass. When a score collapses to a single failure kind, suspect the check first.
+And the gate failed in silence: the test device held an older build of the same package signed
+with another key, the install was refused, and the reason went only to the builder's tool result;
+nothing in the CLI's output, the feed or device.json said why `gate` stayed null. A check that
+couldn't look says so wherever its score is shown, and names what to do.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
