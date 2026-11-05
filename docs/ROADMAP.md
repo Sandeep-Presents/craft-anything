@@ -1114,7 +1114,8 @@ room throughout: nothing is pulled off the device or decoded.
       and an icon without a content description isn't in it at all. Each read screen's picture
       is scored against the original's (the screenshot check's measure, `picture` per screen and
       `picture_likeness` in device.json, the least alike screens in the note) and, with
-      `picture_good_enough` set, claimed per screen ("it looks at least N% like the original")
+      `picture_good_enough` set, claimed per screen ("it looks at least N% like the original";
+      a blank picture of the original, a video surface or an overlay already gone, is skipped)
       with the pass's likeness capped by the pictures' mean; the brief and the stack ask for a
       contentDescription on every icon control and Material icons.
 - [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so

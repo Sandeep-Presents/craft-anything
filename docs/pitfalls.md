@@ -672,6 +672,10 @@ And a run went Ready at 93% with another accent colour, another typeface, placeh
 the list cursor one row off: the check read dumps alone, and a dump has no colours, type or icon
 glyphs, while an icon without a content description isn't in it at all. A screen's likeness
 counts its picture too (both pictures are there already), and every icon control gets a name.
+Its first live round then scored three player screens 100% and an info bar 76%: the original's
+pictures there were black (a video surface the screenshot can't see; an overlay that had hidden
+by the time the map took it), so a black build scored a free 100% and a drawn one lost. A blank
+picture of the original says nothing: no claim, nothing in the mean.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it

@@ -139,8 +139,15 @@ pub struct StateScore {
 
 /// How alike a screen's picture is to the original's, in percent: the screenshot check's
 /// measure (perceptual detail and coarse layout, both at 640×360), so colours, type, spacing
-/// and icon glyphs count, which a dump never shows. None when either picture can't be read.
+/// and icon glyphs count, which a dump never shows. None when either picture can't be read,
+/// and when the original's is blank (a video surface the screenshot can't see, an overlay that
+/// had already gone when the map took it): nothing can be said about such a screen, and a
+/// black build picture would otherwise score a free 100% there.
 pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
+    let theirs = std::fs::read(original).ok().and_then(|b| decode_png(&b).ok())?;
+    if super::screenshot::is_blank(&theirs) {
+        return None;
+    }
     let shot = std::fs::read(built).ok().and_then(|b| decode_png(&b).ok())?;
     match super::screenshot::picture_likeness(&shot, &[original.to_path_buf()]) {
         super::screenshot::Likeness::Best { score, .. } => Some(score),
@@ -309,7 +316,8 @@ impl DeviceCheck {
                 }
             }
             let mut claims = state_claims(&id, &name, &original, &built, build.android_dp_tolerance);
-            // The look, which the dump can't show: the two pictures side by side.
+            // The look, which the dump can't show: the two pictures side by side (a blank
+            // picture of the original, a video surface or an overlay already gone, is skipped).
             let read = built.get("count").and_then(Value::as_u64).unwrap_or(0) > 0;
             let picture = if read { picture_score(&map_dir.join("states").join(&id).join("screen.png"), &out.join("screen.png")) } else { None };
             if let (Some(bar), true) = (build.picture_good_enough, read) {
@@ -527,6 +535,12 @@ mod tests {
         std::fs::write(&other, b"not a png").unwrap();
         assert_eq!(picture_score(&original, &other), None);
         assert_eq!(picture_score(&dir.path().join("missing.png"), &same), None, "no original to compare with");
+        let black = img(&|_, _| [16, 16, 16]);
+        let blank = dir.path().join("blank.png");
+        std::fs::write(&blank, encode_png(&black).unwrap()).unwrap();
+        assert_eq!(picture_score(&blank, &blank), None, "a blank original says nothing, even against a blank build");
+        assert_eq!(picture_score(&blank, &same), None);
+        assert!(picture_score(&original, &blank).is_some_and(|p| p < 80.0), "a blank build against a drawn original scores low");
     }
 
     /// Likeness is the bar: a pass at 92% with every screen read and no crash is good at 90,
