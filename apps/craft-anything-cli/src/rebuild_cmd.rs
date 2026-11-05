@@ -37,7 +37,8 @@ pub struct RebuildArgs {
     #[arg(long)]
     pub continue_in: Option<PathBuf>,
     /// With --continue-in: carry on where the project's last run stopped (paused, or the app or
-    /// the computer stopped); the request is ignored.
+    /// the computer stopped). A request given with it (anything but `-` or nothing) reaches the
+    /// builder as a follow-up message.
     #[arg(long, requires = "continue_in")]
     pub resume: bool,
     /// The coding agent to use (an enabled backend name from `ai list`, or an installed agent
@@ -157,7 +158,7 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
     }
     let allow = allowed_kinds(&a.allow)?;
     let (mut ws, message) = match &a.continue_in {
-        Some(dir) => (Workspace::open(&std::path::absolute(dir).map_err(|e| ToolError::io(dir.display(), e))?)?, (!a.resume).then(|| a.request.clone())),
+        Some(dir) => (Workspace::open(&std::path::absolute(dir).map_err(|e| ToolError::io(dir.display(), e))?)?, follow_up_message(&a.request)),
         None => {
             use craft_anything_ai::rebuild::project::Place;
             use craft_anything_engine::workspace::ExistingFiles;
@@ -341,10 +342,29 @@ fn prompt_answer(r: &Request) -> Answer {
     }
 }
 
+/// The follow-up a continued project is asked for: the request as typed, unless there is none
+/// (`-`, or nothing). With `--resume` it used to be thrown away, and notes sent to a running
+/// rebuild that way reached the builder only because it read the CLI's command line with `ps`.
+fn follow_up_message(request: &str) -> Option<String> {
+    let r = request.trim();
+    (!r.is_empty() && r != "-").then(|| request.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::Parser as _;
+
+    /// A message typed with --resume is a follow-up, not noise: only `-` or nothing is none.
+    #[test]
+    fn a_message_given_with_resume_is_kept() {
+        assert_eq!(follow_up_message("Port the core to Rust"), Some("Port the core to Rust".to_string()));
+        assert_eq!(follow_up_message("  "), None);
+        assert_eq!(follow_up_message("-"), None);
+        let cli = Cli::try_parse_from(["craft-anything-cli", "rebuild", "-", "Port the core to Rust", "--continue-in", "p", "--resume"]).unwrap();
+        let crate::Command::Rebuild(a) = cli.command else { panic!("not rebuild") };
+        assert!(a.resume && follow_up_message(&a.request).is_some());
+    }
 
     #[test]
     fn rounds_default_to_the_settings_and_allow_takes_consent_kinds() {

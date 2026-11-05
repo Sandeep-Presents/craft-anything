@@ -1120,11 +1120,11 @@ room throughout: nothing is pulled off the device or decoded.
       composes into its screenshot, is left out of both scores)
       with the pass's likeness capped by the pictures' mean; the brief and the stack ask for a
       contentDescription on every icon control and Material icons.
-- [ ] A message given with `--resume` is dropped: `rebuild - "<message>" --continue-in <dir> --resume`
+- [x] A message given with `--resume` is dropped: `rebuild - "<message>" --continue-in <dir> --resume`
       threw the message away, and five notes sent to a running rebuild that way reached the builder
       only because it ran `ps` and read the CLI's command line; the sixth, cut short there, was lost
-      and the builder repeated its last check. Keep the message (the run already hands a follow-up
-      to an agent carrying on its session). — claimed: rockmeister, branch feature/r2.12-resume-message
+      and the builder repeated its last check. The message is kept (`follow_up_message`: anything but
+      `-` or nothing) and the run hands it to the agent carrying on its session as the follow-up.
 - [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so
       "About" skipped a whole Settings list and "Recordings" a menu bar that merely listed them
       (seen on the first real map). Skip a capture when the focused control or the state's name
