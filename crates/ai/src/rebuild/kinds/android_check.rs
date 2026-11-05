@@ -7,7 +7,7 @@
 //! [`DeviceCheck::run`] touches a device.
 
 use super::*;
-use craft_anything_engine::tools::web_common::{Image, NoiseMask, block_similarity_masked, decode_png, perceptual_similarity_masked, resize};
+use craft_anything_engine::tools::web_common::{Image, NoiseMask, block_similarity_masked, decode_png, perceptual_similarity_masked, resize, tile_mean};
 use craft_anything_engine::workspace::Claim;
 use serde::Serialize;
 
@@ -135,6 +135,9 @@ pub struct StateScore {
     /// How alike the build's picture of the screen is to the original's, in percent (None when
     /// the screen wasn't read, or either picture couldn't be).
     pub picture: Option<f64>,
+    /// Where the two pictures differ most, in words a builder can act on (empty when alike).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub picture_why: String,
 }
 
 /// The size both pictures are brought to before they are compared (the screenshot check's).
@@ -160,10 +163,64 @@ pub fn pair_score(original: &Image, built: &Image, mask: Option<&NoiseMask>) -> 
     (perceptual_similarity_masked(original, built, mask) + block_similarity_masked(original, built, 16, 24, mask)) * 50.0
 }
 
+/// Where two pictures differ most, for the builder: the pair of colours (the original's, the
+/// build's) that covers most of the tiles whose mean colours differ, when it covers at least a
+/// twentieth of the screen. A pure black panel against the original's very dark grey is what
+/// the eye misses and the measure counts: "over 58% of the screen the original is #111111 and
+/// yours #000000". Empty when nothing differs; "spread thin" when no one pair covers much.
+/// Differing tiles by (the original's colour, the build's), each to the nearest sixteenth: how
+/// many, and the sums of both colours, for the mean.
+type ColourPairs = std::collections::BTreeMap<([u8; 3], [u8; 3]), (usize, [f64; 3], [f64; 3])>;
+
+pub fn picture_why(original: &Image, built: &Image, mask: Option<&NoiseMask>) -> String {
+    const TILE: u32 = 16;
+    if original.width != built.width || original.height != built.height || original.width == 0 || original.height == 0 {
+        return String::new();
+    }
+    let (cols, rows) = (original.width.div_ceil(TILE), original.height.div_ceil(TILE));
+    let mut buckets: ColourPairs = ColourPairs::new();
+    let (mut counted, mut differing) = (0usize, 0usize);
+    for by in 0..rows {
+        for bx in 0..cols {
+            if mask.is_some_and(|m| m.covers(bx * TILE, by * TILE)) {
+                continue;
+            }
+            counted += 1;
+            let (a, b) = (tile_mean(original, TILE, bx, by), tile_mean(built, TILE, bx, by));
+            if a.iter().zip(&b).all(|(x, y)| (x - y).abs() <= 4.0) {
+                continue;
+            }
+            differing += 1;
+            let key = |m: [f64; 3]| [m[0], m[1], m[2]].map(|v| (v / 16.0).round().min(15.0) as u8);
+            let e = buckets.entry((key(a), key(b))).or_insert((0, [0.0; 3], [0.0; 3]));
+            e.0 += 1;
+            for i in 0..3 {
+                e.1[i] += a[i];
+                e.2[i] += b[i];
+            }
+        }
+    }
+    if differing == 0 || counted == 0 {
+        return String::new();
+    }
+    let Some((_, (n, sa, sb))) = buckets.iter().max_by_key(|(_, (n, ..))| *n) else { return String::new() };
+    if n.saturating_mul(LEAST_LEFT) < counted {
+        return format!("the differences are spread thin over {}% of the screen", differing * 100 / counted);
+    }
+    let hex =
+        |s: &[f64; 3]| format!("#{:02x}{:02x}{:02x}", (s[0] / *n as f64).round() as u8, (s[1] / *n as f64).round() as u8, (s[2] / *n as f64).round() as u8);
+    format!("over {}% of the screen the original is {} and yours {}", n * 100 / counted, hex(sa), hex(sb))
+}
+
+/// A screen's picture against the original's: how alike in percent, and where they differ.
+fn picture_of(original: &Path, built: &Path, mask: Option<&NoiseMask>) -> Option<(f64, String)> {
+    picture_pair(original, built).map(|(theirs, ours)| (pair_score(&theirs, &ours, mask), picture_why(&theirs, &ours, mask)))
+}
+
 /// How alike a screen's picture is to the original's, in percent ([`pair_score`] of
 /// [`picture_pair`]); None when there is nothing to compare.
 pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
-    picture_pair(original, built).map(|(theirs, ours)| pair_score(&theirs, &ours, None))
+    picture_of(original, built, None).map(|(score, _)| score)
 }
 
 /// How far (per channel, in a tile's mean colour) two devices' pictures of one build may differ
@@ -199,6 +256,8 @@ pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [St
         let enough = left.saturating_mul(LEAST_LEFT) >= noise.bits.len();
         s.picture = enough.then(|| pair_score(&theirs, &ours, Some(&noise)));
         g.picture = enough.then(|| pair_score(&theirs, &gours, Some(&noise)));
+        s.picture_why = if enough { picture_why(&theirs, &ours, Some(&noise)) } else { String::new() };
+        g.picture_why = if enough { picture_why(&theirs, &gours, Some(&noise)) } else { String::new() };
         if let Some(bar) = bar {
             replace_picture_claim(s, bar);
             replace_picture_claim(g, bar);
@@ -209,7 +268,7 @@ pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [St
 /// A screen's picture claim made again from its current score, in place of the one it had;
 /// a screen with no picture to speak of loses its claim.
 fn replace_picture_claim(st: &mut StateScore, bar: f64) {
-    let claim = picture_claim(&format!("{} {}", st.id, st.name), st.picture, bar);
+    let claim = picture_claim(&format!("{} {}", st.id, st.name), st.picture, bar, &st.picture_why);
     let at = st.claims.iter().position(|c| c.title == claim.title);
     match (st.picture.is_some(), at) {
         (true, Some(i)) => st.claims[i] = claim,
@@ -224,10 +283,11 @@ fn replace_picture_claim(st: &mut StateScore, bar: f64) {
 
 /// The claim a picture bar (`build.picture_good_enough`) adds to a screen that was read: its
 /// picture is at least that alike. A screen read but not pictured fails it, saying so.
-pub fn picture_claim(who: &str, picture: Option<f64>, bar: f64) -> Claim {
+pub fn picture_claim(who: &str, picture: Option<f64>, bar: f64, why: &str) -> Claim {
     let title = format!("{who}: it looks at least {bar:.0}% like the original");
     match picture {
-        Some(p) => Claim::new(title, p >= bar, format!("{p:.0}% alike")),
+        Some(p) if why.is_empty() => Claim::new(title, p >= bar, format!("{p:.0}% alike")),
+        Some(p) => Claim::new(title, p >= bar, format!("{p:.0}% alike; {why}")),
         None => Claim::new(title, false, "the build's picture couldn't be read"),
     }
 }
@@ -386,12 +446,16 @@ impl DeviceCheck {
             // The look, which the dump can't show: the two pictures side by side (a blank
             // picture of the original, a video surface or an overlay already gone, is skipped).
             let read = built.get("count").and_then(Value::as_u64).unwrap_or(0) > 0;
-            let picture = if read { picture_score(&map_dir.join("states").join(&id).join("screen.png"), &out.join("screen.png")) } else { None };
+            let looked = if read { picture_of(&map_dir.join("states").join(&id).join("screen.png"), &out.join("screen.png"), None) } else { None };
+            let (picture, picture_why) = match looked {
+                Some((score, why)) => (Some(score), why),
+                None => (None, String::new()),
+            };
             if let (Some(bar), true) = (build.picture_good_enough, read) {
-                claims.push(picture_claim(&format!("{id} {name}"), picture, bar));
+                claims.push(picture_claim(&format!("{id} {name}"), picture, bar, &picture_why));
             }
             let files = out.strip_prefix(&cx.ws.root).ok().map(|p| p.to_string_lossy().to_string()).filter(|_| out.join("ui.json").is_file());
-            states.push(StateScore { likeness: likeness(&claims), id, name, claims, files, picture });
+            states.push(StateScore { likeness: likeness(&claims), id, name, claims, files, picture, picture_why });
         }
         let crashed = match cx.call("adb_crash_log_read", json!({"serial": serial, "package": package, "count": 500})) {
             Ok(ToolOutput::Evidence(e)) => e.result.get("crashed").and_then(Value::as_bool).unwrap_or(false),
@@ -584,6 +648,32 @@ mod tests {
         Image { width: w, height: h, rgba }
     }
 
+    /// The claim says where the pictures differ: a panel the eye reads as black on both, while
+    /// the measure counts the original's very dark grey against the build's pure black.
+    #[test]
+    fn a_picture_claim_says_where_the_pictures_differ() {
+        let original = picture(640, 360, &|x, _| if x < 400 { [17, 17, 17] } else { [40, 40, 44] });
+        let same = picture(640, 360, &|x, _| if x < 400 { [17, 17, 17] } else { [40, 40, 44] });
+        let black_panel = picture(640, 360, &|x, _| if x < 400 { [0, 0, 0] } else { [40, 40, 44] });
+        assert_eq!(picture_why(&original, &same, None), "");
+        let why = picture_why(&original, &black_panel, None);
+        assert!(why.starts_with("over 6") && why.ends_with("of the screen the original is #111111 and yours #000000"), "{why}");
+        let speckled = picture(640, 360, &|x, y| {
+            if (x / 16 + y / 16) % 29 == 0 {
+                [30, 30, 30]
+            } else if x < 400 {
+                [17, 17, 17]
+            } else {
+                [40, 40, 44]
+            }
+        });
+        let thin = picture_why(&original, &speckled, None);
+        assert!(thin.starts_with("the differences are spread thin"), "{thin}");
+        // Masked tiles don't count: a mask over the panel leaves nothing to say.
+        let masked = NoiseMask::between(&original, &black_panel, 8);
+        assert_eq!(picture_why(&original, &black_panel, Some(&masked)), "");
+    }
+
     /// A dark screen with a light bar at the foot: one device photographs it as drawn, the
     /// other composes the video plane into its screenshot. Against the original, the second
     /// scores badly on its own and as well as the first once the device noise is left out.
@@ -609,9 +699,10 @@ mod tests {
             id: "s03".into(),
             name: "Player".into(),
             likeness: 50.0,
-            claims: vec![Claim::new("s03 Player: the screen is read on the device", true, ""), picture_claim("s03 Player", Some(picture), 80.0)],
+            claims: vec![Claim::new("s03 Player: the screen is read on the device", true, ""), picture_claim("s03 Player", Some(picture), 80.0, "")],
             files: Some(files.into()),
             picture: Some(picture),
+            picture_why: String::new(),
         };
         let mut states = vec![state("dev/s03", 99.0)];
         let mut gstates = vec![state("gate/s03", 40.0)];
@@ -639,16 +730,28 @@ mod tests {
     /// pictures' mean; without one, the pictures are only reported.
     #[test]
     fn a_picture_bar_claims_the_look_and_caps_the_score() {
-        let s = |id: &str, picture: Option<f64>| StateScore { id: id.into(), name: "Guide".into(), likeness: 95.0, claims: vec![], files: None, picture };
+        let s = |id: &str, picture: Option<f64>| StateScore {
+            id: id.into(),
+            name: "Guide".into(),
+            likeness: 95.0,
+            claims: vec![],
+            files: None,
+            picture,
+            picture_why: String::new(),
+        };
         let states = [s("s01", Some(100.0)), s("s02", Some(63.0)), s("s03", None)];
         assert_eq!(picture_mean(&states), Some(81.5));
         assert_eq!(least_alike(&states, 2), vec!["s02 Guide 63%", "s01 Guide 100%"]);
         assert_eq!(picture_mean(&[s("s04", None)]), None);
-        let c = picture_claim("s02 Guide", Some(63.0), 80.0);
+        let c = picture_claim("s02 Guide", Some(63.0), 80.0, "");
         assert!(!c.passed);
         assert_eq!((c.title.as_str(), c.detail.as_str()), ("s02 Guide: it looks at least 80% like the original", "63% alike"));
-        assert!(picture_claim("s01 Guide", Some(80.0), 80.0).passed);
-        let unread = picture_claim("s03 Guide", None, 80.0);
+        assert_eq!(
+            picture_claim("s02 Guide", Some(63.0), 80.0, "over 58% of the screen the original is #111111 and yours #000000").detail,
+            "63% alike; over 58% of the screen the original is #111111 and yours #000000"
+        );
+        assert!(picture_claim("s01 Guide", Some(80.0), 80.0, "").passed);
+        let unread = picture_claim("s03 Guide", None, 80.0, "");
         assert!(!unread.passed && unread.detail.contains("couldn't be read"));
         assert_eq!(device_score(95.0, Some(81.5), Some(80.0)), 81.5);
         assert_eq!(device_score(95.0, Some(81.5), None), 95.0, "without a bar the pictures are only reported");
@@ -706,6 +809,7 @@ mod tests {
             ],
             files: read.then(|| format!("checks/round-0/device/states/{id}")),
             picture: None,
+            picture_why: String::new(),
         };
         let states = vec![screen("s01", true, true), screen("s02", true, false)];
         let mut musts = must_hold(&states);
@@ -833,6 +937,7 @@ mod tests {
             claims: vec![Claim::new("s01 Home: x", true, "")],
             files: Some("checks/round-1/device/states/s01".into()),
             picture: None,
+            picture_why: String::new(),
         };
         let b = StateScore {
             id: "s02".into(),
@@ -846,6 +951,7 @@ mod tests {
             ],
             files: None,
             picture: Some(63.0),
+            picture_why: "over 58% of the screen the original is #111111 and yours #000000".into(),
         };
         let c = StateScore {
             id: "s03".into(),
@@ -854,6 +960,7 @@ mod tests {
             claims: vec![Claim::new("s03 Settings: a", true, ""), Claim::new("s03 Settings: b", false, "no")],
             files: None,
             picture: Some(97.0),
+            picture_why: String::new(),
         };
         let card = scorecard(
             "192.168.1.20:5555",

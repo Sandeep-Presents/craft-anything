@@ -683,6 +683,10 @@ device's doing, not the build's: those tiles are left out of both scores once bo
 At a threshold of 24 the video dimmed by a translucent menu still got through (33% against 77%);
 at 8 the two devices agree within two points on every screen. Measure a threshold on both
 devices before trusting it, and a screen with almost nothing left to compare says nothing.
+Then a round went from 91% to 86% by pictures after the builder made the player's background
+pure black: the original's is #111111, which no eye tells apart on a TV and the measure counts
+over half of every player screen, and the claim said only "69% alike". A picture claim names
+where the pictures differ most, by share of the screen and both colours.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
