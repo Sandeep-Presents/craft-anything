@@ -1432,6 +1432,10 @@ Gaps found while using the app for real projects.
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
 - [x] Let waiting notes scroll with the conversation so a long note leaves the live build
       activity and prompt box reachable — claimed: jeffreylm, branch bugfix/r2.9-keep-build-activity-visible
+- [ ] An Arabic UI that reads right to left: a full `ar` catalog, Arabic sentences in their right
+      word order (egui 0.36 shapes each word but lays words out left to right), and the window
+      mirrored (sidebar on the right, rows from the right)
+      — claimed: SoldierPePe, branch feature/r2.9-arabic-rtl
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress
