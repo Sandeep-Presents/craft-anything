@@ -668,6 +668,10 @@ goes in its scorecard and its note. Read `CheckResult::good` before deciding wha
 And a second study failed in its first second: one dump of the original read as no controls
 (a screen between frames), the map gave up, and the builder went on without a map. A dump that
 reads empty is read again after a moment, twice, and every map capture wakes the device first.
+And a run went Ready at 93% with another accent colour, another typeface, placeholder logos and
+the list cursor one row off: the check read dumps alone, and a dump has no colours, type or icon
+glyphs, while an icon without a content description isn't in it at all. A screen's likeness
+counts its picture too (both pictures are there already), and every icon control gets a name.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it

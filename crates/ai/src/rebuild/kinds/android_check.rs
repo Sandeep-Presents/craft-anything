@@ -7,6 +7,7 @@
 //! [`DeviceCheck::run`] touches a device.
 
 use super::*;
+use craft_anything_engine::tools::web_common::decode_png;
 use craft_anything_engine::workspace::Claim;
 use serde::Serialize;
 
@@ -131,6 +132,52 @@ pub struct StateScore {
     pub claims: Vec<Claim>,
     /// Where the build's dump and picture of it are, relative to the project folder.
     pub files: Option<String>,
+    /// How alike the build's picture of the screen is to the original's, in percent (None when
+    /// the screen wasn't read, or either picture couldn't be).
+    pub picture: Option<f64>,
+}
+
+/// How alike a screen's picture is to the original's, in percent: the screenshot check's
+/// measure (perceptual detail and coarse layout, both at 640×360), so colours, type, spacing
+/// and icon glyphs count, which a dump never shows. None when either picture can't be read.
+pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
+    let shot = std::fs::read(built).ok().and_then(|b| decode_png(&b).ok())?;
+    match super::screenshot::picture_likeness(&shot, &[original.to_path_buf()]) {
+        super::screenshot::Likeness::Best { score, .. } => Some(score),
+        _ => None,
+    }
+}
+
+/// The claim a picture bar (`build.picture_good_enough`) adds to a screen that was read: its
+/// picture is at least that alike. A screen read but not pictured fails it, saying so.
+pub fn picture_claim(who: &str, picture: Option<f64>, bar: f64) -> Claim {
+    let title = format!("{who}: it looks at least {bar:.0}% like the original");
+    match picture {
+        Some(p) => Claim::new(title, p >= bar, format!("{p:.0}% alike")),
+        None => Claim::new(title, false, "the build's picture couldn't be read"),
+    }
+}
+
+/// The mean picture likeness of the screens that were pictured; None when none was.
+pub fn picture_mean(states: &[StateScore]) -> Option<f64> {
+    let v: Vec<f64> = states.iter().filter_map(|s| s.picture).collect();
+    if v.is_empty() { None } else { Some(v.iter().fold(0.0, |a, b| a + b) / v.len() as f64) }
+}
+
+/// The screens whose pictures look least like the original's, as "id Name NN%" (at most `n`).
+pub fn least_alike(states: &[StateScore], n: usize) -> Vec<String> {
+    let mut v: Vec<(&StateScore, f64)> = states.iter().filter_map(|s| s.picture.map(|p| (s, p))).collect();
+    v.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.id.cmp(&b.0.id)));
+    v.into_iter().take(n).map(|(s, p)| format!("{} {} {p:.0}%", s.id, s.name)).collect()
+}
+
+/// The likeness the run judges a pass by: the claims that hold, and with a picture bar set no
+/// more than the pictures' mean, so a build can't be Ready on its structure alone.
+pub fn device_score(claims: f64, pictures: Option<f64>, bar: Option<f64>) -> f64 {
+    match (bar, pictures) {
+        (Some(_), Some(p)) => claims.min(p),
+        _ => claims,
+    }
 }
 
 /// The package an APK declares in its manifest: what the build is installed and driven as. A
@@ -160,6 +207,7 @@ pub fn scorecard(serial: &str, package: &str, original: &str, apk: &Path, states
         "claims": all.len(),
         "held": held,
         "likeness": if all.is_empty() { 0.0 } else { held as f64 * 100.0 / all.len() as f64 },
+        "picture_likeness": picture_mean(states),
         "crashed": crashed,
         "states": states,
         "gate": gate,
@@ -260,9 +308,15 @@ impl DeviceCheck {
                     }
                 }
             }
-            let claims = state_claims(&id, &name, &original, &built, build.android_dp_tolerance);
+            let mut claims = state_claims(&id, &name, &original, &built, build.android_dp_tolerance);
+            // The look, which the dump can't show: the two pictures side by side.
+            let read = built.get("count").and_then(Value::as_u64).unwrap_or(0) > 0;
+            let picture = if read { picture_score(&map_dir.join("states").join(&id).join("screen.png"), &out.join("screen.png")) } else { None };
+            if let (Some(bar), true) = (build.picture_good_enough, read) {
+                claims.push(picture_claim(&format!("{id} {name}"), picture, bar));
+            }
             let files = out.strip_prefix(&cx.ws.root).ok().map(|p| p.to_string_lossy().to_string()).filter(|_| out.join("ui.json").is_file());
-            states.push(StateScore { likeness: likeness(&claims), id, name, claims, files });
+            states.push(StateScore { likeness: likeness(&claims), id, name, claims, files, picture });
         }
         let crashed = match cx.call("adb_crash_log_read", json!({"serial": serial, "package": package, "count": 500})) {
             Ok(ToolOutput::Evidence(e)) => e.result.get("crashed").and_then(Value::as_bool).unwrap_or(false),
@@ -328,6 +382,7 @@ impl Check for DeviceCheck {
         let dir = cx.ws.checks_dir().join(format!("round-{round}")).join(DEVICE);
         fresh_dir(&dir)?;
         let good_enough = cx.build_settings().good_enough;
+        let picture_bar = cx.build_settings().picture_good_enough;
         let gate_serial = cx.build_settings().android_gate_serial.filter(|s| !s.trim().is_empty() && *s != serial);
         let (states, crashed) = match Self::pass(cx, &serial, &package, &apk, &screens, &dir) {
             Ok(v) => v,
@@ -344,7 +399,8 @@ impl Check for DeviceCheck {
         let read_any = states.iter().any(|s| s.files.is_some());
         let mut unknowns: Vec<String> =
             states.iter().filter(|s| s.files.is_none()).map(|s| format!("{} {} couldn't be read on the device", s.id, s.name)).collect();
-        let mut score = likeness(&claims);
+        let pictures = picture_mean(&states);
+        let mut score = device_score(likeness(&claims), pictures, picture_bar);
         let mut note = format!(
             "Device check on {serial}: {score:.0}% alike over {} screen(s) ({} of {} claims hold).",
             states.len(),
@@ -354,6 +410,14 @@ impl Check for DeviceCheck {
         let weak = weakest(&states, 3);
         if !weak.is_empty() {
             note.push_str(&format!(" Weakest: {}.", weak.join(", ")));
+        }
+        if let Some(p) = pictures {
+            let bar = picture_bar.map(|b| format!(", the bar is {b:.0}%")).unwrap_or_default();
+            note.push_str(&format!(" Pictures: {p:.0}% like the original's on average{bar}."));
+            let least = least_alike(&states, 3);
+            if !least.is_empty() {
+                note.push_str(&format!(" Least alike: {}.", least.join(", ")));
+            }
         }
         if crashed {
             note.push_str(&format!(" {package} crashed on the device: see the crash claim."));
@@ -372,7 +436,7 @@ impl Check for DeviceCheck {
                         gclaims.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
                         musts.extend(must_hold(&gstates).into_iter().map(|c| Claim { title: format!("Test device: {}", c.title), ..c }));
                         musts.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
-                        let gscore = likeness(&gclaims);
+                        let gscore = device_score(likeness(&gclaims), picture_mean(&gstates), picture_bar);
                         gate_ok = !gcrashed && gscore >= good_enough;
                         note.push_str(&format!(" On the test device {gs}: {gscore:.0}% alike{}.", if gcrashed { ", and it crashed" } else { "" }));
                         gate = Some(scorecard(&gs, &package, &original, &apk, &gstates, Some(gcrashed), None));
@@ -402,6 +466,68 @@ impl Check for DeviceCheck {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use craft_anything_engine::tools::web_common::{Image, encode_png};
+
+    /// A picture bar claims each read screen's look and caps the pass's likeness by the
+    /// pictures' mean; without one, the pictures are only reported.
+    #[test]
+    fn a_picture_bar_claims_the_look_and_caps_the_score() {
+        let s = |id: &str, picture: Option<f64>| StateScore { id: id.into(), name: "Guide".into(), likeness: 95.0, claims: vec![], files: None, picture };
+        let states = [s("s01", Some(100.0)), s("s02", Some(63.0)), s("s03", None)];
+        assert_eq!(picture_mean(&states), Some(81.5));
+        assert_eq!(least_alike(&states, 2), vec!["s02 Guide 63%", "s01 Guide 100%"]);
+        assert_eq!(picture_mean(&[s("s04", None)]), None);
+        let c = picture_claim("s02 Guide", Some(63.0), 80.0);
+        assert!(!c.passed);
+        assert_eq!((c.title.as_str(), c.detail.as_str()), ("s02 Guide: it looks at least 80% like the original", "63% alike"));
+        assert!(picture_claim("s01 Guide", Some(80.0), 80.0).passed);
+        let unread = picture_claim("s03 Guide", None, 80.0);
+        assert!(!unread.passed && unread.detail.contains("couldn't be read"));
+        assert_eq!(device_score(95.0, Some(81.5), Some(80.0)), 81.5);
+        assert_eq!(device_score(95.0, Some(81.5), None), 95.0, "without a bar the pictures are only reported");
+        assert_eq!(device_score(95.0, None, Some(80.0)), 95.0, "nothing pictured, nothing to cap by");
+    }
+
+    /// The picture score sees what the dump can't: the same picture is 100%, one with another
+    /// colour over half of it is well under, and a missing or broken picture is None.
+    #[test]
+    fn a_screen_s_picture_is_scored_against_the_original_s() {
+        let img = |f: &dyn Fn(u32, u32) -> [u8; 3]| {
+            let (w, h) = (64u32, 36u32);
+            let mut rgba = Vec::new();
+            for y in 0..h {
+                for x in 0..w {
+                    rgba.extend_from_slice(&f(x, y));
+                    rgba.push(255);
+                }
+            }
+            Image { width: w, height: h, rgba }
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let scene = img(&|x, y| if (x / 8 + y / 6) % 2 == 0 { [20, 20, 24] } else { [200, 200, 210] });
+        let tinted = img(&|x, y| {
+            if x < 32 {
+                [230, 120, 20]
+            } else if (x / 8 + y / 6) % 2 == 0 {
+                [20, 20, 24]
+            } else {
+                [200, 200, 210]
+            }
+        });
+        let original = dir.path().join("original.png");
+        let same = dir.path().join("same.png");
+        let other = dir.path().join("other.png");
+        std::fs::write(&original, encode_png(&scene).unwrap()).unwrap();
+        std::fs::write(&same, encode_png(&scene).unwrap()).unwrap();
+        std::fs::write(&other, encode_png(&tinted).unwrap()).unwrap();
+        assert!(picture_score(&original, &same).is_some_and(|p| p > 99.9), "the same picture is 100%");
+        let off = picture_score(&original, &other).unwrap();
+        assert!(off < 80.0, "half the picture in another colour: {off}");
+        assert_eq!(picture_score(&original, &dir.path().join("missing.png")), None);
+        std::fs::write(&other, b"not a png").unwrap();
+        assert_eq!(picture_score(&original, &other), None);
+        assert_eq!(picture_score(&dir.path().join("missing.png"), &same), None, "no original to compare with");
+    }
 
     /// Likeness is the bar: a pass at 92% with every screen read and no crash is good at 90,
     /// whatever its detail claims say; a screen that couldn't be read is not.
@@ -416,6 +542,7 @@ mod tests {
                 Claim::new(format!("{id} Home: it has \"Guide\""), detail_ok, "no control with that text"),
             ],
             files: read.then(|| format!("checks/round-0/device/states/{id}")),
+            picture: None,
         };
         let states = vec![screen("s01", true, true), screen("s02", true, false)];
         let mut musts = must_hold(&states);
@@ -542,6 +669,7 @@ mod tests {
             likeness: 100.0,
             claims: vec![Claim::new("s01 Home: x", true, "")],
             files: Some("checks/round-1/device/states/s01".into()),
+            picture: None,
         };
         let b = StateScore {
             id: "s02".into(),
@@ -554,6 +682,7 @@ mod tests {
                 Claim::new("s02 Guide: d", false, "no"),
             ],
             files: None,
+            picture: Some(63.0),
         };
         let c = StateScore {
             id: "s03".into(),
@@ -561,6 +690,7 @@ mod tests {
             likeness: 50.0,
             claims: vec![Claim::new("s03 Settings: a", true, ""), Claim::new("s03 Settings: b", false, "no")],
             files: None,
+            picture: Some(97.0),
         };
         let card = scorecard(
             "192.168.1.20:5555",
@@ -573,6 +703,7 @@ mod tests {
         );
         assert_eq!((card["screens"].as_u64(), card["claims"].as_u64(), card["held"].as_u64()), (Some(3), Some(7), Some(3)));
         assert!((card["likeness"].as_f64().unwrap() - 300.0 / 7.0).abs() < 0.01);
+        assert!((card["picture_likeness"].as_f64().unwrap() - 80.0).abs() < 0.01, "the mean of the pictured screens: {}", card["picture_likeness"]);
         assert_eq!(card["states"][1]["name"], "Guide");
         assert_eq!(weakest(&[a.clone(), b.clone(), c.clone()], 3), ["s02 Guide 25%", "s03 Settings 50%"]);
         assert_eq!(weakest(&[a], 3), Vec::<String>::new());

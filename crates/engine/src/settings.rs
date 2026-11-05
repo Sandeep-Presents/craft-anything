@@ -149,7 +149,9 @@ pub struct BuildSettings {
     /// Other pages of a website studied and checked besides the start page.
     pub max_pages: usize,
     /// When set, an app or game must look at least this alike (percent) to the person's pictures
-    /// (or the original running) to be good enough; unset, that likeness is only reported.
+    /// (or the original running) to be good enough, and an app on a device claims it for each
+    /// screen's picture against the original's, its likeness capped by the pictures' mean;
+    /// unset, that likeness is only reported.
     pub picture_good_enough: Option<f64>,
     /// Projects that may build at the same time; more wait their turn (at least 1).
     pub parallel: usize,
