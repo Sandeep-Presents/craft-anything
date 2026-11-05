@@ -1153,6 +1153,10 @@ room throughout: nothing is pulled off the device or decoded.
       `max_states` counts kept screens: rows left alone by skip_texts took slots, so a map
       pruned to one area ran out of states on the screens it was told to ignore. — claimed:
       rockmeister, branch feature/r2.12-map-unreadable
+- [ ] A tool run from the CLI stops cleanly on Ctrl-C: SIGINT during `craft-anything-cli adb_app_map`
+      killed the process outright, so a 30-minute map wrote no screens.json (the rebuild command
+      turns SIGINT into "Paused."; a plain tool call does not set `ctx.cancel`). Turn SIGINT into
+      the call's cancel so the tool writes what it has (the map already handles Cancelled).
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
