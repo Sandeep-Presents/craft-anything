@@ -811,6 +811,11 @@ struct MapParams {
     /// the focus and OK are pressed, so the screen a control opens is found.
     #[serde(default = "default_max_focus")]
     max_focus_per_screen: usize,
+    /// Keys pressed after every launch before the map begins (up to 40, repeats like `DPAD_DOWN x3`
+    /// allowed): the map then starts on the screen they reach, and every state's `path` includes
+    /// them, so a deeper part of a big app (its Settings pages) is mapped with the whole budget.
+    #[serde(default)]
+    start_keys: Vec<String>,
     /// Absolute host folder that must not exist yet; it is created fresh.
     output_directory: String,
 }
@@ -2175,6 +2180,12 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         return Err(ToolError::invalid("keys must be 1 to 20 single key names, one per entry (no repeats like `x3`)"));
     }
     let explore: Vec<String> = parsed.into_iter().map(|k| k.key).collect();
+    // Where the map begins: the keys are checked here, and pressed by every capture after its launch.
+    if p.start_keys.len() > 40 {
+        return Err(ToolError::invalid("start_keys must be at most 40 entries"));
+    }
+    adb_ui::parse_keys(&p.start_keys)?;
+    let start_path: Vec<String> = p.start_keys.clone();
     let outdir = create_absent_dir(&p.output_directory)?;
     let made = UnlessWritten::new(&outdir);
     let states_dir = outdir.join("states");
@@ -2262,13 +2273,16 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         let _ = std::fs::remove_dir_all(&tmp);
         Ok(Arrived::Seen { id, new_focus })
     };
-    let start = match capture(&mut map, None, None, &[])? {
+    let start = match capture(&mut map, None, None, &start_path)? {
         Arrived::New(id) | Arrived::Seen { id, .. } => id,
-        Arrived::Left => return Err(ToolError::new(ErrorCode::NotFound, format!("The screen after launching {package} wasn't the app's."))),
+        Arrived::Left => {
+            let after = if start_path.is_empty() { String::new() } else { format!(" and pressing {}", start_path.join(", ")) };
+            return Err(ToolError::new(ErrorCode::NotFound, format!("The screen after launching {package}{after} wasn't the app's.")));
+        }
     };
     // Breadth first over (screen, path): every key from a screen's first position, and from each
     // further focus position on it the keys that act on the focus or move it on.
-    let mut frontier = std::collections::VecDeque::from([(start, Vec::<String>::new(), true)]);
+    let mut frontier = std::collections::VecDeque::from([(start, start_path.clone(), true)]);
     'outer: while let Some((from, path, all_keys)) = frontier.pop_front() {
         let keys: Vec<&String> = explore.iter().filter(|k| all_keys || adb_ui::FOCUS_KEYS.contains(&k.as_str())).collect();
         for key in keys {
@@ -2306,6 +2320,7 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         "density_dpi": density,
         "size_px": size.map(|(w, h)| json!({"width": w, "height": h})),
         "keys": explore,
+        "start_keys": start_path,
         "skip_texts": p.skip_texts,
         "timing": {"launch_wait_ms": p.launch_wait_ms, "gap_ms": p.gap_ms, "wait_ms": p.wait_ms, "dump_lead_ms": p.dump_lead_ms},
         "limits": {"max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "stopped_by": stop},
@@ -2327,7 +2342,7 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
         ctx,
         "adb_app_map",
         serial,
-        json!({"serial": serial, "package": package, "category": p.category, "max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "keys": p.keys, "skip_texts": p.skip_texts, "output_directory": outdir.to_string_lossy()}),
+        json!({"serial": serial, "package": package, "category": p.category, "max_states": p.max_states, "max_presses": p.max_presses, "time_budget_s": p.time_budget_s, "keys": p.keys, "start_keys": p.start_keys, "skip_texts": p.skip_texts, "output_directory": outdir.to_string_lossy()}),
     )
     .result(json!({"file": file, "count": map.len(), "kept": kept, "skipped": skipped, "presses": presses.get(), "captures": captures.get(), "stopped_by": stop, "states": screens["states"], "edges": screens["edges"], "exits": screens["exits"]}))
     .summary(format!(
@@ -2342,7 +2357,7 @@ fn adb_app_map(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError
     if stop != MapStop::Exhausted {
         e = e.limitation(Limitation::new(
             "bounded",
-            format!("The map is partial: {why}. Raise the limit, or map from a deeper screen with adb_ui_walkthrough_record."),
+            format!("The map is partial: {why}. Raise the limit, or map from a deeper screen with start_keys (or adb_ui_walkthrough_record)."),
         ));
     }
     let e = e.build()?;
@@ -2512,6 +2527,8 @@ mod tests {
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_focus_per_screen": 0, "output_directory": out})),
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "max_focus_per_screen": 31, "output_directory": out})),
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "not a package", "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "start_keys": ["POWER"], "output_directory": out})),
+            ("adb_app_map", json!({"serial": "emulator-5554", "package": "com.example.tv", "start_keys": vec!["OK"; 41], "output_directory": out})),
         ];
         for (id, params) in bad {
             let err = refused(&e, id, params);
