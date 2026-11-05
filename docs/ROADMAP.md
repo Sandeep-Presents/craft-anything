@@ -1109,6 +1109,12 @@ room throughout: nothing is pulled off the device or decoded.
 - [x] A screen is known by its structure and the texts of its controls, not by every text on it:
       a live map of a TV guide made a new state of every scroll position and every minute of the
       clock (digits in a label are read as one) — claimed: rock-meister, branch feature/r2.12-map-fingerprint
+- [ ] The device check judges the look too: a run went Ready at 93% with another accent colour,
+      another typeface and placeholder logos, since a dump has no colours, type or icon glyphs,
+      and an icon without a content description isn't in it at all. Score each screen's picture
+      against the original's (the screenshot check's measure) and, with `picture_good_enough`
+      set, claim it per screen and cap the likeness by the pictures' mean; the brief asks for a
+      name on every icon control. — claimed: rockmeister, branch feature/r2.12-picture-likeness
 - [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so
       "About" skipped a whole Settings list and "Recordings" a menu bar that merely listed them
       (seen on the first real map). Skip a capture when the focused control or the state's name
