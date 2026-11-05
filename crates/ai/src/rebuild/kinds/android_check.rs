@@ -166,11 +166,24 @@ pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
     picture_pair(original, built).map(|(theirs, ours)| pair_score(&theirs, &ours, None))
 }
 
+/// How far (per channel, in a tile's mean colour) two devices' pictures of one build may differ
+/// before the tile counts as the device's doing. Measured on a TV that composes the video plane
+/// into its screenshots against one that doesn't: at 24, video dimmed by a translucent menu
+/// still got through and the two devices scored 33% and 77% on one screen; at 8 they agree
+/// within two points on every screen.
+pub const DEVICE_NOISE: u8 = 8;
+
+/// The share of a screen's tiles that must be left after the device noise is taken out for its
+/// picture to say anything: one in twenty. A player with the video over almost all of it is
+/// scored on a dozen tiles otherwise.
+const LEAST_LEFT: usize = 20;
+
 /// What two devices photograph differently of the same build of a screen (a video plane one of
 /// them composes into its screenshot and the other doesn't, a clock) is the device's doing, not
 /// the build's: once the test device has been pictured too, the tiles that differ between the
 /// two build pictures are left out of both scores against the original, and each screen's
-/// picture claim is made again from its new score. `root` is where each state's `files` lead.
+/// picture claim is made again from its new score. A screen with almost nothing left to compare
+/// says nothing (no picture, no claim). `root` is where each state's `files` lead.
 pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [StateScore], root: &Path, map_dir: &Path, bar: Option<f64>) {
     for s in states.iter_mut() {
         let Some(g) = gstates.iter_mut().find(|g| g.id == s.id) else { continue };
@@ -181,9 +194,11 @@ pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [St
         else {
             continue;
         };
-        let noise = NoiseMask::between(&ours, &gours, 24);
-        s.picture = Some(pair_score(&theirs, &ours, Some(&noise)));
-        g.picture = Some(pair_score(&theirs, &gours, Some(&noise)));
+        let noise = NoiseMask::between(&ours, &gours, DEVICE_NOISE);
+        let left = noise.bits.len().saturating_sub(noise.count());
+        let enough = left.saturating_mul(LEAST_LEFT) >= noise.bits.len();
+        s.picture = enough.then(|| pair_score(&theirs, &ours, Some(&noise)));
+        g.picture = enough.then(|| pair_score(&theirs, &gours, Some(&noise)));
         if let Some(bar) = bar {
             replace_picture_claim(s, bar);
             replace_picture_claim(g, bar);
@@ -191,12 +206,18 @@ pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [St
     }
 }
 
-/// A screen's picture claim made again from its current score (in place of the one it had).
+/// A screen's picture claim made again from its current score, in place of the one it had;
+/// a screen with no picture to speak of loses its claim.
 fn replace_picture_claim(st: &mut StateScore, bar: f64) {
     let claim = picture_claim(&format!("{} {}", st.id, st.name), st.picture, bar);
-    match st.claims.iter_mut().find(|c| c.title == claim.title) {
-        Some(c) => *c = claim,
-        None => st.claims.push(claim),
+    let at = st.claims.iter().position(|c| c.title == claim.title);
+    match (st.picture.is_some(), at) {
+        (true, Some(i)) => st.claims[i] = claim,
+        (true, None) => st.claims.push(claim),
+        (false, Some(i)) => {
+            st.claims.remove(i);
+        }
+        (false, None) => {}
     }
     st.likeness = likeness(&st.claims);
 }
@@ -573,7 +594,7 @@ mod tests {
         let plain = picture(640, 360, &ui);
         let with_video = picture(640, 360, &|x, y| if y < 280 { [(x / 80 * 30) as u8, 200, 100] } else { ui(x, y) });
         assert!(pair_score(&original, &with_video, None) < 60.0, "{}", pair_score(&original, &with_video, None));
-        let noise = NoiseMask::between(&plain, &with_video, 24);
+        let noise = NoiseMask::between(&plain, &with_video, DEVICE_NOISE);
         assert!(pair_score(&original, &with_video, Some(&noise)) > 99.0);
         assert!(pair_score(&original, &plain, Some(&noise)) > 99.0);
         // Through the files the check keeps: both screens rescored, the claims made again.
@@ -603,6 +624,15 @@ mod tests {
         let mut unread = vec![StateScore { files: None, claims: vec![], picture: None, ..state("gate/s03", 40.0) }];
         rescore_without_device_noise(&mut states, &mut unread, root, &root.join("capture/map"), None);
         assert_eq!(unread[0].picture, None);
+        // A screen the video covers almost entirely has nothing left to compare: no picture, and
+        // its claim goes (the likeness then rests on the claims that remain).
+        let all_video = picture(640, 360, &|x, y| if y < 352 { [(x / 80 * 30) as u8, 200, 100] } else { ui(x, y) });
+        std::fs::write(root.join("gate/s03/screen.png"), encode_png(&all_video).unwrap()).unwrap();
+        let mut states = vec![state("dev/s03", 99.0)];
+        let mut gstates = vec![state("gate/s03", 40.0)];
+        rescore_without_device_noise(&mut states, &mut gstates, root, &root.join("capture/map"), Some(80.0));
+        assert_eq!((states[0].picture, gstates[0].picture), (None, None));
+        assert_eq!((states[0].claims.len(), gstates[0].claims.len(), gstates[0].likeness), (1, 1, 100.0));
     }
 
     /// A picture bar claims each read screen's look and caps the pass's likeness by the

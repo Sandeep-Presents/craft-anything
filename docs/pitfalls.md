@@ -680,6 +680,9 @@ Then the gate scored 76% by pictures where the build device scored 91%: the test
 the video plane into its screenshot (colour bars under the menu), the build TV and the original's
 map pictures show black there. What two devices photograph differently of one build is the
 device's doing, not the build's: those tiles are left out of both scores once both are pictured.
+At a threshold of 24 the video dimmed by a translucent menu still got through (33% against 77%);
+at 8 the two devices agree within two points on every screen. Measure a threshold on both
+devices before trusting it, and a screen with almost nothing left to compare says nothing.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
