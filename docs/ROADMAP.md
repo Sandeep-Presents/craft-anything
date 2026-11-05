@@ -1146,6 +1146,13 @@ room throughout: nothing is pulled off the device or decoded.
       seven Settings pages) is mapped with the whole budget; every state's `path` includes them,
       so the device check replays them as it does any path, and screens.json records them. Run
       live on a TV player's Settings. — claimed: rockmeister, branch feature/r2.12-map-start-keys
+- [x] A map survives a screen it can't read: one dump that stayed empty after its retries ended a
+      Settings map 70 minutes in with nothing written (the error left the capture closure through
+      `?`). Such a key press is noted under `unreadable` in screens.json and in a limitation, and
+      the walk goes on; adb gone or a folder that can't be made still ends the map. And
+      `max_states` counts kept screens: rows left alone by skip_texts took slots, so a map
+      pruned to one area ran out of states on the screens it was told to ignore. — claimed:
+      rockmeister, branch feature/r2.12-map-unreadable
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
