@@ -749,18 +749,38 @@ impl Worker {
         }
     }
 
-    /// The Kotlin stack builds with Gradle, which needs a JDK and the Android SDK: say so before
-    /// the first turn rather than after it.
+    /// The Android stacks build with Gradle, which needs a JDK and the Android SDK, and a Rust
+    /// core needs cargo-ndk and an NDK besides: say so before the first turn rather than after it.
     fn check_android_tools(&self, stack: &str) -> Result<(), ToolError> {
-        if stack != kinds::AndroidAppKind::STACK {
+        if !kinds::AndroidAppKind::builds_android(stack) {
             return Ok(());
         }
         let settings = self.engine.session().settings.clone();
-        match kinds::android_homes(&settings) {
-            Some(_) => Ok(()),
-            None => Err(ToolError::new(ErrorCode::BadSettings, "Building an Android app needs a JDK (17 or newer) and the Android SDK, and one of them wasn't found.").with_remediation(
-                "Install them (a JDK, and the Android SDK with its command-line tools, platform 36 and build-tools), set JAVA_HOME and ANDROID_HOME or point Settings → Engines at javac and sdkmanager, then start again.",
-            )),
+        let homes = match kinds::android_homes(&settings) {
+            Some(h) => h,
+            None => {
+                return Err(ToolError::new(ErrorCode::BadSettings, "Building an Android app needs a JDK (17 or newer) and the Android SDK, and one of them wasn't found.").with_remediation(
+                    "Install them (a JDK, and the Android SDK with its command-line tools, platform 36 and build-tools), set JAVA_HOME and ANDROID_HOME or point Settings → Engines at javac and sdkmanager, then start again.",
+                ));
+            }
+        };
+        if stack != kinds::AndroidAppKind::RUST_STACK {
+            return Ok(());
+        }
+        let ndk = std::env::var_os("ANDROID_NDK_HOME").map(PathBuf::from).filter(|p| p.is_dir()).or(homes.ndk_home);
+        match (kinds::cargo_ndk(&settings), ndk) {
+            (Some(_), Some(_)) => Ok(()),
+            (cargo_ndk, ndk) => {
+                let missing = match (cargo_ndk.is_some(), ndk.is_some()) {
+                    (false, false) => "neither cargo-ndk nor an NDK was found",
+                    (false, true) => "cargo-ndk wasn't found",
+                    _ => "no NDK was found",
+                };
+                Err(ToolError::new(ErrorCode::BadSettings, format!("Building a Rust core for an Android app needs cargo-ndk and an NDK, and {missing}."))
+                    .with_remediation(
+                        "Install cargo-ndk (`cargo install cargo-ndk`, or point Settings → Engines at it), an NDK (`sdkmanager \"ndk;28.2.13676358\"`, or set ANDROID_NDK_HOME) and the Rust targets (`rustup target add armv7-linux-androideabi aarch64-linux-android`), then start again.",
+                    ))
+            }
         }
     }
 

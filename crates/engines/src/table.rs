@@ -216,6 +216,13 @@ const ANDROID_SDK_PATHS: &[KnownPath] = &[
 /// Arch and its derivatives in `/opt/ghidra`, Debian and Kali in `/usr/share/ghidra` (#85).
 const GHIDRA_PATHS: &[KnownPath] = &[linux("/opt/ghidra", "support/analyzeHeadless"), linux("/usr/share/ghidra", "support/analyzeHeadless")];
 
+/// cargo-ndk is installed by cargo into its own bin folder, which isn't always on PATH.
+const CARGO_NDK_PATHS: &[KnownPath] = &[
+    linux_home(".cargo/bin/cargo-ndk"),
+    KnownPath { os: "macos", base: Base::Env("HOME"), rel: ".cargo/bin/cargo-ndk" },
+    KnownPath { os: "windows", base: Base::Env("USERPROFILE"), rel: ".cargo\\bin\\cargo-ndk.exe" },
+];
+
 const NO_ROOTS: &[KnownRoot] = &[];
 
 const fn root(os: &'static str, base: Base, rel: &'static str, depth: usize) -> KnownRoot {
@@ -557,6 +564,19 @@ pub const ENGINES: &[ExternalEngine] = &[
         exes: &["sdkmanager"],
         exes_windows: &["sdkmanager.bat"],
         known_paths: ANDROID_SDK_PATHS,
+        known_roots: NO_ROOTS,
+        path_setting: true,
+        install: Install::Manual,
+    },
+    // A Rust core in an Android app (R2.12): cargo-ndk builds it for the device's ABIs with the
+    // NDK that sits under the SDK.
+    ExternalEngine {
+        id: "cargondk",
+        name: "cargo-ndk",
+        needed_for: "Building the Rust core of an Android app (cargo install cargo-ndk; it needs an NDK from sdkmanager and the Android Rust targets from rustup)",
+        exes: &["cargo-ndk"],
+        exes_windows: &["cargo-ndk.exe"],
+        known_paths: CARGO_NDK_PATHS,
         known_roots: NO_ROOTS,
         path_setting: true,
         install: Install::Manual,

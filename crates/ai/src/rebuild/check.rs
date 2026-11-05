@@ -114,6 +114,9 @@ fn last_lines(out: &str, n: usize) -> String {
 pub struct AndroidHomes {
     pub java_home: PathBuf,
     pub android_home: PathBuf,
+    /// The newest NDK under `<ANDROID_HOME>/ndk`, for a Rust core built with cargo-ndk
+    /// (`ANDROID_NDK_HOME`); None when none is installed.
+    pub ndk_home: Option<PathBuf>,
 }
 
 impl AndroidHomes {
@@ -122,8 +125,25 @@ impl AndroidHomes {
     pub fn from_tools(javac: &Path, sdkmanager: &Path) -> Option<AndroidHomes> {
         let java_home = javac.ancestors().nth(2)?.to_path_buf();
         let android_home = sdkmanager.ancestors().nth(4)?.to_path_buf();
-        Some(AndroidHomes { java_home, android_home })
+        let ndk_home = newest_ndk(&android_home);
+        Some(AndroidHomes { java_home, android_home, ndk_home })
     }
+}
+
+/// The newest NDK installed under the SDK (`ndk/<version>/`, versions sorted as sdkmanager names
+/// them, `28.2.13676358`), by its folder name.
+pub fn newest_ndk(android_home: &Path) -> Option<PathBuf> {
+    let mut versions: Vec<PathBuf> = std::fs::read_dir(android_home.join("ndk"))
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir() && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(|c: char| c.is_ascii_digit())))
+        .collect();
+    versions.sort_by_key(|p| {
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        name.split('.').map(|part| part.parse::<u64>().unwrap_or(0)).collect::<Vec<_>>()
+    });
+    versions.pop()
 }
 
 /// The newest debug APK a Gradle build left under `app` (`**/build/outputs/apk/debug/*.apk`, a
@@ -243,6 +263,9 @@ pub(super) fn build_check(app: &Path, place: &str, stack: &str, editor: Option<&
                 }
                 if std::env::var_os("ANDROID_HOME").is_none() {
                     proc = proc.env("ANDROID_HOME", &a.android_home);
+                }
+                if let (None, Some(ndk)) = (std::env::var_os("ANDROID_NDK_HOME"), &a.ndk_home) {
+                    proc = proc.env("ANDROID_NDK_HOME", ndk);
                 }
             }
             // Nothing starts once it's time to stop.
@@ -590,6 +613,24 @@ mod tests {
         assert_eq!(build_check(built.path(), "app/", "Builder's choice", None, None, &stop), passed);
     }
 
+    /// The NDK a Rust core builds with is the newest under the SDK, by version, not by text.
+    #[test]
+    fn the_newest_ndk_under_the_sdk_is_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let sdk = dir.path().join("sdk");
+        assert_eq!(newest_ndk(&sdk), None, "no SDK");
+        std::fs::create_dir_all(sdk.join("ndk")).unwrap();
+        assert_eq!(newest_ndk(&sdk), None, "no NDK installed");
+        for v in ["9.0.1", "26.1.10909125", "28.2.13676358", "notes.txt"] {
+            std::fs::create_dir_all(sdk.join("ndk").join(v)).unwrap();
+        }
+        std::fs::write(sdk.join("ndk").join("28.3.0"), b"a file, not an NDK").unwrap();
+        assert_eq!(newest_ndk(&sdk), Some(sdk.join("ndk").join("28.2.13676358")));
+        std::fs::create_dir_all(sdk.join("cmdline-tools/latest/bin")).unwrap();
+        let homes = AndroidHomes::from_tools(Path::new("/opt/jdk/bin/javac"), &sdk.join("cmdline-tools/latest/bin/sdkmanager")).unwrap();
+        assert_eq!(homes.ndk_home, Some(sdk.join("ndk").join("28.2.13676358")));
+    }
+
     /// A Gradle project is built by its wrapper and passes only with a debug APK to show for it.
     #[cfg(unix)]
     #[test]
@@ -607,6 +648,7 @@ mod tests {
         std::fs::write(app.join("gradlew"), "#!/bin/sh\nmkdir -p tv/build/outputs/apk/debug && echo apk > tv/build/outputs/apk/debug/tv-debug.apk\n").unwrap();
         let homes = AndroidHomes::from_tools(Path::new("/opt/jdk/bin/javac"), Path::new("/opt/sdk/cmdline-tools/latest/bin/sdkmanager")).unwrap();
         assert_eq!((homes.java_home.as_path(), homes.android_home.as_path()), (Path::new("/opt/jdk"), Path::new("/opt/sdk")));
+        assert_eq!(homes.ndk_home, None, "no NDK under a folder that isn't there");
         assert_eq!(build_check(app, "app/", "Kotlin + Jetpack Compose (Android)", None, Some(&homes), &stop), (true, "Build succeeded.".into()));
         assert!(debug_apk(app).unwrap().ends_with("tv-debug.apk"));
         // One that fails says so with its output.

@@ -9,6 +9,14 @@ impl AndroidAppKind {
     pub const ID: &'static str = "android-app";
     /// The stack a device target is built with unless the request names another.
     pub const STACK: &'static str = "Kotlin + Jetpack Compose (Android)";
+    /// The stack a request for "a Rust core" (or a Kotlin shim, UniFFI) gets: the same Gradle
+    /// app with its model, parsers, clients and stores in a Rust cdylib under app/core.
+    pub const RUST_STACK: &'static str = "Rust core + Kotlin/Compose (Android)";
+
+    /// Whether a stack builds an Android app with Gradle (and so needs the JDK and SDK).
+    pub fn builds_android(stack: &str) -> bool {
+        stack == Self::STACK || stack == Self::RUST_STACK
+    }
 }
 
 /// What the builder is told about an app studied on a device: what capture/ holds, how to read
@@ -93,6 +101,12 @@ pub fn android_homes(settings: &craft_anything_engine::Settings) -> Option<super
     super::super::check::AndroidHomes::from_tools(&javac, &sdkmanager)
 }
 
+/// Where cargo-ndk is on this computer, for a Rust core (the `cargondk` engine: Settings →
+/// Engines, PATH, cargo's own bin folder).
+pub fn cargo_ndk(settings: &craft_anything_engine::Settings) -> Option<PathBuf> {
+    craft_anything_engines::locate("cargondk", &settings.engines.tools, &settings.engine_store_dir())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,6 +125,15 @@ mod tests {
             AndroidAppKind::STACK,
             "an unknown stack name keeps the default; the brief passes the request on"
         );
+        assert_eq!(
+            kinds.choose("the same app, with a Rust core and a Kotlin shim", &device, false).unwrap().1,
+            AndroidAppKind::RUST_STACK,
+            "a Rust core is asked for by name"
+        );
+        assert!(AndroidAppKind::builds_android(AndroidAppKind::STACK) && AndroidAppKind::builds_android(AndroidAppKind::RUST_STACK));
+        assert!(!AndroidAppKind::builds_android("Rust + egui (eframe)"));
+        let steps = crate::rebuild::stacks::steps(AndroidAppKind::RUST_STACK, None);
+        assert!(steps.contains("app/core/") && steps.contains("cargo ndk") && steps.contains("uniffi") && steps.contains("assembleDebug"), "{steps}");
         assert!(!AndroidAppKind.self_screenshots());
         assert!(!DEVICE_BRIEF.contains("--screenshot option to add") || DEVICE_BRIEF.contains("There is no --screenshot"));
     }

@@ -66,7 +66,8 @@ macro_rules! tool_paths {
 
 // Ghidra is not here: its folder is `GhidraSettings::install_dir`.
 tool_paths!(
-    adb, jadx, apktool, chromium, frida, gdb, lldb, mitmdump, binwalk, unblob, ilspy, java, tshark, objdump, rizin, rtl433, vineflower, jdk, androidsdk
+    adb, jadx, apktool, chromium, frida, gdb, lldb, mitmdump, binwalk, unblob, ilspy, java, tshark, objdump, rizin, rtl433, vineflower, jdk, androidsdk,
+    cargondk
 );
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

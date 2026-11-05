@@ -15,7 +15,7 @@ pub mod screenshot;
 pub mod self_test;
 pub mod website;
 
-pub use android::{AndroidAppKind, DEVICE_BRIEF, android_homes};
+pub use android::{AndroidAppKind, DEVICE_BRIEF, android_homes, cargo_ndk};
 pub use app::{AppKind, RUNS_BRIEF};
 pub use game::{CreditsCheck, GameKind};
 pub use mechanics::MechanicsCheck;
