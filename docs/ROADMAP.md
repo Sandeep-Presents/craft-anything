@@ -1157,6 +1157,13 @@ room throughout: nothing is pulled off the device or decoded.
       killed the process outright, so a 30-minute map wrote no screens.json (the rebuild command
       turns SIGINT into "Paused."; a plain tool call does not set `ctx.cancel`). Turn SIGINT into
       the call's cancel so the tool writes what it has (the map already handles Cancelled).
+- [x] The original's unseen video says nothing: the first map's pictures were taken on a box
+      whose screenshots show the video plane as pure black; later captures on the same box showed
+      the video, and once the build began drawing it too (a software-decoder fallback), every
+      player screen of the first map fell from 90% to 60% by picture while the Settings pages
+      rose. Tiles the original's picture shows as pure black (every channel at or under 2) are
+      left out of the picture score and its why, with the device noise; a screen with under a
+      twentieth left says nothing. — claimed: rockmeister, branch feature/r2.12-unseen-video
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
