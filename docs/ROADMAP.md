@@ -1141,6 +1141,11 @@ room throughout: nothing is pulled off the device or decoded.
       screens than `android_max_states` never gets past the cap (a TV player's Settings pages
       stayed unmapped at 24). Let a map continue from a kept screens.json, exploring only the
       states whose keys were not all pressed.
+- [x] A map that starts deeper: `adb_app_map` takes `start_keys`, pressed after every launch
+      before the map begins, so a part of a big app the first map never reached (a TV player's
+      seven Settings pages) is mapped with the whole budget; every state's `path` includes them,
+      so the device check replays them as it does any path, and screens.json records them. Run
+      live on a TV player's Settings. — claimed: rockmeister, branch feature/r2.12-map-start-keys
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
