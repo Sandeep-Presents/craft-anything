@@ -213,8 +213,50 @@ pub fn picture_why(original: &Image, built: &Image, mask: Option<&NoiseMask>) ->
 }
 
 /// A screen's picture against the original's: how alike in percent, and where they differ.
+/// What the original's picture shows as pure black (the video plane its screenshot couldn't
+/// see) is left out, with whatever `mask` leaves out; a screen with almost nothing else says
+/// nothing.
 fn picture_of(original: &Path, built: &Path, mask: Option<&NoiseMask>) -> Option<(f64, String)> {
-    picture_pair(original, built).map(|(theirs, ours)| (pair_score(&theirs, &ours, mask), picture_why(&theirs, &ours, mask)))
+    let (theirs, ours) = picture_pair(original, built)?;
+    let mask = with_unseen_video(&theirs, mask)?;
+    Some((pair_score(&theirs, &ours, Some(&mask)), picture_why(&theirs, &ours, Some(&mask))))
+}
+
+/// A tile's mean colour at or under this, on every channel, is a video surface the
+/// screenshot couldn't see (the original draws its own dark panels at #0b0c0d and up).
+const UNSEEN_BLACK: f64 = 2.0;
+
+/// The tiles of the original's picture that are pure black: a video plane the device's
+/// screenshot can't see, which says nothing about the build (a build that draws the video there
+/// would lose on every player screen, and one that draws black would win for free).
+fn unseen_video(original: &Image) -> NoiseMask {
+    let tile = craft_anything_engine::tools::web_common::NOISE_TILE;
+    let (cols, rows) = (original.width.div_ceil(tile), original.height.div_ceil(tile));
+    let black: Vec<bool> = (0..rows)
+        .flat_map(|ty| (0..cols).map(move |tx| (tx, ty)))
+        .map(|(tx, ty)| tile_mean(original, tile, tx, ty).iter().all(|c| *c <= UNSEEN_BLACK))
+        .collect();
+    // Grown by one tile, as the device mask is: the video's edge blurs into its neighbours
+    // when the pictures are resized.
+    let at = |x: i64, y: i64| {
+        x >= 0 && y >= 0 && x < i64::from(cols) && y < i64::from(rows) && black.get((y * i64::from(cols) + x) as usize).copied().unwrap_or(false)
+    };
+    let bits = (0..rows)
+        .flat_map(|ty| (0..cols).map(move |tx| (i64::from(tx), i64::from(ty))))
+        .map(|(x, y)| (-1..=1).any(|dy| (-1..=1).any(|dx| at(x + dx, y + dy))))
+        .collect();
+    NoiseMask { tile, cols, rows, bits }
+}
+
+/// `mask` with the original's unseen video added; None when under a twentieth of the screen
+/// is left to compare.
+fn with_unseen_video(original: &Image, mask: Option<&NoiseMask>) -> Option<NoiseMask> {
+    let mut m = unseen_video(original);
+    if let Some(other) = mask {
+        m = m.union(other);
+    }
+    let left = m.bits.len().saturating_sub(m.count());
+    (left.saturating_mul(LEAST_LEFT) >= m.bits.len()).then_some(m)
 }
 
 /// How alike a screen's picture is to the original's, in percent ([`pair_score`] of
@@ -251,13 +293,14 @@ pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [St
         else {
             continue;
         };
-        let noise = NoiseMask::between(&ours, &gours, DEVICE_NOISE);
-        let left = noise.bits.len().saturating_sub(noise.count());
-        let enough = left.saturating_mul(LEAST_LEFT) >= noise.bits.len();
-        s.picture = enough.then(|| pair_score(&theirs, &ours, Some(&noise)));
-        g.picture = enough.then(|| pair_score(&theirs, &gours, Some(&noise)));
-        s.picture_why = if enough { picture_why(&theirs, &ours, Some(&noise)) } else { String::new() };
-        g.picture_why = if enough { picture_why(&theirs, &gours, Some(&noise)) } else { String::new() };
+        let device = NoiseMask::between(&ours, &gours, DEVICE_NOISE);
+        let noise = with_unseen_video(&theirs, Some(&device));
+        let enough = noise.is_some();
+        s.picture = noise.as_ref().map(|m| pair_score(&theirs, &ours, Some(m)));
+        g.picture = noise.as_ref().map(|m| pair_score(&theirs, &gours, Some(m)));
+        s.picture_why = noise.as_ref().map(|m| picture_why(&theirs, &ours, Some(m))).unwrap_or_default();
+        g.picture_why = noise.as_ref().map(|m| picture_why(&theirs, &gours, Some(m))).unwrap_or_default();
+        debug_assert!(enough || s.picture.is_none());
         if let Some(bar) = bar {
             replace_picture_claim(s, bar);
             replace_picture_claim(g, bar);
@@ -759,6 +802,40 @@ mod tests {
     }
 
     /// The picture score sees what the dump can't: the same picture is 100%, one with another
+    /// What the original's picture shows as pure black is a video plane its screenshot couldn't
+    /// see: a build that draws the video there scores as if those tiles weren't there, and a
+    /// screen that is almost all such black says nothing.
+    #[test]
+    fn the_original_s_unseen_video_is_left_out() {
+        let img = |f: &dyn Fn(u32, u32) -> [u8; 3]| picture(64, 36, f);
+        let dir = tempfile::tempdir().unwrap();
+        let ui = |x: u32, y: u32| if (x / 8 + y / 6).is_multiple_of(2) { [20, 20, 24] } else { [200, 200, 210] };
+        // The original: black video over the left 60%, its own panel on the right.
+        let original = img(&|x, y| if x < 38 { [0, 0, 0] } else { ui(x, y) });
+        // The build: colour bars where the video plays, the same panel on the right.
+        let bars = img(&|x, y| if x < 38 { [[230, 30, 30], [30, 200, 30], [30, 30, 230]][(x / 13) as usize % 3] } else { ui(x, y) });
+        // The build drawing black where the video is scores the same: those tiles say nothing.
+        let black = img(&|x, y| if x < 38 { [0, 0, 0] } else { ui(x, y) });
+        let (o, b, k) = (dir.path().join("o.png"), dir.path().join("b.png"), dir.path().join("k.png"));
+        std::fs::write(&o, encode_png(&original).unwrap()).unwrap();
+        std::fs::write(&b, encode_png(&bars).unwrap()).unwrap();
+        std::fs::write(&k, encode_png(&black).unwrap()).unwrap();
+        let with_bars = picture_score(&o, &b).unwrap();
+        let with_black = picture_score(&o, &k).unwrap();
+        assert!(with_bars > 99.0, "the video plane is left out: {with_bars}");
+        assert!((with_bars - with_black).abs() < 0.5, "black or bars under the unseen video, the same: {with_bars} vs {with_black}");
+        // Almost all black: nothing to compare.
+        let mostly = img(&|x, y| if x < 62 { [0, 0, 0] } else { ui(x, y) });
+        let m = dir.path().join("m.png");
+        std::fs::write(&m, encode_png(&mostly).unwrap()).unwrap();
+        assert_eq!(picture_score(&m, &b), None, "under a twentieth left says nothing");
+        // The mask itself: pure black only, not the original's dark panels.
+        let dark = img(&|x, _| if x < 38 { [11, 12, 13] } else { [0, 0, 0] });
+        let mask = unseen_video(&resize(&dark, COMPARE.0, COMPARE.1));
+        assert!(!mask.covers(0, 0), "#0b0c0d is a panel, not the video (the grown edge is far right)");
+        assert!(mask.covers(COMPARE.0 - 1, 0), "pure black is the video");
+    }
+
     /// colour over half of it is well under, and a missing or broken picture is None.
     #[test]
     fn a_screen_s_picture_is_scored_against_the_original_s() {

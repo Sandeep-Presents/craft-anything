@@ -690,6 +690,13 @@ Then a round went from 91% to 86% by pictures after the builder made the player'
 pure black: the original's is #111111, which no eye tells apart on a TV and the measure counts
 over half of every player screen, and the claim said only "69% alike". A picture claim names
 where the pictures differ most, by share of the screen and both colours.
+And the next study's pictures showed the video the first map's didn't: the same box composes
+the video plane into a screenshot some days and not others, so once the build drew the video
+(a software-decoder fallback, as the original has), the first map's 40 player screens fell to
+60% by picture while the 17 new Settings pages rose to 90%. What the original's picture shows
+as pure black is a video plane the screenshot couldn't see, never a fact about the build:
+those tiles are left out, and a map's pictures are never trusted to agree with each other
+about the video.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
