@@ -676,6 +676,10 @@ Its first live round then scored three player screens 100% and an info bar 76%: 
 pictures there were black (a video surface the screenshot can't see; an overlay that had hidden
 by the time the map took it), so a black build scored a free 100% and a drawn one lost. A blank
 picture of the original says nothing: no claim, nothing in the mean.
+Then the gate scored 76% by pictures where the build device scored 91%: the test TV composes
+the video plane into its screenshot (colour bars under the menu), the build TV and the original's
+map pictures show black there. What two devices photograph differently of one build is the
+device's doing, not the build's: those tiles are left out of both scores once both are pictured.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it

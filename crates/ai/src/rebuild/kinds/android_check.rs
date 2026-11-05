@@ -7,7 +7,7 @@
 //! [`DeviceCheck::run`] touches a device.
 
 use super::*;
-use craft_anything_engine::tools::web_common::decode_png;
+use craft_anything_engine::tools::web_common::{Image, NoiseMask, block_similarity_masked, decode_png, perceptual_similarity_masked, resize};
 use craft_anything_engine::workspace::Claim;
 use serde::Serialize;
 
@@ -137,22 +137,68 @@ pub struct StateScore {
     pub picture: Option<f64>,
 }
 
-/// How alike a screen's picture is to the original's, in percent: the screenshot check's
-/// measure (perceptual detail and coarse layout, both at 640×360), so colours, type, spacing
-/// and icon glyphs count, which a dump never shows. None when either picture can't be read,
-/// and when the original's is blank (a video surface the screenshot can't see, an overlay that
-/// had already gone when the map took it): nothing can be said about such a screen, and a
-/// black build picture would otherwise score a free 100% there.
-pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
-    let theirs = std::fs::read(original).ok().and_then(|b| decode_png(&b).ok())?;
+/// The size both pictures are brought to before they are compared (the screenshot check's).
+const COMPARE: (u32, u32) = (640, 360);
+
+/// A screen's two pictures, the original's and the build's, at the compare size. None when
+/// either can't be read, and when the original's is blank (a video surface the screenshot
+/// can't see, an overlay that had already gone when the map took it): nothing can be said about
+/// such a screen, and a black build picture would otherwise score a free 100% there.
+fn picture_pair(original: &Path, built: &Path) -> Option<(Image, Image)> {
+    let read = |p: &Path| std::fs::read(p).ok().and_then(|b| decode_png(&b).ok());
+    let theirs = read(original)?;
     if super::screenshot::is_blank(&theirs) {
         return None;
     }
-    let shot = std::fs::read(built).ok().and_then(|b| decode_png(&b).ok())?;
-    match super::screenshot::picture_likeness(&shot, &[original.to_path_buf()]) {
-        super::screenshot::Likeness::Best { score, .. } => Some(score),
-        _ => None,
+    let ours = read(built)?;
+    Some((resize(&theirs, COMPARE.0, COMPARE.1), resize(&ours, COMPARE.0, COMPARE.1)))
+}
+
+/// The screenshot check's measure, in percent: perceptual detail and coarse layout, over the
+/// tiles `mask` leaves in. Colours, type, spacing and icon glyphs count, which a dump never shows.
+pub fn pair_score(original: &Image, built: &Image, mask: Option<&NoiseMask>) -> f64 {
+    (perceptual_similarity_masked(original, built, mask) + block_similarity_masked(original, built, 16, 24, mask)) * 50.0
+}
+
+/// How alike a screen's picture is to the original's, in percent ([`pair_score`] of
+/// [`picture_pair`]); None when there is nothing to compare.
+pub fn picture_score(original: &Path, built: &Path) -> Option<f64> {
+    picture_pair(original, built).map(|(theirs, ours)| pair_score(&theirs, &ours, None))
+}
+
+/// What two devices photograph differently of the same build of a screen (a video plane one of
+/// them composes into its screenshot and the other doesn't, a clock) is the device's doing, not
+/// the build's: once the test device has been pictured too, the tiles that differ between the
+/// two build pictures are left out of both scores against the original, and each screen's
+/// picture claim is made again from its new score. `root` is where each state's `files` lead.
+pub fn rescore_without_device_noise(states: &mut [StateScore], gstates: &mut [StateScore], root: &Path, map_dir: &Path, bar: Option<f64>) {
+    for s in states.iter_mut() {
+        let Some(g) = gstates.iter_mut().find(|g| g.id == s.id) else { continue };
+        let (Some(sf), Some(gf)) = (s.files.clone(), g.files.clone()) else { continue };
+        let original = map_dir.join("states").join(&s.id).join("screen.png");
+        let (Some((theirs, ours)), Some((_, gours))) =
+            (picture_pair(&original, &root.join(sf).join("screen.png")), picture_pair(&original, &root.join(gf).join("screen.png")))
+        else {
+            continue;
+        };
+        let noise = NoiseMask::between(&ours, &gours, 24);
+        s.picture = Some(pair_score(&theirs, &ours, Some(&noise)));
+        g.picture = Some(pair_score(&theirs, &gours, Some(&noise)));
+        if let Some(bar) = bar {
+            replace_picture_claim(s, bar);
+            replace_picture_claim(g, bar);
+        }
     }
+}
+
+/// A screen's picture claim made again from its current score (in place of the one it had).
+fn replace_picture_claim(st: &mut StateScore, bar: f64) {
+    let claim = picture_claim(&format!("{} {}", st.id, st.name), st.picture, bar);
+    match st.claims.iter_mut().find(|c| c.title == claim.title) {
+        Some(c) => *c = claim,
+        None => st.claims.push(claim),
+    }
+    st.likeness = likeness(&st.claims);
 }
 
 /// The claim a picture bar (`build.picture_good_enough`) adds to a screen that was read: its
@@ -396,14 +442,45 @@ impl Check for DeviceCheck {
             Ok(v) => v,
             Err(e) => return Ok(CheckResult::new(DEVICE, round, false, format!("Couldn't install or drive the build on {serial}: {}", e.message))),
         };
-        let mut claims: Vec<Claim> = states.iter().flat_map(|s| s.claims.clone()).collect();
-        claims.push(Claim::new(format!("No crash of {package} on {serial}"), !crashed, "the device's crash log names it"));
+        let crash_claim = |crashed: bool| Claim::new(format!("No crash of {package} on {serial}"), !crashed, "the device's crash log names it");
+        let flat = |states: &[StateScore]| -> Vec<Claim> { states.iter().flat_map(|s| s.claims.clone()).collect() };
+        // The gate: the same pass on the second device, once the first is good enough by its
+        // own claims and pictures. What the two devices then photograph differently of one
+        // build (a video plane one of them composes into its screenshot, a clock) is the
+        // device's doing, not the build's, and is left out of both pictures' scores.
+        let mut states = states;
+        let mut gate_pass = None;
+        let mut gate_error = None;
+        let mut gate_waits = None;
+        let first = {
+            let mut c = flat(&states);
+            c.push(crash_claim(crashed));
+            device_score(likeness(&c), picture_mean(&states), picture_bar)
+        };
+        if let Some(gs) = gate_serial {
+            if first >= good_enough && !crashed {
+                let gdir = dir.join("gate");
+                fresh_dir(&gdir)?;
+                match Self::pass(cx, &gs, &package, &apk, &screens, &gdir) {
+                    Ok((mut gstates, gcrashed)) => {
+                        let map_dir = cx.ws.capture_dir().join("map");
+                        rescore_without_device_noise(&mut states, &mut gstates, &cx.ws.root, &map_dir, picture_bar);
+                        gate_pass = Some((gs, gstates, gcrashed));
+                    }
+                    Err(e) => gate_error = Some((gs, e.message)),
+                }
+            } else {
+                gate_waits = Some(gs);
+            }
+        }
+        let mut claims = flat(&states);
+        claims.push(crash_claim(crashed));
         // What the run is handed: the claims that must hold (every screen reached and read, no
         // crash), while the likeness is the bar for the rest. Every detail claim stays in the
         // scorecard and names the weakest screens in the note; handing them all over would ask
         // for 100% before Ready, whatever good_enough says.
         let mut musts = must_hold(&states);
-        musts.push(Claim::new(format!("No crash of {package} on {serial}"), !crashed, "the device's crash log names it"));
+        musts.push(crash_claim(crashed));
         let read_any = states.iter().any(|s| s.files.is_some());
         let mut unknowns: Vec<String> =
             states.iter().filter(|s| s.files.is_none()).map(|s| format!("{} {} couldn't be read on the device", s.id, s.name)).collect();
@@ -430,36 +507,35 @@ impl Check for DeviceCheck {
         if crashed {
             note.push_str(&format!(" {package} crashed on the device: see the crash claim."));
         }
-        // The gate: the same pass on the second device, once the first is good enough.
         let mut gate = None;
         let mut gate_ok = true;
-        if let Some(gs) = gate_serial {
-            if score >= good_enough && !crashed {
-                let gdir = dir.join("gate");
-                fresh_dir(&gdir)?;
-                match Self::pass(cx, &gs, &package, &apk, &screens, &gdir) {
-                    Ok((gstates, gcrashed)) => {
-                        let mut gclaims: Vec<Claim> =
-                            gstates.iter().flat_map(|s| s.claims.clone()).map(|c| Claim { title: format!("Test device: {}", c.title), ..c }).collect();
-                        gclaims.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
-                        musts.extend(must_hold(&gstates).into_iter().map(|c| Claim { title: format!("Test device: {}", c.title), ..c }));
-                        musts.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
-                        let gscore = device_score(likeness(&gclaims), picture_mean(&gstates), picture_bar);
-                        gate_ok = !gcrashed && gscore >= good_enough;
-                        note.push_str(&format!(" On the test device {gs}: {gscore:.0}% alike{}.", if gcrashed { ", and it crashed" } else { "" }));
-                        gate = Some(scorecard(&gs, &package, &original, &apk, &gstates, Some(gcrashed), None));
-                        score = score.min(gscore);
-                        claims.extend(gclaims);
-                    }
-                    Err(e) => {
-                        gate_ok = false;
-                        unknowns.push(format!("the test device {gs} couldn't be checked: {}", e.message));
-                        note.push_str(&format!(" The test device {gs} couldn't be checked: {}.", e.message));
-                    }
+        if let Some((gs, gstates, gcrashed)) = gate_pass {
+            let mut gclaims: Vec<Claim> = flat(&gstates).into_iter().map(|c| Claim { title: format!("Test device: {}", c.title), ..c }).collect();
+            gclaims.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
+            musts.extend(must_hold(&gstates).into_iter().map(|c| Claim { title: format!("Test device: {}", c.title), ..c }));
+            musts.push(Claim::new(format!("Test device: no crash of {package} on {gs}"), !gcrashed, "the device's crash log names it"));
+            let gpictures = picture_mean(&gstates);
+            let gscore = device_score(likeness(&gclaims), gpictures, picture_bar);
+            gate_ok = !gcrashed && gscore >= good_enough;
+            note.push_str(&format!(" On the test device {gs}: {gscore:.0}% alike{}.", if gcrashed { ", and it crashed" } else { "" }));
+            if let Some(p) = gpictures {
+                note.push_str(&format!(" Its pictures: {p:.0}% on average, what the two devices photograph differently left out."));
+                let least = least_alike(&gstates, 3);
+                if !least.is_empty() {
+                    note.push_str(&format!(" Least alike there: {}.", least.join(", ")));
                 }
-            } else {
-                note.push_str(&format!(" The test device {gs} waits until the build device is good enough."));
             }
+            gate = Some(scorecard(&gs, &package, &original, &apk, &gstates, Some(gcrashed), None));
+            score = score.min(gscore);
+            claims.extend(gclaims);
+        }
+        if let Some((gs, message)) = gate_error {
+            gate_ok = false;
+            unknowns.push(format!("the test device {gs} couldn't be checked: {message}"));
+            note.push_str(&format!(" The test device {gs} couldn't be checked: {message}."));
+        }
+        if let Some(gs) = gate_waits {
+            note.push_str(&format!(" The test device {gs} waits until the build device is good enough."));
         }
         let card = scorecard(&serial, &package, &original, &apk, &states, Some(crashed), gate);
         let file = dir.join("device.json");
@@ -474,7 +550,60 @@ impl Check for DeviceCheck {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use craft_anything_engine::tools::web_common::{Image, encode_png};
+    use craft_anything_engine::tools::web_common::encode_png;
+
+    fn picture(w: u32, h: u32, f: &dyn Fn(u32, u32) -> [u8; 3]) -> Image {
+        let mut rgba = Vec::new();
+        for y in 0..h {
+            for x in 0..w {
+                rgba.extend_from_slice(&f(x, y));
+                rgba.push(255);
+            }
+        }
+        Image { width: w, height: h, rgba }
+    }
+
+    /// A dark screen with a light bar at the foot: one device photographs it as drawn, the
+    /// other composes the video plane into its screenshot. Against the original, the second
+    /// scores badly on its own and as well as the first once the device noise is left out.
+    #[test]
+    fn what_two_devices_photograph_differently_is_the_device_s_doing() {
+        let ui = |_: u32, y: u32| if y >= 300 { [220, 220, 220] } else { [16, 16, 16] };
+        let original = picture(640, 360, &ui);
+        let plain = picture(640, 360, &ui);
+        let with_video = picture(640, 360, &|x, y| if y < 280 { [(x / 80 * 30) as u8, 200, 100] } else { ui(x, y) });
+        assert!(pair_score(&original, &with_video, None) < 60.0, "{}", pair_score(&original, &with_video, None));
+        let noise = NoiseMask::between(&plain, &with_video, 24);
+        assert!(pair_score(&original, &with_video, Some(&noise)) > 99.0);
+        assert!(pair_score(&original, &plain, Some(&noise)) > 99.0);
+        // Through the files the check keeps: both screens rescored, the claims made again.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for (p, img) in [("capture/map/states/s03/screen.png", &original), ("dev/s03/screen.png", &plain), ("gate/s03/screen.png", &with_video)] {
+            let f = root.join(p);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::write(&f, encode_png(img).unwrap()).unwrap();
+        }
+        let state = |files: &str, picture: f64| StateScore {
+            id: "s03".into(),
+            name: "Player".into(),
+            likeness: 50.0,
+            claims: vec![Claim::new("s03 Player: the screen is read on the device", true, ""), picture_claim("s03 Player", Some(picture), 80.0)],
+            files: Some(files.into()),
+            picture: Some(picture),
+        };
+        let mut states = vec![state("dev/s03", 99.0)];
+        let mut gstates = vec![state("gate/s03", 40.0)];
+        assert!(!gstates[0].claims[1].passed);
+        rescore_without_device_noise(&mut states, &mut gstates, root, &root.join("capture/map"), Some(80.0));
+        assert!(gstates[0].picture.unwrap() > 99.0 && states[0].picture.unwrap() > 99.0);
+        assert!(gstates[0].claims.iter().all(|c| c.passed) && gstates[0].claims.len() == 2, "{:?}", gstates[0].claims);
+        assert_eq!(gstates[0].likeness, 100.0);
+        // Without a bar there is no claim to remake; a screen the gate didn't read is left alone.
+        let mut unread = vec![StateScore { files: None, claims: vec![], picture: None, ..state("gate/s03", 40.0) }];
+        rescore_without_device_noise(&mut states, &mut unread, root, &root.join("capture/map"), None);
+        assert_eq!(unread[0].picture, None);
+    }
 
     /// A picture bar claims each read screen's look and caps the pass's likeness by the
     /// pictures' mean; without one, the pictures are only reported.
@@ -500,17 +629,7 @@ mod tests {
     /// colour over half of it is well under, and a missing or broken picture is None.
     #[test]
     fn a_screen_s_picture_is_scored_against_the_original_s() {
-        let img = |f: &dyn Fn(u32, u32) -> [u8; 3]| {
-            let (w, h) = (64u32, 36u32);
-            let mut rgba = Vec::new();
-            for y in 0..h {
-                for x in 0..w {
-                    rgba.extend_from_slice(&f(x, y));
-                    rgba.push(255);
-                }
-            }
-            Image { width: w, height: h, rgba }
-        };
+        let img = |f: &dyn Fn(u32, u32) -> [u8; 3]| picture(64, 36, f);
         let dir = tempfile::tempdir().unwrap();
         let scene = img(&|x, y| if (x / 8 + y / 6) % 2 == 0 { [20, 20, 24] } else { [200, 200, 210] });
         let tinted = img(&|x, y| {
