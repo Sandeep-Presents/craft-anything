@@ -5,15 +5,16 @@ use egui_kittest::{Harness, kittest::Queryable};
 
 #[test]
 fn a_formatted_glossary_word_after_unicode_still_has_its_hover_hint() {
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 820.0)).build_eframe(|cc| {
+    let mut h = Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1280.0, 820.0)).build_eframe(|cc| {
         CraftApp::setup_context(&cc.egui_ctx);
         let mut app = demo::app(demo::engine(Mode::Beginner, true));
         demo::fill_project(&mut app);
         app.state.feed = vec![FeedItem::Agent { text: "ação **IPC** e `source.rs`".into(), streaming: false }];
-        cc.egui_ctx.all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
         app
     });
     h.run_steps(3);
+    // After the theme is applied on the first frame, which sets the style again.
+    h.ctx.global_style_mut(|style| style.interaction.tooltip_delay = 0.0);
     let text = h
         .output()
         .shapes

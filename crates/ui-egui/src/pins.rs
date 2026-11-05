@@ -173,7 +173,7 @@ pub fn section(app: &mut CraftApp, ui: &mut Ui, fold: bool) {
         let status = row.running.then_some((t.success, "Running", false));
         let r = crate::sidebar::row(ui, "pin", &row.pin.name, status, false);
         if fold && row.running {
-            ui.painter().circle_filled(egui::pos2(r.rect.right() - 10.0, r.rect.top() + 9.0), 4.0, t.success);
+            ui.painter().circle_filled(egui::pos2(crate::widgets::mirror_x(r.rect, r.rect.right() - 10.0), r.rect.top() + 9.0), 4.0, t.success);
         }
         let mode = match row.pin.mode {
             PinMode::Frozen => tr("Frozen copy"),

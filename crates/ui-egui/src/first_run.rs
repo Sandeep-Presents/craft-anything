@@ -7,7 +7,7 @@ use crate::theme::{self, Tokens};
 use crate::{CraftApp, icons, widgets};
 use craft_anything_ai::{BackendKind, Detected};
 use craft_anything_engine::Mode;
-use egui::{Align2, RichText, Ui, Vec2};
+use egui::{RichText, Ui, Vec2};
 
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
@@ -36,15 +36,17 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     ui.painter().galley_with_override_text_color(egui::pos2(full.center().x - g.size().x / 2.0, y - g.size().y / 2.0), g, t.text_dim);
     let track = egui::Rect::from_min_size(egui::pos2(full.left(), full.bottom() - 2.0), Vec2::new(full.width(), 2.0));
     ui.painter().rect_filled(track, 0.0, t.separator);
-    ui.painter().rect_filled(egui::Rect::from_min_size(track.min, Vec2::new(track.width() * (step + 1) as f32 / 4.0, 2.0)), 0.0, t.accent);
+    let done = egui::Rect::from_min_size(track.min, Vec2::new(track.width() * (step + 1) as f32 / 4.0, 2.0));
+    ui.painter().rect_filled(widgets::mirror(track, done), 0.0, t.accent);
     if step > 0 && step < 3 {
-        let r = egui::Rect::from_min_size(egui::pos2(full.left() + 24.0, y - 14.0), Vec2::new(120.0, 28.0));
-        let resp = ui.interact(r, ui.id().with("fr-back"), egui::Sense::click());
+        let r = widgets::mirror(full, egui::Rect::from_min_size(egui::pos2(full.left() + 24.0, y - 14.0), Vec2::new(120.0, 28.0)));
+        let resp = ui.interact(r, ui.scope_id().with("fr-back"), egui::Sense::click());
         let g = widgets::label_galley(ui, &tr("← Back"), 12.0, t.text);
         let col = if resp.hovered() { t.text } else { t.text_dim };
-        ui.painter().galley_with_override_text_color(egui::pos2(r.left(), r.center().y - g.size().y / 2.0), g, col);
+        let at = widgets::mirror(r, egui::Rect::from_min_size(egui::pos2(r.left(), r.center().y - g.size().y / 2.0), g.size()));
+        ui.painter().galley_with_override_text_color(at.min, g, col);
         widgets::focus_ring(ui, &resp, r);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tr("Back")));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tr("Back")));
         if resp.clicked() {
             app.state.first_run = match app.state.first_run {
                 FirstRunStep::Purpose => FirstRunStep::Brain,
@@ -147,7 +149,7 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     icons::show(ui, "radar", 22.0, t.text_faint);
-                    ui.vertical(|ui| {
+                    ui.with_layout(crate::widgets::down(), |ui| {
                         ui.label(RichText::new(tr("We didn't find an AI on this computer yet")).font(theme::medium(theme::BODY)));
                         ui.label(RichText::new(tr("You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.")).color(t.text_dim));
                     });
@@ -202,11 +204,11 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(40.0), egui::Sense::hover());
             ui.painter().rect_filled(rect, t.radius, t.raised);
             icons::paint(ui, rect, kind_icon(d.suggestion.kind), 20.0, t.accent_ink);
-            ui.vertical(|ui| {
+            ui.with_layout(crate::widgets::down(), |ui| {
                 ui.label(theme::heading(&name, theme::CARD));
                 ui.label(RichText::new(&d.reason).color(t.text_dim).size(theme::SMALL));
             });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 if on {
                     widgets::pill(ui, "Selected", t.on_accent, t.accent);
                 } else if configured {
@@ -252,15 +254,19 @@ fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui
     let stroke = if on { egui::Stroke::new(1.0, t.accent) } else { egui::Stroke::new(1.0, theme::mix(t.card_border, t.field_border, h)) };
     ui.painter().rect(rect, t.radius_lg, fill, stroke, egui::StrokeKind::Inside);
     let ir = egui::Rect::from_min_size(rect.min + Vec2::new(14.0, 12.0), Vec2::splat(40.0));
+    let text_x = widgets::mirror_x(rect, ir.right() + 14.0);
+    let ir = widgets::mirror(rect, ir);
     ui.painter().rect_filled(ir, t.radius, t.raised);
     icons::paint(ui, ir, icon, 20.0, if on { t.accent_ink } else { t.icon });
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 14.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::BODY), t.text);
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 35.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
+    let top = widgets::start_anchor(egui::Align::Min);
+    ui.painter().text(egui::pos2(text_x, rect.top() + 14.0), top, tr(title), theme::semibold(theme::BODY), t.text);
+    ui.painter().text(egui::pos2(text_x, rect.top() + 35.0), top, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
     if on {
-        icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0)), "check", 18.0, t.accent);
+        let tick = egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0));
+        icons::paint(ui, widgets::mirror(rect, tick), "check", 18.0, t.accent);
     }
     widgets::focus_ring(ui, &resp, rect);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, tr(title)));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 

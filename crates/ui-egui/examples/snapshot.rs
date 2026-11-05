@@ -23,8 +23,13 @@ fn arg(args: &[String], name: &str) -> Option<String> {
 static LANG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 fn render(out: &std::path::Path, name: &str, w: f32, h: f32, scale: f32, make: impl FnOnce() -> CraftApp + 'static) {
-    let mut harness =
-        egui_kittest::Harness::builder().with_size(egui::vec2(w, h)).with_pixels_per_point(scale).with_max_steps(64).wgpu().build_eframe(move |cc| {
+    let mut harness = egui_kittest::Harness::builder()
+        .allow_missing_glyphs()
+        .with_size(egui::vec2(w, h))
+        .with_pixels_per_point(scale)
+        .with_max_steps(64)
+        .wgpu()
+        .build_eframe(move |cc| {
             CraftApp::setup_context(&cc.egui_ctx);
             let mut app = make();
             // A made-up folder: the default names the account of whoever renders the pictures.

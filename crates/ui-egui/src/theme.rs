@@ -197,7 +197,7 @@ impl Tokens {
 }
 
 fn tokens_id() -> egui::Id {
-    egui::Id::new("craft-anything-theme")
+    egui::Id::unique("craft-anything-theme")
 }
 
 // ---- fonts -------------------------------------------------------------------------------------

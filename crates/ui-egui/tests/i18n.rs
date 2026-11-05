@@ -11,7 +11,7 @@ fn harness(mut settings: Settings, dir: &Path) -> Harness<'static, CraftApp> {
     // Keep every engine path under the test directory, including after a saved-settings reload.
     settings.engines.store_dir = Some(dir.join("engines"));
     settings.projects_dir = Some(dir.join("projects"));
-    Harness::builder().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
+    Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
         CraftApp::setup_context(&cc.egui_ctx);
         let engine = demo::engine(Mode::Beginner, true);
         {
@@ -47,7 +47,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         // Startup must apply the saved locale itself, rather than relying on a manual call to
         // set_language after app construction. Check both lookup and a rendered settings row.
         assert_eq!(i18n::language(), initial);
-        h.get_by_label(translated_language);
+        h.get_by_role_and_label(egui::Role::Label, translated_language);
         assert_eq!(i18n::trf("Opened {name}", &[("name", "sample.exe")]), translated_open);
         assert_eq!(i18n::tr("A deliberately uncatalogued message"), "A deliberately uncatalogued message");
         assert_eq!(i18n::trf("Uncatalogued {name}", &[("name", "sample.exe")]), "Uncatalogued sample.exe");
@@ -95,7 +95,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         restored.run_steps(3);
         assert_eq!(i18n::language(), other);
         restored.get_by_value(other_native);
-        restored.get_by_label(if other == "zh-hans" { "语言" } else { "語言" });
+        restored.get_by_role_and_label(egui::Role::Label, if other == "zh-hans" { "语言" } else { "語言" });
 
         // English remains available from either Chinese catalog and takes effect immediately.
         restored.get_by_value(other_native).click();
@@ -107,7 +107,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         assert_eq!(i18n::language(), "en");
         assert_eq!(restored.state().settings.language, "en");
         assert_eq!(restored.state().engine.session().settings.language, "en");
-        restored.get_by_label("Language");
+        restored.get_by_role_and_label(egui::Role::Label, "Language");
         assert!(restored.query_by_label("语言").is_none());
         assert!(restored.query_by_label("語言").is_none());
 
@@ -129,13 +129,26 @@ fn chinese_startup_language_menu_and_saved_selection() {
         ("ka", "ქართული", "ენა"),
         ("ko", "한국어", "언어"),
         ("vi", "Tiếng Việt", "Ngôn ngữ"),
+        ("ar", "العربية", "اللغة"),
     ] {
         let settings = Settings { mode: Mode::Beginner, first_run_done: true, language: code.into(), ..Default::default() };
         let mut existing = harness(settings, &temp.path().join(code));
         existing.run_steps(3);
         assert_eq!(i18n::language(), code);
-        existing.get_by_label(label);
+        existing.get_by_role_and_label(egui::Role::Label, label);
         existing.get_by_value(native);
+    }
+    // Arabic reads right to left: the sidebar moves to the right, and egui's own parts follow.
+    for (code, new_project) in [("ar", "مشروع جديد"), ("en", "New project")] {
+        let settings = Settings { mode: Mode::Beginner, first_run_done: true, language: code.into(), ..Default::default() };
+        let mut h = harness(settings, &temp.path().join(format!("mirror-{code}")));
+        h.state_mut().state.settings_open = false;
+        h.run_steps(3);
+        let rtl = code == "ar";
+        assert_eq!(i18n::is_rtl(), rtl);
+        assert_eq!(h.ctx.global_style().right_to_left, rtl);
+        let x = h.get_by_label(new_project).rect().center().x;
+        assert_eq!(x > 640.0, rtl, "{code}: New project at x = {x}");
     }
     i18n::set_language("unsupported-locale");
     assert_eq!(i18n::language(), "en");

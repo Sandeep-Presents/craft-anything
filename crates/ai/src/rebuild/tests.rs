@@ -217,6 +217,16 @@ fn estonian_requests_keep_their_project_kind() {
 }
 
 #[test]
+fn arabic_requests_keep_their_project_kind() {
+    for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة"] {
+        assert_eq!(choose(request, &TargetRef::None), ("game", "Unity"), "{request}");
+    }
+    for request in ["موقع ويب لمخبزي", "أعد بناء صفحة الويب هذه", "انسخ الموقع كما هو"] {
+        assert_eq!(choose(request, &TargetRef::None), ("website", stacks::BUILDERS_CHOICE), "{request}");
+    }
+}
+
+#[test]
 fn chinese_requests_keep_their_project_kind() {
     for request in ["一个简单的贪吃蛇游戏", "簡單的貪食蛇遊戲", "复刻它的玩法"] {
         assert_eq!(choose(request, &TargetRef::None), ("game", "Unity"), "{request}");
