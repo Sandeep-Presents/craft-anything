@@ -1125,6 +1125,12 @@ room throughout: nothing is pulled off the device or decoded.
       only because it ran `ps` and read the CLI's command line; the sixth, cut short there, was lost
       and the builder repeated its last check. The message is kept (`follow_up_message`: anything but
       `-` or nothing) and the run hands it to the agent carrying on its session as the follow-up.
+- [ ] A Rust core with a Kotlin shim: a person who wants one core for a TV app and later a desktop
+      one asks for "a Rust core"; today every Android stack is Kotlin through and through. A stack
+      row `Rust core + Kotlin/Compose (Android)` (a cdylib under app/core with UniFFI bindings, the
+      shim drawing and playing, one Gradle build that runs cargo-ndk first), a `cargo-ndk` engine,
+      the NDK found under the SDK for the build, and a preflight that names what's missing.
+      — claimed: rockmeister, branch feature/r2.12-rust-core
 - [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so
       "About" skipped a whole Settings list and "Recordings" a menu bar that merely listed them
       (seen on the first real map). Skip a capture when the focused control or the state's name
