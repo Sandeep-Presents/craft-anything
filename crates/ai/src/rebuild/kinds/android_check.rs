@@ -18,8 +18,84 @@ pub const DEVICE: &str = "device";
 /// What makes two labels the same control: spacing, case and a trailing colon don't, and no
 /// run of digits does (a guide cell says "Programme 22609" at map time and "Programme 27796" an
 /// hour later; a clock moves on), as the screen fingerprint reads them.
+/// And nothing the clock writes does either: AM and PM, the names of days and months read as
+/// one each, and a row's cells that repeat ("Programme # & more" three times at one hour, four
+/// at another) fold into one, so a guide row is the same row at any hour. The key is cut after
+/// all that, so a longer number can't move the cut.
 fn key_of(label: &str) -> String {
-    craft_anything_engines::adb_ui::digits_as_one(&label.split_whitespace().collect::<Vec<_>>().join(" ").trim_end_matches(':').trim().to_lowercase())
+    let flat =
+        craft_anything_engines::adb_ui::digits_as_one(&label.split_whitespace().collect::<Vec<_>>().join(" ").trim_end_matches(':').trim().to_lowercase());
+    let words = fold_repeats(flat.split(' ').filter(|w| !w.is_empty()).map(clock_word).collect());
+    let mut key = words.join(" ");
+    if key.len() > KEY_LEN {
+        key.truncate(key.floor_char_boundary(KEY_LEN));
+    }
+    key.trim_end().to_string()
+}
+
+/// How much of a control's normalised words make its key.
+const KEY_LEN: usize = 60;
+
+/// A word as the key holds it: what a clock or a calendar writes becomes one token per kind.
+fn clock_word(word: &str) -> String {
+    const DAYS: [&str; 14] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const MONTHS: [&str; 23] = [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "sept",
+        "oct",
+        "nov",
+        "dec",
+        "january",
+        "february",
+        "march",
+        "april",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+    ];
+    let core = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '#');
+    if matches!(core, "am" | "pm") {
+        return "~m".to_string();
+    }
+    if DAYS.contains(&core) {
+        return "~day".to_string();
+    }
+    if MONTHS.contains(&core) || core == "december" {
+        return "~month".to_string();
+    }
+    // "4:05pm" has become "#:#pm".
+    let timed = core.strip_suffix("am").or_else(|| core.strip_suffix("pm")).filter(|t| !t.is_empty() && t.chars().all(|c| matches!(c, '#' | ':' | '.')));
+    if let Some(time) = timed {
+        return format!("{time} ~m");
+    }
+    word.to_string()
+}
+
+/// `words` with every run of words that repeats straight after itself (up to eight words long)
+/// kept once.
+fn fold_repeats(mut words: Vec<String>) -> Vec<String> {
+    for n in 1..=8usize {
+        let mut i = 0;
+        while i + 2 * n <= words.len() {
+            if words[i..i + n] == words[i + n..i + 2 * n] {
+                words.drain(i + n..i + 2 * n);
+            } else {
+                i += 1;
+            }
+        }
+    }
+    words
 }
 
 /// A screen's controls as (key, label shown, dp bounds) for the ones a person can land on
@@ -36,14 +112,16 @@ fn landable(tree: &Value) -> Vec<(String, String, Option<[i64; 4]>)> {
             continue;
         }
         let mut shown = title(n);
+        // The key is made from all the words, the label shown from the first 80 bytes of them.
+        let mut key = key_of(&shown);
         if shown.is_empty() {
             let inside: Vec<String> = nodes.iter().skip(i + 1).take_while(|m| depth(m) > depth(n)).map(|m| title(m)).filter(|t| !t.is_empty()).collect();
             shown = inside.join(" ");
+            key = key_of(&shown);
             if shown.len() > 80 {
                 shown.truncate(shown.floor_char_boundary(80));
             }
         }
-        let key = key_of(&shown);
         if key.is_empty() || !seen.insert(key.clone()) {
             continue;
         }
@@ -802,6 +880,32 @@ mod tests {
     }
 
     /// The picture score sees what the dump can't: the same picture is 100%, one with another
+    /// A guide row is the same row at any hour: three programme cells or four, AM or PM, a
+    /// Wednesday in November or a Thursday in March, a five-digit programme or a six-digit one.
+    #[test]
+    fn what_the_clock_writes_makes_no_other_control() {
+        let three = "23 Channel 382 News Programme 29582 & more Programme 29583 & more Programme 29584 & more";
+        let four = "24 Channel 382 News Programme 131072 & more Programme 131073 & more Programme 131074 & more Programme 131075 & more";
+        assert_eq!(key_of(three), key_of(four), "cells that repeat fold, digits read as one");
+        assert_eq!(key_of("04:00 PM 04:30 PM 05:00 PM 05:30 PM"), key_of("09:00 AM 09:30 AM 10:00 AM"));
+        assert_eq!(key_of("Wed, Nov 4, 4:05 PM"), key_of("Thu, Mar 12, 10:15 AM"));
+        assert_eq!(key_of("03:00 — 04:30 AM"), key_of("11:00 — 12:30pm"));
+        assert_ne!(key_of("Channels list"), key_of("Recordings"), "words that aren't the clock's still tell controls apart");
+        assert_ne!(key_of("26 Channel 412 News Programme 31859 & more"), key_of("26 Channel 412 Sports Programme 31859 & more"));
+        assert!(key_of(&"word ".repeat(40)).len() <= KEY_LEN);
+        // On a screen: the original's row has three cells and an AM header, the build's four and PM.
+        let node = |t: &str, focusable: bool, depth: u64, y: i64| json!({"title": t, "focusable": focusable, "clickable": false, "depth": depth, "dp": {"x": 0, "y": y, "width": 100, "height": 20}});
+        let screen = |header: &str, cells: usize| {
+            let mut nodes = vec![node(header, true, 1, 0), node("", true, 1, 30), node("23", false, 2, 30), node("Channel 382 News", false, 2, 30)];
+            nodes.extend((0..cells).map(|i| node(&format!("Programme {} & more", 29582 + i), false, 2, 30)));
+            json!({"count": nodes.len(), "nodes": nodes})
+        };
+        let claims = state_claims("s02", "Guide", &screen("04:00 PM 04:30 PM", 3), &screen("09:00 AM 09:30 AM", 4), 1);
+        let failed: Vec<&str> = claims.iter().filter(|c| !c.passed).map(|c| c.title.as_str()).collect();
+        assert!(failed.is_empty(), "nothing the clock changed fails: {failed:?}");
+        assert!(claims.iter().any(|c| c.title.contains("it has \"23 Channel 382 News Programme 29582")), "the row is still claimed by what it shows");
+    }
+
     /// What the original's picture shows as pure black is a video plane its screenshot couldn't
     /// see: a build that draws the video there scores as if those tiles weren't there, and a
     /// screen that is almost all such black says nothing.

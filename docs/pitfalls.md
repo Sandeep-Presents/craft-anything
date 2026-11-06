@@ -697,6 +697,11 @@ the video plane into a screenshot some days and not others, so once the build dr
 as pure black is a video plane the screenshot couldn't see, never a fact about the build:
 those tiles are left out, and a map's pictures are never trusted to agree with each other
 about the video.
+And the same build scored 93% by its controls one afternoon and 89% the next morning: a ninth
+of the claims named rows whose cells, AM/PM and date move with the clock, so the builder was
+sent after differences the original has with itself. Before trusting a claim, ask whether the
+original would hold it against its own map tomorrow morning; what the clock writes is read as
+one, like the digits.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
