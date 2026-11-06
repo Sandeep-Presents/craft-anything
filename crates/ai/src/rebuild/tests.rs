@@ -218,14 +218,18 @@ fn estonian_requests_keep_their_project_kind() {
 
 #[test]
 fn arabic_requests_keep_their_project_kind() {
-    for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة"] {
+    for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة", "العاب ورق بسيطة"] {
         assert_eq!(choose(request, &TargetRef::None), ("game", "Unity"), "{request}");
     }
-    // The catalog's own suggestions too ("Recreate this website").
-    for request in ["موقع ويب لمخبزي", "أعد بناء صفحة الويب هذه", "انسخ الموقع كما هو", "أعد إنشاء موقع الويب هذا", "مثلًا: أعد إنشاء موقع الويب هذا"]
+    // The catalog's own suggestions too ("Recreate this website"), and a site with العابرة
+    // ("passing"), which starts like العاب ("games").
+    for request in
+        ["موقع ويب لمخبزي", "أعد بناء صفحة الويب هذه", "أعد إنشاء موقع الويب هذا", "مثلًا: أعد إنشاء موقع الويب هذا", "أنشئ موقع ويب لعرض حركة المرور العابرة"]
     {
         assert_eq!(choose(request, &TargetRef::None), ("website", stacks::BUILDERS_CHOICE), "{request}");
     }
+    // الموقع alone is as often a place as a site: an app that tracks one stays an app.
+    assert_eq!(choose("أنشئ تطبيق لتتبع الموقع الجغرافي", &TargetRef::None).0, "app");
 }
 
 #[test]

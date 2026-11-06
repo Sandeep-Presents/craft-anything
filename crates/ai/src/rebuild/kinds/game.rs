@@ -101,8 +101,9 @@ impl TargetKind for GameKind {
                 "لعبة",
                 "لعبه",
                 "ألعاب",
-                "العاب",
             ])
+            // "Games" without its hamza, as a whole word: it also starts العابرة ("passing").
+            || cx.words.contains(" العاب ")
             || says_game_in_spanish(cx)
             || says_game_in_estonian(cx)
         {

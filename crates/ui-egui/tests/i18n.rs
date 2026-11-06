@@ -150,6 +150,9 @@ fn chinese_startup_language_menu_and_saved_selection() {
         let x = h.get_by_label(new_project).rect().center().x;
         assert_eq!(x > 640.0, rtl, "{code}: New project at x = {x}");
     }
+    // Evidence cards and the agent's tool chips name a tool by its translated title.
+    i18n::set_language("ar");
+    assert_eq!(craft_anything_ui_egui::evidence_ui::nice_operation("native_strings_browse"), "عرض السلاسل النصية");
     i18n::set_language("unsupported-locale");
     assert_eq!(i18n::language(), "en");
     assert_eq!(i18n::tr("Settings"), "Settings");
