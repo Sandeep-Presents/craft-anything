@@ -388,8 +388,9 @@ pub(crate) fn bubble(t: &Tokens, user: bool, dense: bool) -> egui::Frame {
 /// A button at `at` that copies a whole message (#825: selecting text in the feed is
 /// unreliable). Shown while the pointer is over the message (`over`) or the button has keyboard
 /// focus; it's always laid out, so Tab reaches it.
+/// `at` is where the button goes left to right; right to left it's mirrored across `over`.
 fn copy_button(ui: &mut Ui, over: egui::Rect, at: egui::Pos2, text: &str) {
-    let at = egui::Rect::from_min_size(at, Vec2::splat(COPY));
+    let at = crate::widgets::mirror(over, egui::Rect::from_min_size(at, Vec2::splat(COPY)));
     let mut slot = ui.new_child(egui::UiBuilder::new().max_rect(at));
     if !(ui.rect_contains_pointer(over.union(at)) || ui.memory(|m| m.has_focus(slot.next_auto_id()))) {
         slot.set_opacity(0.0);

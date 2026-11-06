@@ -145,8 +145,8 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     // A download anywhere in the app fills the bottom edge of the bar, on every screen.
     let download = crate::engine_ui::global_download(app);
     if let Some((_, Some(f), _)) = &download {
-        let x = bar.left() + bar.width() * f.clamp(0.0, 1.0);
-        ui.painter().line_segment([egui::pos2(bar.left(), bar.bottom() - s), egui::pos2(x, bar.bottom() - s)], egui::Stroke::new(2.0 * s, t.accent));
+        let (from, x) = (widgets::mirror_x(bar, bar.left()), widgets::mirror_x(bar, bar.left() + bar.width() * f.clamp(0.0, 1.0)));
+        ui.painter().line_segment([egui::pos2(from, bar.bottom() - s), egui::pos2(x, bar.bottom() - s)], egui::Stroke::new(2.0 * s, t.accent));
     }
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = 10.0 * s;
@@ -266,8 +266,7 @@ fn download_pill(ui: &mut Ui, title: &str, fraction: Option<f32>) -> egui::Respo
     icons::paint(ui, widgets::mirror(rect, icon_rect), "download", 14.0 * s, t.accent);
     let at = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.left() + 26.0 * s, rect.center().y - g.size().y / 2.0), g.size()));
     ui.painter().galley_with_override_text_color(at.min, g, t.text);
-    let track =
-        widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.right() - 48.0 * s, rect.center().y - 1.5 * s), Vec2::new(38.0, 3.0) * s));
+    let track = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.right() - 48.0 * s, rect.center().y - 1.5 * s), Vec2::new(38.0, 3.0) * s));
     ui.painter().rect_filled(track, 1.5 * s, t.separator);
     let f = fraction.unwrap_or_else(|| (ui.input(|i| i.time) * 0.6).fract() as f32).clamp(0.0, 1.0);
     let done = egui::Rect::from_min_size(track.min, Vec2::new(track.width() * f, track.height()));
@@ -290,8 +289,7 @@ fn deep_toggle(app: &mut CraftApp, ui: &mut Ui) {
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let fill = if resp.hovered() { t.hover } else { egui::Color32::TRANSPARENT };
     ui.painter().rect(rect, t.radius, fill, egui::Stroke::new(s, t.card_border), egui::StrokeKind::Inside);
-    let icon_rect =
-        widgets::mirror(rect, egui::Rect::from_center_size(egui::pos2(rect.left() + 16.0 * s, rect.center().y), Vec2::splat(16.0 * s)));
+    let icon_rect = widgets::mirror(rect, egui::Rect::from_center_size(egui::pos2(rect.left() + 16.0 * s, rect.center().y), Vec2::splat(16.0 * s)));
     let (icon, col) = if deep { ("microscope", t.accent) } else { ("shield-check", t.success) };
     icons::paint(ui, icon_rect, icon, 15.0 * s, col);
     let at = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.left() + 30.0 * s, rect.center().y - g.size().y / 2.0), g.size()));

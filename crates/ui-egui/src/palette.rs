@@ -155,22 +155,18 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
                                 Entry::Tool { id, title, summary, toolset } => ("wrench", tr(title), format!("{id} · {summary}"), tr(toolset)),
                             };
                             r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, &title));
-                            icons::paint(
-                                ui,
-                                egui::Rect::from_min_size(rect.min + Vec2::new(8.0, 12.0), Vec2::splat(16.0)),
-                                icon,
-                                16.0,
-                                if on { t.accent_ink } else { t.icon },
-                            );
-                            ui.painter().text(rect.min + Vec2::new(34.0, 5.0), egui::Align2::LEFT_TOP, title, theme::medium(theme::SMALL), t.text);
+                            // Laid out from the left, mirrored right to left.
+                            let at = |min: egui::Pos2, size: Vec2| crate::widgets::mirror(rect, egui::Rect::from_min_size(min, size));
+                            let icon_rect = at(rect.min + Vec2::new(8.0, 12.0), Vec2::splat(16.0));
+                            icons::paint(ui, icon_rect, icon, 16.0, if on { t.accent_ink } else { t.icon });
+                            let title_g = ui.painter().layout_no_wrap(title, theme::medium(theme::SMALL), t.text);
+                            ui.painter().galley(at(rect.min + Vec2::new(34.0, 5.0), title_g.size()).min, title_g, t.text);
                             let sub_g =
                                 ui.painter().layout_no_wrap(crate::evidence_ui::truncate(&sub, 90), egui::FontId::proportional(theme::TINY), t.text_faint);
-                            ui.painter().with_clip_rect(rect.shrink(2.0)).galley(rect.min + Vec2::new(34.0, 23.0), sub_g, t.text_faint);
+                            let sub_at = at(rect.min + Vec2::new(34.0, 23.0), sub_g.size()).min;
+                            ui.painter().with_clip_rect(rect.shrink(2.0)).galley(sub_at, sub_g, t.text_faint);
                             let tag_g = ui.painter().layout_no_wrap(tag, egui::FontId::proportional(theme::TINY), t.text_dim);
-                            let tr_ = egui::Rect::from_min_size(
-                                egui::pos2(rect.right() - tag_g.size().x - 18.0, rect.top() + 6.0),
-                                tag_g.size() + Vec2::new(10.0, 4.0),
-                            );
+                            let tr_ = at(egui::pos2(rect.right() - tag_g.size().x - 18.0, rect.top() + 6.0), tag_g.size() + Vec2::new(10.0, 4.0));
                             ui.painter().rect_filled(tr_, t.r_sm(), t.raised);
                             ui.painter().galley(tr_.min + Vec2::new(5.0, 2.0), tag_g, t.text_dim);
                             if r.clicked() {

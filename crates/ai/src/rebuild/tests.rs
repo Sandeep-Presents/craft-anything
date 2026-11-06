@@ -221,7 +221,9 @@ fn arabic_requests_keep_their_project_kind() {
     for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة"] {
         assert_eq!(choose(request, &TargetRef::None), ("game", "Unity"), "{request}");
     }
-    for request in ["موقع ويب لمخبزي", "أعد بناء صفحة الويب هذه", "انسخ الموقع كما هو"] {
+    // The catalog's own suggestions too ("Recreate this website").
+    for request in ["موقع ويب لمخبزي", "أعد بناء صفحة الويب هذه", "انسخ الموقع كما هو", "أعد إنشاء موقع الويب هذا", "مثلًا: أعد إنشاء موقع الويب هذا"]
+    {
         assert_eq!(choose(request, &TargetRef::None), ("website", stacks::BUILDERS_CHOICE), "{request}");
     }
 }

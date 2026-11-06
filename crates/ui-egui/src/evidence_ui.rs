@@ -182,7 +182,11 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
                     Value::Bool(b) => (b.to_string(), theme::WORKED_OUT),
                     other => (other.to_string(), theme::SEEN_IT),
                 };
-                ui.add(egui::Label::new(RichText::new(text).font(theme::mono(12.0)).color(col)).wrap());
+                // Data reads left to right in every language, so an Arabic value can't move its
+                // quotes and numbers around it; the Arabic inside keeps its own order.
+                let mut job = egui::text::LayoutJob::single_section(text, egui::TextFormat::simple(theme::mono(12.0), col));
+                job.direction = egui::epaint::text::TextDirection::LeftToRight;
+                ui.add(egui::Label::new(job).wrap());
             });
         }
     }

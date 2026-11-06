@@ -719,7 +719,7 @@ fn checklist(ui: &mut Ui, steps: &[PlanStep], t: &Tokens, began: Option<std::tim
                             // Sighted users get the warning marker above; screen readers
                             // get the status through the accessible label and the text.
                             let name = format!("{}: {}", s.text, tr("Stopped here"));
-                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &name));
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &name));
                             ui.label(RichText::new(tr("Stopped here")).size(theme::SMALL).color(t.warning));
                         }
                     });
