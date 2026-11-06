@@ -1164,6 +1164,13 @@ room throughout: nothing is pulled off the device or decoded.
       rose. Tiles the original's picture shows as pure black (every channel at or under 2) are
       left out of the picture score and its why, with the device noise; a screen with under a
       twentieth left says nothing. — claimed: rockmeister, branch feature/r2.12-unseen-video
+- [x] What the clock writes makes no other control: a check run on another morning scored 89%
+      where the afternoon before scored 93%, with nothing changed: 114 of 1251 claims named guide
+      rows that hold three programme cells at one hour and four at the next, time headers that flip
+      AM and PM, and a date. The original fails those against its own map. A control's key reads
+      AM/PM, day names and month names as one each, folds words that repeat straight after
+      themselves, and is cut after that (a longer number moved the 80-byte cut). — claimed:
+      rockmeister, branch feature/r2.12-clock-claims
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
