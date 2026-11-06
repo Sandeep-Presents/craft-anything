@@ -218,7 +218,8 @@ fn estonian_requests_keep_their_project_kind() {
 
 #[test]
 fn arabic_requests_keep_their_project_kind() {
-    for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة", "العاب ورق بسيطة"] {
+    for request in ["لعبة ثعبان بسيطة", "نفس اللعبة مع لوحة صدارة", "العاب ورق بسيطة", "أنشئ الالعاب التعليمية للأطفال", "العابٌ تعليمية للأطفال"]
+    {
         assert_eq!(choose(request, &TargetRef::None), ("game", "Unity"), "{request}");
     }
     // The catalog's own suggestions too ("Recreate this website"), and a site with العابرة
