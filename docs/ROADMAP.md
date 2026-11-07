@@ -458,6 +458,16 @@ been run live.
 - [ ] Find how each local server is told its context size and set it, or stop with a plain message
       when the prompt won't fit. We assume 24k and send no `num_ctx`, which an OpenAI-style endpoint
       may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73)
+- [ ] Read the context window from the server before the first request, so a large local model
+      isn't trimmed at 24k: llama.cpp's `/props`, llama-swap's `/upstream/<model>/…` (its own
+      model list carries no window), Ollama's `/api/show` and `/api/ps`, LM Studio's model list, and
+      `context_length` in an OpenAI-style model list (OpenRouter). Keep 24k when the server says
+      nothing, and a budget the person set stays the most. Show `context_tokens` in Settings → AI;
+      today it's only in `config.toml`
+      — claimed: youkaicountry, branch feature/r5.4-server-context-window
+- [ ] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
+      window is 64k or more and the lean builder list (#417) below that; the memory steps in the
+      system prompt follow the same choice. Today every local builder is lean, whatever its window
 - [x] A builder that can't see pictures (the API loop) is told it can't, then sent to open
       screenshots with Read: the website capture lines and the `--screenshot` and reference-picture
       lines in `brief.rs`, the website check's "Open each pair", the reminder after each round, the
@@ -470,6 +480,11 @@ been run live.
       to check its work with rebuild_check, which the loop refuses while it builds; only its first
       message says so. Say "Craft Anything checks it after your turn" there instead
       — claimed: Afloat16, branch bugfix/r5.4-api-follow-up-check
+- [ ] Models that can see get pictures: an image block in the conversation, sent as `image_url`
+      parts (OpenAI-style) and `image` blocks (Anthropic), for the check's screenshots beside the
+      original's, the pictures in `reference/` and a PNG the builder reads. Each AI's Pictures
+      setting is Auto, On or Off; Auto follows what the server reports (Ollama's capabilities,
+      LM Studio's model type, `input_modalities` in a model list)
 - [x] When a server refuses a request for its context window and says the size (Ollama, llama.cpp,
       OpenAI-style), fit the conversation to that window and ask once more, else say how to raise it (#962)
 - [x] Ollama fits a long prompt to its context by dropping the oldest messages, and a Qwen 3.8 model
