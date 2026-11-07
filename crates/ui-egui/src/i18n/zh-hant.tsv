@@ -1488,3 +1488,7 @@ Updated to {version}.	已更新至 {version}。
 Use Releases or your package manager to update this installation.	請透過「發行版本」或套件管理器更新此安裝。
 You're up to date.	已是最新版本。
 {version} is available.	{version} 已可用。
+Context budget (tokens)	上下文預算（權杖）
+Auto	自動
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	在截短較早內容之前傳送多少對話。自動：模型伺服器所說的容量，若它不說則用安全的預設值。
+Set an AI's context budget	設定 AI 的上下文預算

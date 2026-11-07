@@ -77,6 +77,9 @@ pub struct OpenAi {
     pub stream_limit: Option<std::time::Duration>,
     /// The longest answer to ask for, once OpenRouter has said the key can't afford more (#1213).
     pub answer_cap: Option<u64>,
+    /// A server on this computer or its network, asked for its context window in its own ways;
+    /// any other is asked only through its model list (see [`crate::window`]).
+    pub on_this_network: bool,
 }
 
 /// An answer cap smaller than this would cut a builder's file writes short: such a refusal stays one.
@@ -111,6 +114,7 @@ impl OpenAi {
             openrouter: false,
             stream_limit: None,
             answer_cap: None,
+            on_this_network: false,
         }
     }
 
@@ -306,6 +310,15 @@ impl ChatModel for OpenAi {
 
     fn model(&self) -> String {
         self.model.clone()
+    }
+
+    fn context_window(&self) -> Option<crate::window::Window> {
+        // OpenAI's and Gemini's model lists don't say a window, so they aren't asked.
+        if !self.on_this_network && !self.openrouter {
+            return None;
+        }
+        let server = crate::window::Server { base: &self.base_url, model: &self.model };
+        crate::window::read_from_server(&server, &self.headers(), self.on_this_network)
     }
 }
 

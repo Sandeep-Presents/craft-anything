@@ -1402,6 +1402,10 @@ fn an_ai_server_is_added_by_its_address() {
         modifiers: egui::Modifiers::NONE,
     });
     h.run_steps(20);
+    // The form is below the AI cards, which grow as settings are added to them: scroll to it
+    // first, or the click lands outside the Settings window and closes it.
+    h.get_by_label("Add").scroll_to_me();
+    h.run_steps(3);
     h.get_by_label("Add").click();
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Studio box" && b.model == "qwen3:8b")), "added with a model that can chat");
     assert!(h.state().server_form.name.is_empty(), "the form empties once it's added");

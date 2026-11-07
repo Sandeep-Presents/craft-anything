@@ -338,7 +338,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
     let mut key_drafts = std::mem::take(&mut app.backend_key_inputs);
     let (mut pick_model, mut chosen_model, mut close_picker) = (None, None, false);
-    let mut chosen_effort = None;
+    let (mut chosen_effort, mut save_context) = (None, None);
     let (mut pick_agent_model, mut chosen_agent_model, mut remote_program) = (None, None, None);
     let (mut tune_models, mut save_tuning) = (Vec::new(), None);
     // A saved API key being replaced or forgotten (the keychain work happens off this frame).
@@ -522,6 +522,28 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                         }
                                     }
                                 });
+                            }
+                            // How much of the conversation an API backend is sent before older
+                            // parts are trimmed. Empty: what its server says it has room for, else
+                            // the default. Saved when the field is left; text that isn't a number reverts.
+                            if b.kind != BackendKind::AgentCli {
+                                let saved = app.backend_options.get(&b.name).and_then(|o| o.context_tokens).filter(|n| *n > 0).map(|n| n.to_string()).unwrap_or_default();
+                                let id = egui::Id::new(("context-budget", &b.name));
+                                let mut text = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_else(|| saved.clone());
+                                let label = ui.label(RichText::new(tr("Context budget (tokens)")).color(t.text_faint).size(theme::CAPTION));
+                                let r = ui
+                                    .add(egui::TextEdit::singleline(&mut text).hint_text(tr("Auto")).desired_width(80.0).frame(widgets::text_field_frame_compact(&t)))
+                                    .labelled_by(label.id)
+                                    .on_hover_text(tr("How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say."));
+                                if r.changed() {
+                                    ui.data_mut(|d| d.insert_temp(id, text.clone()));
+                                }
+                                if r.lost_focus() {
+                                    if let Some(budget) = crate::builders::context_budget(&text).filter(|new| new.map(|n| n.to_string()).unwrap_or_default() != saved) {
+                                        save_context = Some((b.name.clone(), budget));
+                                    }
+                                    ui.data_mut(|d| d.remove::<String>(id));
+                                }
                             }
                         });
                     }
@@ -725,6 +747,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     if let Some((name, effort)) = chosen_effort {
         app.set_effort(&name, effort);
+    }
+    if let Some((name, budget)) = save_context {
+        app.set_context_tokens(&name, budget);
     }
     if close_picker {
         app.model_picker = None;

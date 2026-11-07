@@ -1490,3 +1490,7 @@ Updated to {version}.	Aggiornato a {version}.
 Use Releases or your package manager to update this installation.	Usa Versioni o il gestore pacchetti per aggiornare questa installazione.
 You're up to date.	Hai la versione più recente.
 {version} is available.	{version} è disponibile.
+Context budget (tokens)	Budget di contesto (token)
+Auto	Automatico
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Quanta parte della conversazione viene inviata prima di accorciare le parti più vecchie. Automatico: lo spazio che il server del modello dice di avere, o un valore sicuro se non lo dice.
+Set an AI's context budget	Imposta il budget di contesto di un'IA

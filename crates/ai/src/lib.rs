@@ -27,6 +27,7 @@ pub mod prompt;
 pub mod providers;
 pub mod rebuild;
 pub mod ssh;
+pub mod window;
 
 pub use cli_agents::models::{AgentModel, ModelContext};
 pub use config::{AiConfig, BackendEntry, BackendOptions, Price};
@@ -405,6 +406,10 @@ impl ChatModel for Tunneled {
     fn model(&self) -> String {
         self.inner.model()
     }
+
+    fn context_window(&self) -> Option<window::Window> {
+        self.inner.context_window()
+    }
 }
 
 /// The tools this layer adds to the engine's (rebuild control), for
@@ -754,6 +759,20 @@ impl AiHub {
         Ok(true)
     }
 
+    /// Set how many input tokens an API backend's conversation may grow to before it's trimmed
+    /// (`None`: the window its server says, else the local/cloud default). Agent apps keep their own.
+    pub fn set_context_tokens(&self, name: &str, budget: Option<u64>) -> Result<bool, ToolError> {
+        let mut cfg = self.config_to_change()?;
+        let Some(b) = cfg.backends.iter_mut().find(|b| b.config.name == name) else { return Ok(false) };
+        if b.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which keeps its own conversation."))
+                .with_remediation("A context budget is for API backends."));
+        }
+        b.options.context_tokens = budget.filter(|n| *n > 0);
+        self.save_config(&cfg)?;
+        Ok(true)
+    }
+
     /// The models a backend can be set to: the API's or registered agent's list.
     /// Empty for an agent app that picks its own. Blocking (bounded); run it off the UI thread.
     pub fn model_choices(&self, name: &str) -> Result<Vec<String>, ToolError> {
@@ -1008,6 +1027,7 @@ impl AiHub {
                 let key = self.keys.get(&c.name).or_else(|| go_env_key(base).or_else(|| providers::env_key(base)));
                 let mut o = compatible_client(&c.name, base, key, &c.model, &self.session_id());
                 o.react = e.options.react_fallback.unwrap_or(false);
+                o.on_this_network = local;
                 with_limit(o)
             }
             BackendKind::AgentCli => return Err(ToolError::invalid(format!("{} is an agent app, not an API backend.", c.name))),

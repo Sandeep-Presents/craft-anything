@@ -199,6 +199,17 @@ off the UI thread; a UI test that added pictures, ran three frames and then look
 fast machines and failed in CI on unrelated PRs. When work moves to a worker, grep the tests that
 call it and make them `wait` for the result, not `run_steps(n)`.
 
+**A click on a button below the window's edge.** A field added to each AI card pushed Settings →
+AI's Add button just past the bottom of the Settings window; its rectangle was still on the screen,
+so kittest clicked there, the click landed outside the window and closed it, and the test timed out
+waiting for the AI to be added. A test that clicks something below content that can grow calls
+`scroll_to_me()` on it first.
+
+**A stand-in server that answers every request in order.** The AI tests' `mock` answered each
+request with the next scripted reply, so when the agent began asking the server for its context
+window before the first chat, that question took the chat's reply. A stand-in says which requests
+it was scripted for and answers anything else as a real server that doesn't know would.
+
 ## Building and running
 
 **A documentation edit rebuilt dependencies in a separate cache.** A sequential review follow-up

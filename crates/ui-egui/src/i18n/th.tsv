@@ -1488,3 +1488,7 @@ Updated to {version}.	อัปเดตเป็น {version} แล้ว
 Use Releases or your package manager to update this installation.	ใช้รุ่นที่เผยแพร่หรือตัวจัดการแพ็กเกจเพื่ออัปเดตการติดตั้งนี้
 You're up to date.	คุณใช้เวอร์ชันล่าสุดแล้ว
 {version} is available.	มี {version} พร้อมใช้งานแล้ว
+Context budget (tokens)	งบบริบท (โทเค็น)
+Auto	อัตโนมัติ
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	ปริมาณบทสนทนาที่ส่งก่อนตัดส่วนเก่าออก อัตโนมัติ: เท่าที่เซิร์ฟเวอร์ของโมเดลบอกว่ารับได้ หรือค่าเริ่มต้นที่ปลอดภัยเมื่อไม่บอก
+Set an AI's context budget	ตั้งงบบริบทของ AI

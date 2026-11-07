@@ -1488,3 +1488,7 @@ Updated to {version}.	განახლდა {version} ვერსიამ�
 Use Releases or your package manager to update this installation.	ამ ინსტალაციის გასაახლებლად გამოიყენეთ გამოშვებები ან პაკეტების მმართველი.
 You're up to date.	უახლეს ვერსიას იყენებთ.
 {version} is available.	ხელმისაწვდომია {version}.
+Context budget (tokens)	კონტექსტის ბიუჯეტი (ტოკენები)
+Auto	ავტომატური
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	საუბრის რა ნაწილი იგზავნება, სანამ ძველი ნაწილები შემოიკვეცება. ავტომატური: რამდენ ადგილსაც ამბობს მოდელის სერვერი, ან უსაფრთხო ნაგულისხმევი, თუ არ ამბობს.
+Set an AI's context budget	AI-ის კონტექსტის ბიუჯეტის დაყენება

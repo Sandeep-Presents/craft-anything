@@ -297,6 +297,15 @@ impl CraftApp {
         });
     }
 
+    /// Set how much of the conversation an AI is sent (`None`: what its server says, or the default).
+    pub fn set_context_tokens(&mut self, name: &str, budget: Option<u64>) {
+        let (hub, name) = (self.hub.clone(), name.to_string());
+        self.jobs.spawn(tr("Set an AI's context budget"), false, move |_| {
+            hub.set_context_tokens(&name, budget).map_err(|e| e.message)?;
+            Ok(crate::backends(&hub))
+        });
+    }
+
     /// Connect the server in Settings → AI's address form. Its key goes to the keychain; the form
     /// keeps what was typed until it's added, so a mistake can be fixed.
     pub fn add_server(&mut self) {
@@ -479,4 +488,32 @@ pub fn need_builder_modal(app: &mut CraftApp, ui: &mut Ui, start: bool, close: &
             }
         });
     });
+}
+
+/// What the context budget field holds: `Some(None)` when it's empty (Auto), `Some(Some(n))` for a
+/// whole number of tokens (spaces, commas and underscores between digits allowed), `None` for text
+/// that isn't one, which leaves the setting as it was.
+pub fn context_budget(text: &str) -> Option<Option<u64>> {
+    let digits: String = text.chars().filter(|c| !matches!(c, ' ' | ',' | '_')).collect();
+    if digits.is_empty() {
+        return Some(None);
+    }
+    digits.parse::<u64>().ok().filter(|n| *n > 0).map(Some)
+}
+
+#[cfg(test)]
+mod context_budget_tests {
+    use super::context_budget;
+
+    #[test]
+    fn the_field_reads_auto_numbers_and_nothing_else() {
+        assert_eq!(context_budget(""), Some(None));
+        assert_eq!(context_budget("  "), Some(None));
+        assert_eq!(context_budget("390000"), Some(Some(390_000)));
+        assert_eq!(context_budget("390,000"), Some(Some(390_000)));
+        assert_eq!(context_budget("390_000"), Some(Some(390_000)));
+        for bad in ["0", "-5", "12k", "1.5", "lots", "99999999999999999999999"] {
+            assert_eq!(context_budget(bad), None, "{bad}");
+        }
+    }
 }

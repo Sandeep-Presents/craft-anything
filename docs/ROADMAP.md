@@ -458,13 +458,15 @@ been run live.
 - [ ] Find how each local server is told its context size and set it, or stop with a plain message
       when the prompt won't fit. We assume 24k and send no `num_ctx`, which an OpenAI-style endpoint
       may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73)
-- [ ] Read the context window from the server before the first request, so a large local model
-      isn't trimmed at 24k: llama.cpp's `/props`, llama-swap's `/upstream/<model>/…` (its own
-      model list carries no window), Ollama's `/api/show` and `/api/ps`, LM Studio's model list, and
-      `context_length` in an OpenAI-style model list (OpenRouter). Keep 24k when the server says
-      nothing, and a budget the person set stays the most. Show `context_tokens` in Settings → AI;
-      today it's only in `config.toml`
-      — claimed: youkaicountry, branch feature/r5.4-server-context-window
+- [x] Read the context window from the server before the first request, so a large local model
+      isn't trimmed at 24k: llama.cpp's `/props`, llama-swap's `/upstream/<model>/…` (its model
+      list has a window only when its config gives one), Ollama's `/api/ps`, LM Studio's model
+      list, and `context_length` in an OpenAI-style model list (OpenRouter). Only the window a
+      server has loaded counts (not Ollama's `/api/show`, which says what the model was trained
+      with), so Ollama and LM Studio say it once the model is loaded: asked again after the first
+      turn. Keep 24k when the server says nothing, and a budget the person set stays the most.
+      `context_tokens` is in Settings → AI and `ai context`
+      — claimed: youkaicountry, branch feature/r5.4-server-context-window — PR #1155
 - [ ] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
       window is 64k or more and the lean builder list (#417) below that; the memory steps in the
       system prompt follow the same choice. Today every local builder is lean, whatever its window
@@ -715,6 +717,9 @@ yet, and the quick start is how every new person begins.
       — claimed: hasnain607, branch docs/r5.7-vineflower-live-run
 - [ ] Verify the 23 unverified adb tools; record results in tool-status.md
 - [ ] Android locales: try `only_locales` on a real APK (only the test fixture so far)
+- [ ] Ask Ollama, LM Studio and a plain llama.cpp server for their context window (R5.4,
+      `crate::window`): only llama-swap was asked live, so the others' probes rest on their
+      documented answers
 - [ ] `app_graphs_compare` on the two real Electron releases again, to count how many of the
       162 "removed" now pair (and pair the `index-<hash>` chunks by structure if many stay)
 - [ ] A real IL2CPP `global-metadata.dat` (needs a Unity build or a shipped game); synthetic so far.

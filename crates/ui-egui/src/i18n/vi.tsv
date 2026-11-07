@@ -1488,3 +1488,7 @@ Updated to {version}.	Đã cập nhật lên {version}.
 Use Releases or your package manager to update this installation.	Dùng Bản phát hành hoặc trình quản lý gói để cập nhật bản cài đặt này.
 You're up to date.	Bạn đang dùng phiên bản mới nhất.
 {version} is available.	Đã có phiên bản {version}.
+Context budget (tokens)	Ngân sách ngữ cảnh (token)
+Auto	Tự động
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Gửi bao nhiêu phần cuộc trò chuyện trước khi cắt bớt phần cũ. Tự động: bằng chỗ mà máy chủ của mô hình nói là có, hoặc một mặc định an toàn khi nó không nói.
+Set an AI's context budget	Đặt ngân sách ngữ cảnh của AI

@@ -1488,3 +1488,7 @@ Updated to {version}.	Aktualizováno na {version}.
 Use Releases or your package manager to update this installation.	Aktualizujte tuto instalaci přes vydání nebo správce balíčků.
 You're up to date.	Máte nejnovější verzi.
 {version} is available.	Je dostupná verze {version}.
+Context budget (tokens)	Rozpočet kontextu (tokeny)
+Auto	Automaticky
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Kolik konverzace se posílá, než se starší části zkrátí. Automaticky: kolik podle serveru modelu pojme, nebo bezpečná výchozí hodnota, když to neřekne.
+Set an AI's context budget	Nastavit rozpočet kontextu AI
