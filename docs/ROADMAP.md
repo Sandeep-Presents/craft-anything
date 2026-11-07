@@ -457,7 +457,9 @@ been run live.
       — commit `0c3ae5cca569`
 - [ ] Find how each local server is told its context size and set it, or stop with a plain message
       when the prompt won't fit. We assume 24k and send no `num_ctx`, which an OpenAI-style endpoint
-      may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73)
+      may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73). Ollama 0.40.15
+      loads a model with 4096 tokens unless told otherwise: its window is now read (`/api/ps`), so
+      the budget is 3072, but a builder's prompt alone is larger
 - [x] Read the context window from the server before the first request, so a large local model
       isn't trimmed at 24k: llama.cpp's `/props`, llama-swap's `/upstream/<model>/…` (its model
       list has a window only when its config gives one), Ollama's `/api/ps`, LM Studio's model
@@ -717,9 +719,9 @@ yet, and the quick start is how every new person begins.
       — claimed: hasnain607, branch docs/r5.7-vineflower-live-run
 - [ ] Verify the 23 unverified adb tools; record results in tool-status.md
 - [ ] Android locales: try `only_locales` on a real APK (only the test fixture so far)
-- [ ] Ask Ollama, LM Studio and a plain llama.cpp server for their context window (R5.4,
-      `crate::window`): only llama-swap was asked live, so the others' probes rest on their
-      documented answers
+- [ ] Ask LM Studio and a plain llama.cpp server for their context window (R5.4,
+      `crate::window`): llama-swap (its list and its `/upstream/` route) and Ollama 0.40.15 were
+      asked live; these two probes rest on their documented answers
 - [ ] `app_graphs_compare` on the two real Electron releases again, to count how many of the
       162 "removed" now pair (and pair the `index-<hash>` chunks by structure if many stay)
 - [ ] A real IL2CPP `global-metadata.dat` (needs a Unity build or a shipped game); synthetic so far.
