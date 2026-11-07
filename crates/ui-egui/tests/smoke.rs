@@ -774,7 +774,7 @@ fn approvals_are_chosen_from_the_prompt_box_and_its_menu() {
     // The menu under the box: one row per kind, and a click saves it.
     h.get_by_label("Approvals").click();
     h.run_steps(2);
-    assert!(egui::Popup::is_id_open(&h.ctx, egui::Id::new("project-approvals")), "the menu opened");
+    assert!(egui::Popup::is_id_open(&h.ctx, egui::Id::unique("project-approvals")), "the menu opened");
     h.get_by_label("Reading the web");
     h.get_by_label("Pushing and publishing");
     let refuse = h.get_all_by_label("Refuse").count();

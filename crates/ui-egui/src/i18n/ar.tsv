@@ -1444,3 +1444,21 @@ Zoom	تكبير/تصغير
 Bring all to front	إحضار الكل إلى الأمام
 Drag to give the plan more or less room; double-click to reset	اسحب لمنح الخطة مساحة أكبر أو أصغر؛ انقر مرتين لإعادة الضبط
 Copy the message	نسخ الرسالة
+Choose what the builder's approvals get	تحديد ما تلقاه طلبات الموافقة من وكيل البناء
+Reading the web	القراءة من الويب
+Other commands	أوامر أخرى
+Files outside the project	الملفات خارج المشروع
+Pushing and publishing	الدفع والنشر
+Deleting outside the project	الحذف خارج المشروع
+System changes	تغييرات النظام
+Other tools	أدوات أخرى
+Allow	السماح
+Ask	الاستئذان
+Refuse	الرفض
+After /approvals, type a kind and allow, ask, refuse or default, like /approvals publish ask. Kinds: {kinds}.	بعد /approvals اكتب نوعًا ثم allow أو ask أو refuse أو default، مثل /approvals publish ask. الأنواع: {kinds}.
+There's no kind called {name}. Kinds: {kinds}.	لا يوجد نوع باسم {name}. الأنواع: {kinds}.
+Approvals	الموافقات
+In this project, {kind}: {choice}.	في هذا المشروع، {kind}: {choice}.
+Couldn't change the approvals:	تعذّر تغيير الموافقات:
+What the builder may do without asking you, in this project.	ما يحق لوكيل البناء فعله دون سؤالك في هذا المشروع.
+Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	الافتراضي يتبع الوضع التلقائي: عند تشغيله يمضي ما يمكن التراجع عنه ويُرفض الباقي، وعند إيقافه يستأذنك وكيل البناء.
