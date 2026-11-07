@@ -106,8 +106,8 @@ fn number(v: &Value, path: &[&str]) -> Option<u64> {
     path.iter().try_fold(v, |v, key| v.get(key))?.as_u64()
 }
 
-/// `context_length` in an OpenAI-style model list (OpenRouter), `max_model_len` (vLLM), or the
-/// loaded `meta.n_ctx` some llama.cpp-style servers list. Not `meta.n_ctx_train`: that's what the
+/// `context_length` in an OpenAI-style model list (OpenRouter, Together), `context_window` (Groq),
+/// `max_model_len` (vLLM), or the loaded `meta.n_ctx` some llama.cpp-style servers list. Not `meta.n_ctx_train`: that's what the
 /// model was trained with, not what the server loaded.
 struct ModelList;
 
@@ -117,7 +117,7 @@ impl WindowProbe for ModelList {
     }
     fn window(&self, server: &Server<'_>, fetch: &dyn Fetch) -> Option<u64> {
         let m = server.listed(fetch)?;
-        number(&m, &["context_length"]).or_else(|| number(&m, &["max_model_len"])).or_else(|| number(&m, &["meta", "n_ctx"]))
+        ["context_length", "context_window", "max_model_len"].iter().find_map(|k| number(&m, &[k])).or_else(|| number(&m, &["meta", "n_ctx"]))
     }
 }
 
@@ -255,6 +255,14 @@ mod tests {
     fn a_model_list_with_context_length_answers_first() {
         let f = Canned::new(&[("https://or/api/v1/models", json!({"data": [{"id": "a"}, {"id": "b", "context_length": 200000}]}))]);
         assert_eq!(read("https://or/api/v1", "b", &f, false), Some(Window { tokens: 200_000, source: "model list" }));
+    }
+
+    #[test]
+    fn each_model_list_field_is_read() {
+        for (field, n) in [("context_window", 131_072_u64), ("max_model_len", 32_768)] {
+            let f = Canned::new(&[("https://svc/v1/models", json!({"data": [{"id": "m", field: n}]}))]);
+            assert_eq!(read("https://svc/v1", "m", &f, false).map(|w| w.tokens), Some(n), "{field}");
+        }
     }
 
     #[test]

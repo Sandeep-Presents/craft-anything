@@ -658,6 +658,24 @@ fn an_ais_model_is_changed() {
     assert!(h.set_model("Box", " ").is_err());
 }
 
+/// An API backend's context budget is set and cleared; an agent app keeps its own conversation.
+#[test]
+fn an_ais_context_budget_is_set_and_cleared() {
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Box", BackendKind::OpenaiCompatible, "qwen"), None).unwrap();
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    let budget = |h: &AiHub| h.options().get("Box").and_then(|o| o.context_tokens);
+    assert!(h.set_context_tokens("Box", Some(390_000)).unwrap());
+    assert_eq!(budget(&h), Some(390_000));
+    assert!(h.set_context_tokens("Box", None).unwrap());
+    assert_eq!(budget(&h), None, "Auto again");
+    assert!(h.set_context_tokens("Box", Some(0)).unwrap());
+    assert_eq!(budget(&h), None, "zero is Auto, not a budget of nothing");
+    assert!(h.set_context_tokens("Codex", Some(1000)).is_err());
+    assert!(!h.set_context_tokens("Nobody", Some(1000)).unwrap());
+}
+
 /// Every Claude effort level can be chosen for the Claude API and Claude Code, and only for them.
 #[test]
 fn a_claude_ais_effort_is_changed() {

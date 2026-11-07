@@ -75,10 +75,13 @@ pub struct OpenAi {
     /// The AI's own limit on one streamed answer (a slow local model can need hours); none uses
     /// the defaults.
     pub stream_limit: Option<std::time::Duration>,
+    /// Asked for its context window (see [`crate::window`]): OpenRouter and OpenAI-compatible
+    /// services are; OpenAI's and Gemini's own model lists don't say one, so they aren't.
+    pub asks_window: bool,
     /// The longest answer to ask for, once OpenRouter has said the key can't afford more (#1213).
     pub answer_cap: Option<u64>,
-    /// A server on this computer or its network, asked for its context window in its own ways;
-    /// any other is asked only through its model list (see [`crate::window`]).
+    /// A server on this computer or its network, asked for its window in its own ways too; any
+    /// other is asked only through its model list.
     pub on_this_network: bool,
 }
 
@@ -94,6 +97,7 @@ impl OpenAi {
         let mut o = Self::compatible("OpenRouter", base.unwrap_or(OPENROUTER_BASE), Some(key), if model.is_empty() { OPENROUTER_DEFAULT_MODEL } else { model });
         o.extra_headers = vec![("HTTP-Referer", APP_REFERER.to_string()), ("X-Title", APP_TITLE.to_string())];
         o.openrouter = true;
+        o.asks_window = true;
         o
     }
 
@@ -114,6 +118,7 @@ impl OpenAi {
             openrouter: false,
             stream_limit: None,
             answer_cap: None,
+            asks_window: false,
             on_this_network: false,
         }
     }
@@ -313,8 +318,7 @@ impl ChatModel for OpenAi {
     }
 
     fn context_window(&self) -> Option<crate::window::Window> {
-        // OpenAI's and Gemini's model lists don't say a window, so they aren't asked.
-        if !self.on_this_network && !self.openrouter {
+        if !self.asks_window {
             return None;
         }
         let server = crate::window::Server { base: &self.base_url, model: &self.model };

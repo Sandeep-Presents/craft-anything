@@ -1326,6 +1326,35 @@ fn model_server() -> String {
     url
 }
 
+/// R5.4: an API AI's context budget is typed in Settings → AI and saved when the field is left;
+/// text that isn't a number changes nothing.
+#[test]
+fn an_ais_context_budget_is_set_in_settings() {
+    let url = model_server();
+    let mut h = harness(move || {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a
+    });
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Box")));
+    h.run_steps(2);
+    let budget = |a: &CraftApp| a.backend_options.get("Box").and_then(|o| o.context_tokens);
+    assert_eq!(budget(h.state()), None, "Auto until it's set");
+    // Box is listed after the demo's Claude, so its field is the last one with this label.
+    for (typed, expected) in [("lots", None), ("390000", Some(390_000))] {
+        h.get_all_by_label("Context budget (tokens)").last().unwrap().click();
+        h.run_steps(1);
+        h.get_all_by_label("Context budget (tokens)").last().unwrap().type_text(typed);
+        h.run_steps(1);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(2);
+        assert!(wait(&mut h, |a| budget(a) == expected), "{typed}: {:?}", budget(h.state()));
+    }
+}
+
 /// #123, #127: the model an AI uses is changed in Settings → AI from the ones it lists.
 #[test]
 fn an_ais_model_is_changed_in_settings() {

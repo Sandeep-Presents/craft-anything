@@ -1027,6 +1027,7 @@ impl AiHub {
                 let key = self.keys.get(&c.name).or_else(|| go_env_key(base).or_else(|| providers::env_key(base)));
                 let mut o = compatible_client(&c.name, base, key, &c.model, &self.session_id());
                 o.react = e.options.react_fallback.unwrap_or(false);
+                o.asks_window = true;
                 o.on_this_network = local;
                 with_limit(o)
             }
