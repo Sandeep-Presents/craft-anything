@@ -1326,8 +1326,9 @@ fn model_server() -> String {
     url
 }
 
-/// R5.4: an API AI's context budget is typed in Settings → AI and saved when the field is left;
-/// text that isn't a number changes nothing.
+/// R5.4: an API AI's context budget is chosen in Settings → AI: Auto (and what it works out to),
+/// a preset, or a number of your own, saved when its field is left; text that isn't a number
+/// changes nothing.
 #[test]
 fn an_ais_context_budget_is_set_in_settings() {
     let url = model_server();
@@ -1340,19 +1341,44 @@ fn an_ais_context_budget_is_set_in_settings() {
     });
     h.state_mut().refresh_backends();
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Box")));
-    h.run_steps(2);
     let budget = |a: &CraftApp| a.backend_options.get("Box").and_then(|o| o.context_tokens);
     assert_eq!(budget(h.state()), None, "Auto until it's set");
-    // Box is listed after the demo's Claude, so its field is the last one with this label.
+    // The stand-in server names no window, so Auto is the local default, and says so.
+    assert!(wait(&mut h, |a| a.server_windows.get("Box").is_some_and(|(_, w)| w.is_some())));
+    h.run_steps(2);
+    h.get_by_label("Auto: 24,000 tokens, the usual amount (its server doesn't say how much it holds)");
+    // A dropdown is found by what it shows. Box is listed after the demo's Claude, so its
+    // dropdown is the last one showing that.
+    // Each is scrolled into view first: a click below the window's edge would close Settings.
+    let open = |h: &mut Harness<'static, CraftApp>, showing: &str| {
+        h.get_all_by_value(showing).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_value(showing).last().unwrap().click();
+        h.run_steps(2);
+    };
+    let pick = |h: &mut Harness<'static, CraftApp>, label: &str| {
+        h.get_all_by_label(label).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_label(label).last().unwrap().click();
+        h.run_steps(2);
+    };
+    open(&mut h, "Auto");
+    pick(&mut h, "Custom…");
     for (typed, expected) in [("lots", None), ("390000", Some(390_000))] {
-        h.get_all_by_label("Context budget (tokens)").last().unwrap().click();
-        h.run_steps(1);
+        pick(&mut h, "Context budget (tokens)");
         h.get_all_by_label("Context budget (tokens)").last().unwrap().type_text(typed);
         h.run_steps(1);
         h.key_press(egui::Key::Enter);
         h.run_steps(2);
         assert!(wait(&mut h, |a| budget(a) == expected), "{typed}: {:?}", budget(h.state()));
     }
+    open(&mut h, "Custom…");
+    pick(&mut h, "128k");
+    assert!(wait(&mut h, |a| budget(a) == Some(131_072)), "{:?}", budget(h.state()));
+    h.run_steps(2);
+    open(&mut h, "128k");
+    pick(&mut h, "Auto");
+    assert!(wait(&mut h, |a| budget(a).is_none()), "{:?}", budget(h.state()));
 }
 
 /// #123, #127: the model an AI uses is changed in Settings → AI from the ones it lists.

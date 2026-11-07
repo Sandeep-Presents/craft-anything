@@ -1492,3 +1492,10 @@ Context budget (tokens)	컨텍스트 예산(토큰)
 Auto	자동
 How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	오래된 부분을 줄이기 전에 대화를 얼마나 보낼지입니다. 자동: 모델 서버가 알려 주는 여유 공간, 알려 주지 않으면 안전한 기본값.
 Set an AI's context budget	AI의 컨텍스트 예산 설정
+Custom…	사용자 지정…
+Asking the server…	서버에 묻는 중…
+Auto: {budget} tokens of the server's {window}	자동: 서버의 {window} 중 {budget} 토큰
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	자동: {budget} 토큰, 기본값(서버가 수용량을 알려 주지 않음)
+{budget} will be used: the server holds {window}	{budget}만 사용됩니다: 서버 수용량은 {window}
+The server holds {window}	서버 수용량: {window}
+Ask an AI's server how much it holds	AI 서버에 수용량 묻기

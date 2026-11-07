@@ -1492,3 +1492,10 @@ Context budget (tokens)	Ngân sách ngữ cảnh (token)
 Auto	Tự động
 How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Gửi bao nhiêu phần cuộc trò chuyện trước khi cắt bớt phần cũ. Tự động: bằng chỗ mà máy chủ của mô hình nói là có, hoặc một mặc định an toàn khi nó không nói.
 Set an AI's context budget	Đặt ngân sách ngữ cảnh của AI
+Custom…	Tùy chỉnh…
+Asking the server…	Đang hỏi máy chủ…
+Auto: {budget} tokens of the server's {window}	Tự động: {budget} token trong {window} của máy chủ
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Tự động: {budget} token, mức thông thường (máy chủ không cho biết chứa được bao nhiêu)
+{budget} will be used: the server holds {window}	Sẽ dùng {budget}: máy chủ chứa được {window}
+The server holds {window}	Máy chủ chứa được {window}
+Ask an AI's server how much it holds	Hỏi máy chủ của AI xem chứa được bao nhiêu

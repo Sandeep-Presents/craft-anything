@@ -1492,3 +1492,10 @@ Context budget (tokens)	Orçamento de contexto (tokens)
 Auto	Automático
 How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Quanto da conversa é enviado antes de as partes mais antigas serem cortadas. Automático: o espaço que o servidor do modelo diz ter, ou um padrão seguro quando ele não diz.
 Set an AI's context budget	Definir o orçamento de contexto de uma IA
+Custom…	Personalizado…
+Asking the server…	Perguntando ao servidor…
+Auto: {budget} tokens of the server's {window}	Automático: {budget} tokens dos {window} do servidor
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automático: {budget} tokens, a quantidade usual (o servidor não diz quanto comporta)
+{budget} will be used: the server holds {window}	Serão usados {budget}: o servidor comporta {window}
+The server holds {window}	O servidor comporta {window}
+Ask an AI's server how much it holds	Perguntar ao servidor de uma IA quanto ele comporta

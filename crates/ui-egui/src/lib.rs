@@ -173,6 +173,12 @@ pub enum Done {
         name: String,
         result: Result<Vec<String>, ToolError>,
     },
+    /// What an AI's server said about its context window (Settings → AI).
+    ServerWindow {
+        name: String,
+        model: String,
+        result: Result<craft_anything_ai::ServerWindow, ToolError>,
+    },
     AgentModelChoices {
         request: u64,
         context: craft_anything_ai::ModelContext,
@@ -472,6 +478,10 @@ pub struct CraftApp {
     /// come (`None`: still asking).
     pub model_picker: Option<(String, Option<Vec<String>>)>,
     pub agent_model_picker: Option<builders::AgentModelPicker>,
+    /// What each API backend's server said about its context window, by name, with the model it
+    /// was asked for: `None` while asking, `Some(None)` when it couldn't be asked (Settings → AI
+    /// shows what Auto works out to from it).
+    pub server_windows: std::collections::BTreeMap<String, (String, Option<Option<craft_anything_ai::ServerWindow>>)>,
     model_request: u64,
     pub model_tuning: std::collections::BTreeMap<String, ModelTuningDraft>,
     /// The agent app whose program the file dialog is choosing.
@@ -621,6 +631,7 @@ impl CraftApp {
             program_replaced: Default::default(),
             model_picker: None,
             agent_model_picker: None,
+            server_windows: Default::default(),
             model_request: 0,
             model_tuning: Default::default(),
             picking_program_for: None,
@@ -1656,6 +1667,12 @@ impl CraftApp {
                 // changed contexts once it can read the session again; saving rechecks too.
                 if let Some(picker) = self.agent_model_picker.as_mut().filter(|p| p.request == request && p.context == context) {
                     picker.result = Some(result.map_err(|e| e.for_people()));
+                }
+            }
+            // Kept only if it was asked for the model the AI still uses.
+            Done::ServerWindow { name, model, result } => {
+                if let Some(entry) = self.server_windows.get_mut(&name).filter(|(asked, _)| *asked == model) {
+                    entry.1 = Some(result.ok());
                 }
             }
             Done::ModelTuning { name, cli_model, result } => {

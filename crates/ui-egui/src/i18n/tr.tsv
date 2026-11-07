@@ -1492,3 +1492,10 @@ Context budget (tokens)	Bağlam bütçesi (token)
 Auto	Otomatik
 How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Eski kısımlar kısaltılmadan önce konuşmanın ne kadarının gönderileceği. Otomatik: modelin sunucusunun yeri olduğunu söylediği kadar, söylemezse güvenli bir varsayılan.
 Set an AI's context budget	Bir yapay zekânın bağlam bütçesini ayarla
+Custom…	Özel…
+Asking the server…	Sunucuya soruluyor…
+Auto: {budget} tokens of the server's {window}	Otomatik: sunucunun {window} token'ından {budget}
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Otomatik: {budget} token, olağan miktar (sunucusu ne kadar alabildiğini söylemiyor)
+{budget} will be used: the server holds {window}	{budget} kullanılacak: sunucu {window} alabiliyor
+The server holds {window}	Sunucu {window} alabiliyor
+Ask an AI's server how much it holds	Bir yapay zekânın sunucusuna ne kadar alabildiğini sor

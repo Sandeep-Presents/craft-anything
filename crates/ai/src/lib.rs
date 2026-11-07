@@ -29,6 +29,26 @@ pub mod rebuild;
 pub mod ssh;
 pub mod window;
 
+/// The context budgets offered in Settings → AI besides Auto and a number of your own.
+pub const CONTEXT_PRESETS: &[u64] = &[8_192, 16_384, 32_768, 65_536, 131_072, 262_144, 524_288, 1_048_576];
+
+/// What a backend's server said about its context window ([`AiHub::server_window`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServerWindow {
+    /// The window, when the server named one.
+    pub window: Option<window::Window>,
+    /// A server on this computer or its network (its budget may rise to fill a large window).
+    pub local: bool,
+}
+
+impl ServerWindow {
+    /// The budget a conversation gets with this setting (`None`: Auto), worked out exactly as the
+    /// agent loop does before its first request.
+    pub fn budget(&self, configured: Option<u64>) -> u64 {
+        agent::context_budget_from(configured.unwrap_or(0), None, self.window.map(|w| w.tokens), self.local)
+    }
+}
+
 pub use cli_agents::models::{AgentModel, ModelContext};
 pub use config::{AiConfig, BackendEntry, BackendOptions, Price};
 pub use failure::{FailureKind, TurnFailure};
@@ -771,6 +791,22 @@ impl AiHub {
         b.options.context_tokens = budget.filter(|n| *n > 0);
         self.save_config(&cfg)?;
         Ok(true)
+    }
+
+    /// What a backend's server says about its context window, for showing what its budget works
+    /// out to (Settings → AI, `ai context`). A backend reached over ssh isn't asked here (a tunnel
+    /// would be opened just for this), nor one that can't be built (no key): the window is then
+    /// unknown, as it is when the server doesn't say. Blocking (bounded); run it off the UI thread.
+    pub fn server_window(&self, name: &str) -> Result<ServerWindow, ToolError> {
+        let e = self.entry(name)?;
+        if e.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which keeps its own conversation."))
+                .with_remediation("A context budget is for API backends."));
+        }
+        let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
+        let slot = if over_ssh { None } else { self.build_model(&e).ok() };
+        let local = slot.as_ref().map_or(e.config.kind == BackendKind::OpenaiCompatible, |s| s.local);
+        Ok(ServerWindow { window: slot.and_then(|s| s.model.context_window()), local })
     }
 
     /// The models a backend can be set to: the API's or registered agent's list.

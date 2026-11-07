@@ -410,13 +410,19 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             }
         }
         AiCommand::Context { name, tokens: None } => {
-            let options = hub.options();
-            if !hub.backends().iter().any(|b| b.name == *name) {
-                return fail(&ToolError::invalid(format!("No AI backend named {name:?}")).with_remediation("See `craft-anything-cli ai list`."), f);
+            let tokens = hub.options().get(name).and_then(|o| o.context_tokens).filter(|n| *n > 0);
+            match hub.server_window(name) {
+                Ok(server) => {
+                    let (window, source) = (server.window.map(|w| w.tokens), server.window.map(|w| w.source));
+                    let budget = server.budget(tokens);
+                    emit(
+                        &json!({"name": name, "context_tokens": tokens, "auto": tokens.is_none(), "window": window, "window_source": source, "budget": budget}),
+                        f,
+                    );
+                    0
+                }
+                Err(e) => fail(&e, f),
             }
-            let tokens = options.get(name).and_then(|o| o.context_tokens).filter(|n| *n > 0);
-            emit(&json!({"name": name, "context_tokens": tokens, "auto": tokens.is_none()}), f);
-            0
         }
         AiCommand::Context { name, tokens: Some(tokens) } => {
             let budget = match tokens.trim() {

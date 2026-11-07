@@ -1492,3 +1492,10 @@ Context budget (tokens)	Rozpočet kontextu (tokeny)
 Auto	Automaticky
 How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Kolik konverzace se posílá, než se starší části zkrátí. Automaticky: kolik podle serveru modelu pojme, nebo bezpečná výchozí hodnota, když to neřekne.
 Set an AI's context budget	Nastavit rozpočet kontextu AI
+Custom…	Vlastní…
+Asking the server…	Ptám se serveru…
+Auto: {budget} tokens of the server's {window}	Automaticky: {budget} tokenů z {window} serveru
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automaticky: {budget} tokenů, obvyklé množství (server neuvádí, kolik pojme)
+{budget} will be used: the server holds {window}	Použije se {budget}: server pojme {window}
+The server holds {window}	Server pojme {window}
+Ask an AI's server how much it holds	Zeptat se serveru AI, kolik pojme

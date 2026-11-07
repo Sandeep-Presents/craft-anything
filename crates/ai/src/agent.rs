@@ -342,7 +342,7 @@ const WINDOW_ASKS: u8 = 2;
 /// `read` the window it named when asked ahead of time. Each window keeps a quarter free for the
 /// answer. A refusal is the truth; a window read ahead may raise a local model's budget, but only
 /// lowers a paid service's, where a bigger window costs more on every request.
-fn context_budget_from(configured: u64, refused: Option<u64>, read: Option<u64>, local: bool) -> u64 {
+pub(crate) fn context_budget_from(configured: u64, refused: Option<u64>, read: Option<u64>, local: bool) -> u64 {
     let room = |window: u64| window - window / 4;
     let known = refused.map(room).or_else(|| read.map(room).map(|r| if local { r } else { r.min(context::CLOUD_CONTEXT_TOKENS) }));
     match (configured, known) {

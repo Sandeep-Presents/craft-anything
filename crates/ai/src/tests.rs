@@ -676,6 +676,24 @@ fn an_ais_context_budget_is_set_and_cleared() {
     assert!(!h.set_context_tokens("Nobody", Some(1000)).unwrap());
 }
 
+/// What a budget works out to: Auto fills three quarters of a local window, a setting is held to
+/// it, and with no window the defaults apply.
+#[test]
+fn a_budget_is_worked_out_from_the_servers_window() {
+    let w = |tokens: Option<u64>, local| crate::ServerWindow { window: tokens.map(|tokens| crate::window::Window { tokens, source: "model list" }), local };
+    assert_eq!(w(Some(524_288), true).budget(None), 393_216);
+    assert_eq!(w(Some(524_288), true).budget(Some(131_072)), 131_072);
+    assert_eq!(w(Some(262_144), true).budget(Some(1_048_576)), 196_608, "held to what the server holds");
+    assert_eq!(w(None, true).budget(None), crate::context::LOCAL_CONTEXT_TOKENS);
+    assert_eq!(w(None, false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS);
+    assert_eq!(w(Some(1_000_000), false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS, "a paid service isn't raised");
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    assert!(h.server_window("Codex").is_err());
+    assert!(h.server_window("Nobody").is_err());
+}
+
 /// Every Claude effort level can be chosen for the Claude API and Claude Code, and only for them.
 #[test]
 fn a_claude_ais_effort_is_changed() {

@@ -306,6 +306,17 @@ impl CraftApp {
         });
     }
 
+    /// Ask an AI's server how large its context window is, so Settings → AI can say what Auto
+    /// works out to. Asked again when the AI's model changes.
+    pub fn ask_server_window(&mut self, name: &str, model: &str) {
+        let (hub, name, model) = (self.hub.clone(), name.to_string(), model.to_string());
+        self.server_windows.insert(name.clone(), (model.clone(), None));
+        self.jobs.spawn(tr("Ask an AI's server how much it holds"), false, move |_| {
+            let result = hub.server_window(&name);
+            Ok(crate::Done::ServerWindow { name, model, result })
+        });
+    }
+
     /// Connect the server in Settings → AI's address form. Its key goes to the keychain; the form
     /// keeps what was typed until it's added, so a mistake can be fixed.
     pub fn add_server(&mut self) {
@@ -501,9 +512,45 @@ pub fn context_budget(text: &str) -> Option<Option<u64>> {
     digits.parse::<u64>().ok().filter(|n| *n > 0).map(Some)
 }
 
+/// A number of tokens, grouped in threes: `393,216`.
+pub fn token_count(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A preset budget's short name: `8k`, `128k`, `1M`.
+pub fn budget_label(n: u64) -> String {
+    const MI: u64 = 1_048_576;
+    if n >= MI && n.is_multiple_of(MI) {
+        format!("{}M", n / MI)
+    } else if n.is_multiple_of(1024) {
+        format!("{}k", n / 1024)
+    } else {
+        token_count(n)
+    }
+}
+
 #[cfg(test)]
 mod context_budget_tests {
-    use super::context_budget;
+    use super::{budget_label, context_budget, token_count};
+
+    #[test]
+    fn budgets_are_named_plainly() {
+        assert_eq!(
+            [token_count(0), token_count(999), token_count(1000), token_count(393_216), token_count(1_048_576)],
+            ["0", "999", "1,000", "393,216", "1,048,576"]
+        );
+        let presets: Vec<String> = craft_anything_ai::CONTEXT_PRESETS.iter().map(|n| budget_label(*n)).collect();
+        assert_eq!(presets, ["8k", "16k", "32k", "64k", "128k", "256k", "512k", "1M"]);
+        assert_eq!(budget_label(390_000), "390,000");
+    }
 
     #[test]
     fn the_field_reads_auto_numbers_and_nothing_else() {
