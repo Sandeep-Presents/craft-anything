@@ -205,6 +205,11 @@ so kittest clicked there, the click landed outside the window and closed it, and
 waiting for the AI to be added. A test that clicks something below content that can grow calls
 `scroll_to_me()` on it first.
 
+**A dropdown found by what it shows.** The context budget's UI test opened the last dropdown showing
+"Auto"; a Tools dropdown added under it showed "Auto" too, so the test would have opened that one
+instead. When a test finds a widget by its value, make the value unique in the test's setup (here
+the tool list is set to Lean first), and add the new widget's test beside the old one.
+
 **A stand-in server that answers every request in order.** The AI tests' `mock` answered each
 request with the next scripted reply, so when the agent began asking the server for its context
 window before the first chat, that question took the chat's reply. A stand-in says which requests

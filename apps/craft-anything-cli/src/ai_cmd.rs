@@ -3,7 +3,7 @@
 use crate::output::Format;
 use crate::{Cli, INTERRUPTED, emit, fail, make_engine, out};
 use clap::{Args, Subcommand};
-use craft_anything_ai::{AgentEvent, AiHub, BackendConfig, BackendEntry, BackendKind, BackendOptions, Effort};
+use craft_anything_ai::{AgentEvent, AiHub, BackendConfig, BackendEntry, BackendKind, BackendOptions, Effort, ToolList};
 use craft_anything_evidence::ToolError;
 use serde_json::{Value, json};
 use std::io::{Read as _, Write as _};
@@ -98,6 +98,10 @@ pub enum AiCommand {
     /// trimmed, or `auto` for what its server says it has room for (else the default); leave it
     /// out to see the setting.
     Context { name: String, tokens: Option<String> },
+    /// Set which tools a builder on an API backend is offered: `full` (every tool), `lean` (the
+    /// tools for building, for small local models) or `auto` (every tool from a 64k window, and
+    /// always on a paid service); leave it out to see the setting and what it works out to.
+    Tools { name: String, list: Option<String> },
     /// Send a tiny request and report latency.
     Test { name: String },
     /// Choose the backend that builds (leave the name out to go back to automatic).
@@ -438,6 +442,34 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             match hub.set_context_tokens(name, budget) {
                 Ok(found) => {
                     emit(&json!({"name": name, "context_tokens": budget, "found": found}), f);
+                    if found { 0 } else { 1 }
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Tools { name, list: None } => {
+            let options = hub.options().get(name).cloned().unwrap_or_default();
+            let (setting, tokens) = (options.tools.unwrap_or_default(), options.context_tokens.filter(|n| *n > 0));
+            match hub.server_window(name) {
+                Ok(server) => {
+                    let list = if server.lean_tools(setting, tokens) { "lean" } else { "full" };
+                    emit(
+                        &json!({"name": name, "tools": setting.as_str(), "auto": setting == ToolList::Auto, "list": list, "budget": server.budget(tokens)}),
+                        f,
+                    );
+                    0
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Tools { name, list: Some(list) } => {
+            let Some(setting) = ToolList::parse(list) else {
+                let e = ToolError::invalid(format!("{list:?} isn't a tool list.")).with_remediation("Use auto, lean or full.");
+                return fail(&e, f);
+            };
+            match hub.set_tools(name, Some(setting)) {
+                Ok(found) => {
+                    emit(&json!({"name": name, "tools": setting.as_str(), "found": found}), f);
                     if found { 0 } else { 1 }
                 }
                 Err(e) => fail(&e, f),

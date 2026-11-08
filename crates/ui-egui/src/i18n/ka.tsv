@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	გამოყენებული იქნება {budget}: სერვერი იტევს {window}-ს
 The server holds {window}	სერვერი იტევს {window}-ს
 Ask an AI's server how much it holds	ჰკითხე AI-ის სერვერს, რამდენს იტევს
+Tools for building	აწყობის ხელსაწყოები
+Lean	მსუბუქი
+Full	სრული
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	რომელ ხელსაწყოებს იღებს ამ AI-ზე მომუშავე ამწყობი. მსუბუქი: მხოლოდ აწყობის ხელსაწყოები, პატარა ლოკალური მოდელებისთვის. სრული: ყველა ხელსაწყო. ავტომატური: ყველა ხელსაწყო, როცა საუბარს 64k ან მეტი ტოკენის ადგილი აქვს.
+(every tool)	(ყველა ხელსაწყო)
+(the lean list)	(მსუბუქი სია)
+(the lean list until its server says it holds more)	(მსუბუქი სია, სანამ მისი სერვერი არ იტყვის, რომ მეტს იტევს)
+Set which tools an AI is offered	AI-ის ხელსაწყოების არჩევა

@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	{budget} werden genutzt: Der Server fasst {window}
 The server holds {window}	Der Server fasst {window}
 Ask an AI's server how much it holds	Den Server einer KI fragen, wie viel er fasst
+Tools for building	Werkzeuge zum Bauen
+Lean	Schlank
+Full	Alle
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Welche Werkzeuge ein Builder mit dieser KI bekommt. Schlank: nur die Werkzeuge zum Bauen, für kleine lokale Modelle. Alle: jedes Werkzeug. Automatisch: alle Werkzeuge, wenn das Gespräch Platz für 64k Tokens oder mehr hat.
+(every tool)	(alle Werkzeuge)
+(the lean list)	(die schlanke Liste)
+(the lean list until its server says it holds more)	(die schlanke Liste, bis ihr Server sagt, dass er mehr fasst)
+Set which tools an AI is offered	Festlegen, welche Werkzeuge eine KI bekommt

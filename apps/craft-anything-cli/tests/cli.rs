@@ -54,6 +54,29 @@ fn an_ais_context_budget_is_set_from_the_cli() {
     assert!(!cli(&["ai", "context", "Nobody"], cfg.path()).success);
 }
 
+/// `ai tools` shows and sets which tools a builder is offered, and what Auto works out to.
+#[test]
+fn an_ais_tool_list_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "tools", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // No window is known, so Auto works out to the lean list on the local default budget.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["tools"].clone(), auto["auto"].clone(), auto["list"].clone()), (json!("auto"), json!(true), json!("lean")));
+    // A budget of 64k or more is room for every tool.
+    assert!(cli(&["ai", "context", "Box", "65536"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["list"], "full");
+    assert!(cli(&["ai", "tools", "Box", "lean"], cfg.path()).success);
+    assert_eq!((shown(cfg.path())["tools"].clone(), shown(cfg.path())["list"].clone()), (json!("lean"), json!("lean")));
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("tools = \"lean\""));
+    assert!(!cli(&["ai", "tools", "Box", "everything"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["tools"], "lean", "a refused value changes nothing");
+    assert!(cli(&["ai", "tools", "Box", "auto"], cfg.path()).success);
+    assert!(!std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("tools = \"lean\""), "Auto is the default and isn't written");
+    assert!(!cli(&["ai", "tools", "Nobody"], cfg.path()).success);
+}
+
 #[test]
 fn commands_and_exit_codes() {
     let cfg = tempfile::tempdir().unwrap();

@@ -344,7 +344,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
     let mut key_drafts = std::mem::take(&mut app.backend_key_inputs);
     let (mut pick_model, mut chosen_model, mut close_picker) = (None, None, false);
-    let (mut chosen_effort, mut save_context) = (None, None);
+    let (mut chosen_effort, mut save_context, mut save_tools) = (None, None, None);
     // AIs whose server is to be asked how much it holds (Settings → AI's context budget line).
     let mut ask_window: Vec<(String, String)> = Vec::new();
     let (mut pick_agent_model, mut chosen_agent_model, mut remote_program) = (None, None, None);
@@ -615,6 +615,37 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     ui.label(RichText::new(text).color(t.text_faint).size(theme::CAPTION));
                                 });
                             }
+                            // Which tools a builder on it is offered; beside Auto, the list that
+                            // works out to with the budget above (as the build will decide it).
+                            use craft_anything_ai::ToolList;
+                            let tools = app.backend_options.get(&b.name).and_then(|o| o.tools).unwrap_or_default();
+                            ui.horizontal_wrapped(|ui| {
+                                ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
+                                let label = ui.label(RichText::new(tr("Tools for building")).color(t.text_faint).size(theme::CAPTION));
+                                let named = |l: ToolList| match l {
+                                    ToolList::Auto => tr("Auto"),
+                                    ToolList::Lean => tr("Lean"),
+                                    ToolList::Full => tr("Full"),
+                                };
+                                let combo = egui::ComboBox::from_id_salt(("tool-list", &b.name)).icon(widgets::combo_icon).selected_text(named(tools)).show_ui(ui, |ui| {
+                                    for l in ToolList::ALL {
+                                        if ui.selectable_label(l == tools, named(l)).clicked() && l != tools {
+                                            save_tools = Some((b.name.clone(), l));
+                                        }
+                                    }
+                                });
+                                combo.response.labelled_by(label.id).on_hover_text(tr("Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more."));
+                                if tools == ToolList::Auto
+                                    && let Some(Some(Some(server))) = server
+                                {
+                                    let works_out = match (server.lean_tools(tools, saved), server.window.is_some() || !server.local) {
+                                        (false, _) => tr("(every tool)"),
+                                        (true, true) => tr("(the lean list)"),
+                                        (true, false) => tr("(the lean list until its server says it holds more)"),
+                                    };
+                                    ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
+                                }
+                            });
                         }
                     }
                     if craft_anything_ai::model_options::supported(b) {
@@ -823,6 +854,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     if let Some((name, budget)) = save_context {
         app.set_context_tokens(&name, budget);
+    }
+    if let Some((name, tools)) = save_tools {
+        app.set_tools(&name, tools);
     }
     if close_picker {
         app.model_picker = None;

@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	Použije se {budget}: server pojme {window}
 The server holds {window}	Server pojme {window}
 Ask an AI's server how much it holds	Zeptat se serveru AI, kolik pojme
+Tools for building	Nástroje pro sestavení
+Lean	Úsporné
+Full	Všechny
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Které nástroje dostane sestavovací agent na této AI. Úsporné: jen nástroje pro sestavení, pro malé místní modely. Všechny: každý nástroj. Automaticky: všechny nástroje, když má konverzace místo pro 64k tokenů nebo víc.
+(every tool)	(všechny nástroje)
+(the lean list)	(úsporný seznam)
+(the lean list until its server says it holds more)	(úsporný seznam, dokud jeho server neřekne, že pojme víc)
+Set which tools an AI is offered	Nastavit, jaké nástroje AI dostane

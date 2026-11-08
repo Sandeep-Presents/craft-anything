@@ -1335,6 +1335,8 @@ fn an_ais_context_budget_is_set_in_settings() {
     let mut h = harness(move || {
         let mut a = demo::app(demo::engine(Mode::Experienced, true));
         a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
+        // Its tool list shows Lean, so the last dropdown showing "Auto" is its context budget.
+        a.hub.set_tools("Box", Some(craft_anything_ai::ToolList::Lean)).unwrap();
         a.state.settings_open = true;
         a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
         a
@@ -1379,6 +1381,58 @@ fn an_ais_context_budget_is_set_in_settings() {
     open(&mut h, "128k");
     pick(&mut h, "Auto");
     assert!(wait(&mut h, |a| budget(a).is_none()), "{:?}", budget(h.state()));
+}
+
+/// Settings → AI: an AI's tool list is Auto, Lean or Full, and beside Auto is the list it works
+/// out to with the context budget.
+#[test]
+fn an_ais_tool_list_is_chosen_in_settings() {
+    let url = model_server();
+    let mut h = harness(move || {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a
+    });
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Box")));
+    let tools = |a: &CraftApp| a.backend_options.get("Box").and_then(|o| o.tools);
+    assert!(wait(&mut h, |a| a.server_windows.get("Box").is_some_and(|(_, w)| w.is_some())));
+    h.run_steps(2);
+    // The stand-in server names no window, so Auto is lean on the local default budget, for now.
+    h.get_by_label("(the lean list until its server says it holds more)");
+    // Box's tool list is the last dropdown in Settings (it follows its context budget's).
+    let open = |h: &mut Harness<'static, CraftApp>, showing: &str| {
+        h.get_all_by_value(showing).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_value(showing).last().unwrap().click();
+        h.run_steps(2);
+    };
+    let pick = |h: &mut Harness<'static, CraftApp>, label: &str| {
+        h.get_all_by_label(label).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_label(label).last().unwrap().click();
+        h.run_steps(2);
+    };
+    open(&mut h, "Auto");
+    pick(&mut h, "Lean");
+    assert!(wait(&mut h, |a| tools(a) == Some(craft_anything_ai::ToolList::Lean)), "{:?}", tools(h.state()));
+    h.run_steps(2);
+    assert!(h.query_by_label("(the lean list until its server says it holds more)").is_none(), "a chosen list needs no note");
+    open(&mut h, "Lean");
+    pick(&mut h, "Full");
+    assert!(wait(&mut h, |a| tools(a) == Some(craft_anything_ai::ToolList::Full)), "{:?}", tools(h.state()));
+    h.run_steps(2);
+    open(&mut h, "Full");
+    pick(&mut h, "Auto");
+    assert!(wait(&mut h, |a| tools(a).is_none()), "Auto isn't written: {:?}", tools(h.state()));
+    // With room for 64k tokens, Auto offers every tool.
+    h.state().hub.set_context_tokens("Box", Some(65_536)).unwrap();
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backend_options.get("Box").and_then(|o| o.context_tokens) == Some(65_536)));
+    h.run_steps(2);
+    h.get_by_label("(every tool)");
 }
 
 /// #123, #127: the model an AI uses is changed in Settings → AI from the ones it lists.

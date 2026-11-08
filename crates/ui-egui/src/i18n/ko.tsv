@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	{budget}만 사용됩니다: 서버 수용량은 {window}
 The server holds {window}	서버 수용량: {window}
 Ask an AI's server how much it holds	AI 서버에 수용량 묻기
+Tools for building	빌드용 도구
+Lean	간소
+Full	전체
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	이 AI로 빌드하는 빌더가 받는 도구입니다. 간소: 빌드용 도구만, 작은 로컬 모델용. 전체: 모든 도구. 자동: 대화에 64k 토큰 이상의 여유가 있으면 모든 도구.
+(every tool)	(모든 도구)
+(the lean list)	(간소 목록)
+(the lean list until its server says it holds more)	(서버가 더 많이 담는다고 알려 줄 때까지 간소 목록)
+Set which tools an AI is offered	AI가 받는 도구 설정

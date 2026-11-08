@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	Serão usados {budget}: o servidor comporta {window}
 The server holds {window}	O servidor comporta {window}
 Ask an AI's server how much it holds	Perguntar ao servidor de uma IA quanto ele comporta
+Tools for building	Ferramentas para construir
+Lean	Enxuta
+Full	Completa
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Quais ferramentas quem constrói com esta IA recebe. Enxuta: só as ferramentas para construir, para modelos locais pequenos. Completa: todas as ferramentas. Automático: todas quando a conversa tem espaço para 64k tokens ou mais.
+(every tool)	(todas as ferramentas)
+(the lean list)	(a lista enxuta)
+(the lean list until its server says it holds more)	(a lista enxuta até o servidor dizer que comporta mais)
+Set which tools an AI is offered	Definir quais ferramentas uma IA recebe

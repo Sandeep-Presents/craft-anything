@@ -306,6 +306,15 @@ impl CraftApp {
         });
     }
 
+    /// Choose which tools a builder on an AI is offered (Auto, Lean or Full).
+    pub fn set_tools(&mut self, name: &str, tools: craft_anything_ai::ToolList) {
+        let (hub, name) = (self.hub.clone(), name.to_string());
+        self.jobs.spawn(tr("Set which tools an AI is offered"), false, move |_| {
+            hub.set_tools(&name, Some(tools)).map_err(|e| e.message)?;
+            Ok(crate::backends(&hub))
+        });
+    }
+
     /// Ask an AI's server how large its context window is, so Settings → AI can say what Auto
     /// works out to. Asked again when the AI's model changes.
     pub fn ask_server_window(&mut self, name: &str, model: &str) {

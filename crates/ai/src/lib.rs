@@ -42,6 +42,13 @@ pub struct ServerWindow {
 }
 
 impl ServerWindow {
+    /// Whether a builder on this backend gets the lean tool list with these settings (`tools`, and
+    /// the context budget: `None` is Auto), decided exactly as the agent loop decides once it knows
+    /// the window.
+    pub fn lean_tools(&self, tools: ToolList, configured: Option<u64>) -> bool {
+        agent::offers_lean(tools, self.local, self.budget(configured))
+    }
+
     /// The budget a conversation gets with this setting (`None`: Auto), worked out exactly as the
     /// agent loop does before its first request.
     pub fn budget(&self, configured: Option<u64>) -> u64 {
@@ -49,8 +56,9 @@ impl ServerWindow {
     }
 }
 
+pub use agent::FULL_TOOLS_BUDGET;
 pub use cli_agents::models::{AgentModel, ModelContext};
-pub use config::{AiConfig, BackendEntry, BackendOptions, Price};
+pub use config::{AiConfig, BackendEntry, BackendOptions, Price, ToolList};
 pub use failure::{FailureKind, TurnFailure};
 pub use keys::KeyStore;
 pub use model::Effort;
@@ -793,6 +801,21 @@ impl AiHub {
         Ok(true)
     }
 
+    /// Set which tools a builder on an API backend is offered (`None`: Auto). Returns whether the
+    /// backend exists.
+    pub fn set_tools(&self, name: &str, tools: Option<ToolList>) -> Result<bool, ToolError> {
+        let mut cfg = self.config_to_change()?;
+        let Some(b) = cfg.backends.iter_mut().find(|b| b.config.name == name) else { return Ok(false) };
+        if b.config.kind == BackendKind::AgentCli {
+            return Err(
+                ToolError::invalid(format!("{name} is an agent app, which brings its own tools.")).with_remediation("The tool list is for API backends.")
+            );
+        }
+        b.options.tools = tools.filter(|t| *t != ToolList::Auto);
+        self.save_config(&cfg)?;
+        Ok(true)
+    }
+
     /// What a backend's server says about its context window, for showing what its budget works
     /// out to (Settings → AI, `ai context`). A backend reached over ssh isn't asked here (a tunnel
     /// would be opened just for this), nor one that can't be built (no key): the window is then
@@ -1084,6 +1107,7 @@ impl AiHub {
             effort: e.options.effort,
             max_turns: e.options.max_turns.unwrap_or(agent::DEFAULT_MAX_TURNS),
             context_tokens: e.options.context_tokens.unwrap_or(0),
+            tools: e.options.tools.unwrap_or_default(),
         })
     }
 

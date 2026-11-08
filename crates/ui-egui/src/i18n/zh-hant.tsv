@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	將使用 {budget}：伺服器可容納 {window}
 The server holds {window}	伺服器可容納 {window}
 Ask an AI's server how much it holds	詢問 AI 的伺服器能容納多少
+Tools for building	建置用的工具
+Lean	精簡
+Full	完整
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	在這個 AI 上建置時提供哪些工具。精簡：只有建置用的工具，適合小型本機模型。完整：所有工具。自動：對話有 64k 權杖或更多空間時提供所有工具。
+(every tool)	（所有工具）
+(the lean list)	（精簡清單）
+(the lean list until its server says it holds more)	（精簡清單，直到它的伺服器說能容納更多）
+Set which tools an AI is offered	設定 AI 可用的工具

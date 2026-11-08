@@ -473,10 +473,16 @@ been run live.
       window, so they show Auto as "its server doesn't say" while a build, which opens the
       tunnel, may read a large window and use more. Ask through the tunnel, or say the window is
       read when a build starts
-- [ ] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
+- [x] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
       window is 64k or more and the lean builder list (#417) below that; the memory steps in the
-      system prompt follow the same choice. Today every local builder is lean, whatever its window
+      system prompt follow the same choice. Today every local builder is lean, whatever its window.
+      `tools` in `[[ai.backends]]`, `ai tools <name>`; Auto decides on the conversation's budget
+      (`FULL_TOOLS_BUDGET`, a 64k window less its quarter) after the server is asked, and decides
+      again when a later answer changes it (Ollama says only once loaded); paid services keep every
+      tool. Only builders are trimmed: a chat keeps every tool whatever the setting
       — claimed: youkaicountry, branch feature/r5.4-tool-list-per-ai (stacked on #1155)
+- [ ] Run a build live with the full list on a large local model (a 262k or 512k window) and a
+      lean one on a small model, and note in STATUS which models used the extra Core tools well
 - [x] A builder that can't see pictures (the API loop) is told it can't, then sent to open
       screenshots with Read: the website capture lines and the `--screenshot` and reference-picture
       lines in `brief.rs`, the website check's "Open each pair", the reminder after each round, the

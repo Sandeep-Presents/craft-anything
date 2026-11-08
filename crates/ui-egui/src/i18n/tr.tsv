@@ -1499,3 +1499,11 @@ Auto: {budget} tokens, the usual amount (its server doesn't say how much it hold
 {budget} will be used: the server holds {window}	{budget} kullanılacak: sunucu {window} alabiliyor
 The server holds {window}	Sunucu {window} alabiliyor
 Ask an AI's server how much it holds	Bir yapay zekânın sunucusuna ne kadar alabildiğini sor
+Tools for building	Yapım araçları
+Lean	Sade
+Full	Tam
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Bu yapay zekâyla yapan oluşturucunun aldığı araçlar. Sade: yalnızca yapım araçları, küçük yerel modeller için. Tam: tüm araçlar. Otomatik: konuşmada 64k token veya daha fazla yer olduğunda tüm araçlar.
+(every tool)	(tüm araçlar)
+(the lean list)	(sade liste)
+(the lean list until its server says it holds more)	(sunucusu daha fazlasını aldığını söyleyene kadar sade liste)
+Set which tools an AI is offered	Bir yapay zekânın aldığı araçları ayarla
