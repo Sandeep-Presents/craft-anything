@@ -372,6 +372,11 @@ pub enum AgentEvent {
 /// A chat with the agent about the current session.
 pub trait Conversation: Send {
     fn send(&mut self, text: &str);
+    /// Show these pictures ([`model::Block::Image`]) with the next message sent. A conversation
+    /// that can't carry them ignores them: an agent app opens pictures with its own tools.
+    fn attach(&mut self, pictures: Vec<model::Block>) {
+        let _ = pictures;
+    }
     /// Retry an interrupted turn. Stateless adapters resend `text`; a conversation that keeps
     /// its own history can continue it without appending the user's message again.
     fn retry(&mut self, text: &str) {
@@ -1151,6 +1156,7 @@ impl AiHub {
             max_turns: e.options.max_turns.unwrap_or(agent::DEFAULT_MAX_TURNS),
             context_tokens: e.options.context_tokens.unwrap_or(0),
             tools: e.options.tools.unwrap_or_default(),
+            vision: e.options.vision.unwrap_or_default(),
         })
     }
 
