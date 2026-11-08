@@ -26,6 +26,7 @@ pub mod price;
 pub mod prompt;
 pub mod providers;
 pub mod rebuild;
+pub mod sight;
 pub mod ssh;
 pub mod window;
 
@@ -65,7 +66,7 @@ impl ServerWindow {
 
 pub use agent::FULL_TOOLS_BUDGET;
 pub use cli_agents::models::{AgentModel, ModelContext};
-pub use config::{AiConfig, BackendEntry, BackendOptions, Price, ToolList};
+pub use config::{AiConfig, BackendEntry, BackendOptions, Price, ToolList, Vision};
 pub use failure::{FailureKind, TurnFailure};
 pub use keys::KeyStore;
 pub use model::Effort;
@@ -445,6 +446,10 @@ impl ChatModel for Tunneled {
     fn context_window(&self) -> Option<window::Window> {
         self.inner.context_window()
     }
+
+    fn sees_pictures(&self) -> Option<sight::Sight> {
+        self.inner.sees_pictures()
+    }
 }
 
 /// The tools this layer adds to the engine's (rebuild control), for
@@ -821,6 +826,37 @@ impl AiHub {
         b.options.tools = tools.filter(|t| *t != ToolList::Auto);
         self.save_config(&cfg)?;
         Ok(true)
+    }
+
+    /// Set whether an API backend's model sees pictures (`None`: Auto, what its server says).
+    /// Returns whether the backend exists.
+    pub fn set_vision(&self, name: &str, vision: Option<Vision>) -> Result<bool, ToolError> {
+        let mut cfg = self.config_to_change()?;
+        let Some(b) = cfg.backends.iter_mut().find(|b| b.config.name == name) else { return Ok(false) };
+        if b.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which opens pictures with its own tools."))
+                .with_remediation("Whether a model sees pictures is set for API backends."));
+        }
+        b.options.vision = vision.filter(|v| *v != Vision::Auto);
+        self.save_config(&cfg)?;
+        Ok(true)
+    }
+
+    /// A backend's vision setting and what its server says, for showing what Auto works out to
+    /// (`ai vision`): `sight::sees(setting, read)` is whether its model is shown pictures. As with
+    /// [`AiHub::server_window`], a backend over ssh or one that can't be built isn't asked.
+    /// Blocking (bounded); run it off the UI thread.
+    pub fn vision(&self, name: &str) -> Result<(Vision, Option<sight::Sight>), ToolError> {
+        let e = self.entry(name)?;
+        if e.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which opens pictures with its own tools."))
+                .with_remediation("Whether a model sees pictures is set for API backends."));
+        }
+        let setting = e.options.vision.unwrap_or_default();
+        let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
+        // A set answer needs no question to the server.
+        let read = if setting != Vision::Auto || over_ssh { None } else { self.build_model(&e).ok().and_then(|s| s.model.sees_pictures()) };
+        Ok((setting, read))
     }
 
     /// What a backend's server says about its context window, for showing what its budget works

@@ -3,7 +3,7 @@
 use crate::output::Format;
 use crate::{Cli, INTERRUPTED, emit, fail, make_engine, out};
 use clap::{Args, Subcommand};
-use craft_anything_ai::{AgentEvent, AiHub, BackendConfig, BackendEntry, BackendKind, BackendOptions, Effort, ToolList};
+use craft_anything_ai::{AgentEvent, AiHub, BackendConfig, BackendEntry, BackendKind, BackendOptions, Effort, ToolList, Vision};
 use craft_anything_evidence::ToolError;
 use serde_json::{Value, json};
 use std::io::{Read as _, Write as _};
@@ -102,6 +102,9 @@ pub enum AiCommand {
     /// tools for building, for small local models) or `auto` (every tool from a 64k window, and
     /// always on a paid service); leave it out to see the setting and what it works out to.
     Tools { name: String, list: Option<String> },
+    /// Say whether an API backend's model sees pictures: `yes`, `no`, or `auto` (what its server
+    /// says; Claude does); leave it out to see the setting and what its server says.
+    Vision { name: String, sees: Option<String> },
     /// Send a tiny request and report latency.
     Test { name: String },
     /// Choose the backend that builds (leave the name out to go back to automatic).
@@ -470,6 +473,32 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             match hub.set_tools(name, Some(setting)) {
                 Ok(found) => {
                     emit(&json!({"name": name, "tools": setting.as_str(), "found": found}), f);
+                    if found { 0 } else { 1 }
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Vision { name, sees: None } => match hub.vision(name) {
+            Ok((setting, read)) => {
+                emit(
+                    &json!({
+                        "name": name, "vision": setting.as_str(), "sees": craft_anything_ai::sight::sees(setting, read),
+                        "server_says": read.map(|r| r.sees), "source": read.map(|r| r.source),
+                    }),
+                    f,
+                );
+                0
+            }
+            Err(e) => fail(&e, f),
+        },
+        AiCommand::Vision { name, sees: Some(sees) } => {
+            let Some(setting) = Vision::parse(sees) else {
+                let e = ToolError::invalid(format!("{sees:?} isn't a vision setting.")).with_remediation("Use auto, yes or no.");
+                return fail(&e, f);
+            };
+            match hub.set_vision(name, Some(setting)) {
+                Ok(found) => {
+                    emit(&json!({"name": name, "vision": setting.as_str(), "found": found}), f);
                     if found { 0 } else { 1 }
                 }
                 Err(e) => fail(&e, f),

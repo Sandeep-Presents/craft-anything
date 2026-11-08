@@ -277,4 +277,9 @@ pub trait ChatModel: Send {
     fn context_window(&self) -> Option<crate::window::Window> {
         None
     }
+    /// Whether its model sees pictures, when its server says (see [`crate::sight`]). Asked on a
+    /// worker, never on the UI thread.
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        None
+    }
 }

@@ -77,6 +77,28 @@ fn an_ais_tool_list_is_set_from_the_cli() {
     assert!(!cli(&["ai", "tools", "Nobody"], cfg.path()).success);
 }
 
+/// `ai vision` shows and sets whether a model sees pictures, and what its server says.
+#[test]
+fn whether_an_ai_sees_pictures_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "vision", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // Nothing answers at that address, so Auto knows nothing and the model isn't shown pictures.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["vision"].clone(), auto["sees"].clone(), auto["server_says"].clone()), (json!("auto"), json!(false), Value::Null));
+    assert!(cli(&["ai", "vision", "Box", "yes"], cfg.path()).success);
+    assert_eq!((shown(cfg.path())["vision"].clone(), shown(cfg.path())["sees"].clone()), (json!("yes"), json!(true)));
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("vision = \"yes\""));
+    assert!(!cli(&["ai", "vision", "Box", "maybe"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["vision"], "yes", "a refused value changes nothing");
+    assert!(cli(&["ai", "vision", "Box", "no"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["sees"], false);
+    assert!(cli(&["ai", "vision", "Box", "auto"], cfg.path()).success);
+    assert!(!std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("vision ="), "Auto is the default and isn't written");
+    assert!(!cli(&["ai", "vision", "Nobody"], cfg.path()).success);
+}
+
 #[test]
 fn commands_and_exit_codes() {
     let cfg = tempfile::tempdir().unwrap();

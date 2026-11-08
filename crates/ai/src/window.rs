@@ -22,6 +22,11 @@ const ASK_TIMEOUT: Duration = Duration::from_secs(3);
 /// Read JSON from the server; `None` for any failure (a probe that can't read just says nothing).
 pub trait Fetch {
     fn get(&self, url: &str) -> Option<Value>;
+    /// POST `body` as JSON and read JSON back (Ollama's `/api/show` is a POST).
+    fn post(&self, url: &str, body: &Value) -> Option<Value> {
+        let _ = (url, body);
+        None
+    }
 }
 
 /// The model a probe asks about, on the server it's served from.
@@ -40,7 +45,7 @@ impl Server<'_> {
     }
 
     /// This model's entry in the OpenAI-style model list.
-    fn listed(&self, fetch: &dyn Fetch) -> Option<Value> {
+    pub(crate) fn listed(&self, fetch: &dyn Fetch) -> Option<Value> {
         let list = fetch.get(&format!("{}/models", self.base.trim_end_matches('/')))?;
         let entries = list.get("data").or_else(|| list.get("models")).and_then(Value::as_array)?;
         entries.iter().find(|m| m.get("id").and_then(Value::as_str) == Some(self.model)).cloned()
@@ -88,15 +93,25 @@ pub fn ask(server: &Server<'_>, fetch: &dyn Fetch, on_this_network: bool) -> Opt
 
 /// Ask the server with `headers` (its key, when it has one). Each address is asked once.
 pub fn read_from_server(server: &Server<'_>, headers: &[(&'static str, String)], on_this_network: bool) -> Option<Window> {
-    let fetch = HttpFetch { agent: crate::http::quick_agent(ASK_TIMEOUT), headers, seen: RefCell::new(BTreeMap::new()) };
-    ask(server, &fetch, on_this_network)
+    ask(server, &HttpFetch::new(headers), on_this_network)
 }
 
-struct HttpFetch<'a> {
+/// Asks over HTTP with a short time limit, each address once.
+pub(crate) struct HttpFetch<'a> {
     agent: ureq::Agent,
     headers: &'a [(&'static str, String)],
     seen: RefCell<BTreeMap<String, Option<Value>>>,
 }
+
+impl<'a> HttpFetch<'a> {
+    pub(crate) fn new(headers: &'a [(&'static str, String)]) -> Self {
+        HttpFetch { agent: crate::http::quick_agent(ASK_TIMEOUT), headers, seen: RefCell::new(BTreeMap::new()) }
+    }
+}
+
+/// The most a probe reads of an answer it POSTed for (Ollama's `/api/show` carries the template
+/// and parameters, a few kB to a few hundred).
+const MAX_ANSWER: u64 = 4 << 20;
 
 impl Fetch for HttpFetch<'_> {
     fn get(&self, url: &str) -> Option<Value> {
@@ -105,6 +120,19 @@ impl Fetch for HttpFetch<'_> {
         }
         let v = crate::http::get_json(&self.agent, "the model server", url, self.headers).ok();
         self.seen.borrow_mut().insert(url.to_string(), v.clone());
+        v
+    }
+
+    fn post(&self, url: &str, body: &Value) -> Option<Value> {
+        use std::io::Read as _;
+        let key = format!("POST {url} {body}");
+        if let Some(v) = self.seen.borrow().get(&key) {
+            return v.clone();
+        }
+        let v = crate::http::post_json(&self.agent, "the model server", url, self.headers, body)
+            .ok()
+            .and_then(|reader| serde_json::from_reader::<_, Value>(reader.take(MAX_ANSWER)).ok());
+        self.seen.borrow_mut().insert(key, v.clone());
         v
     }
 }
@@ -225,7 +253,7 @@ impl WindowProbe for Ollama {
 }
 
 /// `text` for a URL query: unreserved characters as they are, every other byte as `%XX`.
-fn query_text(text: &str) -> String {
+pub(crate) fn query_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for b in text.bytes() {
         if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {

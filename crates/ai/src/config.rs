@@ -100,6 +100,36 @@ impl ToolList {
     }
 }
 
+/// Whether an API backend's model sees pictures (Settings → AI, `ai vision`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Vision {
+    /// What its server says ([`crate::sight`]); Claude reads pictures. When the server doesn't
+    /// say, the model is treated as one that can't.
+    #[default]
+    Auto,
+    /// It sees pictures, whatever its server says.
+    Yes,
+    /// It doesn't: it's never sent one.
+    No,
+}
+
+impl Vision {
+    pub const ALL: [Vision; 3] = [Vision::Auto, Vision::Yes, Vision::No];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Vision::Auto => "auto",
+            Vision::Yes => "yes",
+            Vision::No => "no",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Vision> {
+        Vision::ALL.into_iter().find(|v| v.as_str().eq_ignore_ascii_case(s.trim()))
+    }
+}
+
 /// Per-backend options beyond [`BackendConfig`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -129,6 +159,9 @@ pub struct BackendOptions {
     /// Which tools a builder on it is offered ([`ToolList`]). Omitted is Auto.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<ToolList>,
+    /// Whether its model sees pictures ([`Vision`]). Omitted is Auto.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vision: Option<Vision>,
     /// Agent CLIs: the program to run instead of the default for `model`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
@@ -511,6 +544,26 @@ mod tests {
         assert_eq!(ToolList::parse(" Full "), Some(ToolList::Full));
         assert!(ToolList::ALL.iter().all(|t| ToolList::parse(t.as_str()) == Some(*t)));
         assert_eq!(ToolList::parse("everything"), None);
+    }
+
+    #[test]
+    fn backend_vision_is_optional_and_validated() {
+        let table = |line: &str| -> toml::Table {
+            toml::from_str(&format!("[[backends]]\nname = \"Local\"\nkind = \"openai_compatible\"\nmodel = \"qwen3:8b\"\n{line}")).unwrap()
+        };
+        for (line, expected) in
+            [("", None), ("vision = \"auto\"", Some(Vision::Auto)), ("vision = \"yes\"", Some(Vision::Yes)), ("vision = \"no\"", Some(Vision::No))]
+        {
+            let config = AiConfig::from_table(&table(line)).unwrap();
+            assert_eq!(config.backends[0].options.vision, expected, "{line}");
+            assert_eq!(AiConfig::from_table(&config.to_table().unwrap()).unwrap(), config);
+        }
+        for line in ["vision = true", "vision = \"maybe\""] {
+            assert_eq!(AiConfig::from_table(&table(line)).unwrap_err().code, ErrorCode::BadSettings, "{line}");
+        }
+        assert_eq!(Vision::parse(" Yes "), Some(Vision::Yes));
+        assert!(Vision::ALL.iter().all(|v| Vision::parse(v.as_str()) == Some(*v)));
+        assert_eq!(Vision::parse("true"), None);
     }
 
     #[test]

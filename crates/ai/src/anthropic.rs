@@ -334,6 +334,12 @@ impl ChatModel for Anthropic {
     fn model(&self) -> String {
         self.model.clone()
     }
+
+    /// Every Claude model reads pictures. Another model behind an Anthropic-style endpoint says
+    /// nothing, and is treated as one that can't unless the person says it can.
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        self.model.starts_with("claude-").then_some(crate::sight::Sight { sees: true, source: "Claude" })
+    }
 }
 
 /// Marker for tool input that wasn't valid JSON.

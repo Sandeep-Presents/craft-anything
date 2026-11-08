@@ -324,6 +324,14 @@ impl ChatModel for OpenAi {
         let server = crate::window::Server { base: &self.base_url, model: &self.model };
         crate::window::read_from_server(&server, &self.headers(), self.on_this_network)
     }
+
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        if !self.asks_window {
+            return None;
+        }
+        let server = crate::window::Server { base: &self.base_url, model: &self.model };
+        crate::sight::read_from_server(&server, &self.headers(), self.on_this_network)
+    }
 }
 
 impl OpenAi {
