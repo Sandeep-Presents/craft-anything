@@ -430,3 +430,55 @@ fn uninstall_rejects_negative_version_app_config() {
     assert!(u.app_config_error.is_some(), "{u:?}");
     assert_eq!(read(&p), negative);
 }
+
+/// Switch the process working directory for the duration of a test and
+/// restore it on drop, even on panic. No other test in this crate reads the
+/// working directory, so the switch cannot disturb them.
+struct ChangeDir(PathBuf);
+
+fn change_dir(dir: &Path) -> ChangeDir {
+    let prev = std::env::current_dir().unwrap();
+    std::env::set_current_dir(dir).unwrap();
+    ChangeDir(prev)
+}
+
+impl Drop for ChangeDir {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.0);
+    }
+}
+
+#[test]
+fn host_env_keeps_empty_config_dir_but_drops_other_empty_values() {
+    let env = Host::capture_env([("CRAFT_ANYTHING_CONFIG_DIR", String::new()), ("XDG_CONFIG_HOME", String::new()), ("APPDATA", "/x".to_string())].into_iter());
+    assert_eq!(env.get("CRAFT_ANYTHING_CONFIG_DIR"), Some(&String::new()));
+    assert!(!env.contains_key("XDG_CONFIG_HOME"));
+    assert_eq!(env.get("APPDATA"), Some(&"/x".to_string()));
+}
+
+#[test]
+fn uninstall_neutralizes_config_in_working_directory_when_config_dir_is_empty() {
+    let fx = fixture();
+    // With CRAFT_ANYTHING_CONFIG_DIR empty the app loads ./config.toml, so
+    // uninstall must neutralize that file, not the platform config.
+    let cwd = fx.host.home.join("appcwd");
+    std::fs::create_dir_all(&cwd).unwrap();
+    std::fs::write(cwd.join("config.toml"), APP_CONFIG).unwrap();
+    let pending = "version = 3\nlanguage = \"de\"\nauto_mode = true\n";
+    std::fs::write(cwd.join("config.pending.toml"), pending).unwrap();
+    // A live platform config must be left alone: the app is not using it.
+    let platform = write_app_config(&fx, APP_CONFIG);
+    let mut host = fx.host.clone();
+    host.env.insert("CRAFT_ANYTHING_CONFIG_DIR".into(), String::new());
+    let u = {
+        let _guard = change_dir(&cwd);
+        uninstall(&host)
+    };
+    assert_eq!(u.status, "removed", "{u:?}");
+    assert_eq!(u.neutralized_config.as_deref(), Some(Path::new("config.toml")));
+    assert_eq!(u.neutralized_pending_config.as_deref(), Some(Path::new("config.pending.toml")));
+    assert!(read(cwd.join("config.toml")).contains("auto_mode = false"), "{}", read(cwd.join("config.toml")));
+    let after_pending = read(cwd.join("config.pending.toml"));
+    assert!(after_pending.contains("auto_mode = false") && after_pending.contains("language = \"de\""), "{after_pending}");
+    assert_eq!(read(&platform), APP_CONFIG);
+}

@@ -622,6 +622,9 @@ fn disable_backends(backends: &mut toml_edit::Item) -> Result<bool, String> {
     Ok(changed)
 }
 
+/// Set `enabled = false` on one backend table, writing the key when it is
+/// missing (a backend without `enabled` counts as on). Returns whether
+/// anything changed.
 fn disable_backend(table: &mut toml_edit::Table) -> Result<bool, String> {
     match table.get_mut("enabled") {
         None => {
