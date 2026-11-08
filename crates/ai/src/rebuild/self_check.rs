@@ -92,20 +92,26 @@ pub fn summary(checks: &[CheckResult], good_enough: f64) -> String {
     text
 }
 
-/// Whether this round's checks moved on from the last round's: a check that newly passes, or
-/// whose likeness rose by more than half a point. A builder turn that changed no file but made
-/// the build measurably better (a device check that reads more, a picture that looks more
-/// alike) is progress, not a stalled turn.
-pub fn moved(previous: &[CheckResult], now: &[CheckResult]) -> bool {
+/// Whether this round's checks moved past every earlier round's: a check that passes where none
+/// of its kind passed before, or whose likeness beats the best so far by more than half a point.
+/// A builder turn that changed no file but made the build measurably better (a device check that
+/// reads more, a picture that looks more alike) is progress, not a stalled turn. Against the last
+/// round alone, a device's picture noise (a point up, a point down) read as progress every other
+/// check, and a run with nothing left to fix never stopped.
+pub fn moved(earlier: &[CheckResult], now: &[CheckResult]) -> bool {
     now.iter().any(|n| {
-        previous.iter().filter(|p| p.check == n.check).any(|p| {
-            (n.passed && !p.passed)
-                || match (n.similarity, p.similarity) {
-                    (Some(a), Some(b)) => a > b + 0.5,
-                    (Some(_), None) => true,
-                    _ => false,
-                }
-        })
+        let same: Vec<&CheckResult> = earlier.iter().filter(|p| p.check == n.check).collect();
+        if same.is_empty() {
+            return false;
+        }
+        let newly_passes = n.passed && same.iter().all(|p| !p.passed);
+        let best = same.iter().filter_map(|p| p.similarity).fold(None, |m: Option<f64>, s| Some(m.map_or(s, |m| m.max(s))));
+        let more_alike = match (n.similarity, best) {
+            (Some(a), Some(b)) => a > b + 0.5,
+            (Some(_), None) => true,
+            _ => false,
+        };
+        newly_passes || more_alike
     })
 }
 
@@ -333,5 +339,18 @@ mod tests {
         assert!(!moved(&[], &better), "nothing to compare with");
         let other = [CheckResult { similarity: Some(99.0), ..CheckResult::new("web-visual", 2, false, "") }];
         assert!(!moved(&was, &other), "a different check says nothing about this one");
+    }
+
+    #[test]
+    fn noise_up_and_down_is_not_progress_only_a_new_best_is() {
+        // Eight checks overnight on a TV player: the picture noise moved the score a point
+        // either way, and a rise over the last check reset the unchanged-turn count each time.
+        let device = |round, s| CheckResult { similarity: Some(s), ..CheckResult::new("device", round, true, "") };
+        let history = [device(16, 80.4), device(17, 79.6), device(18, 80.3), device(19, 79.5)];
+        assert!(!moved(&history, &[device(20, 80.6)]), "0.2 over the best is noise, though 1.1 over the last check");
+        assert!(moved(&history, &[device(20, 81.0)]), "past the best by over half a point");
+        let failing = |round| CheckResult { similarity: Some(50.0), ..CheckResult::new("device", round, false, "") };
+        assert!(!moved(&[failing(1), device(2, 60.0)], &[device(3, 55.0)]), "it passed before: passing again isn't new");
+        assert!(moved(&[failing(1), failing(2)], &[CheckResult { similarity: Some(50.0), ..CheckResult::new("device", 3, true, "") }]));
     }
 }

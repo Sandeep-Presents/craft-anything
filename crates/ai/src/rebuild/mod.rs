@@ -1060,7 +1060,7 @@ impl Worker {
             round += 1;
             let checking = if ws.manifest.target == TargetRef::None { "Checking the build…" } else { "Checking the build against the original…" };
             self.step(ws, Step::Check, Status::Checking, checking)?;
-            let previous: Vec<CheckResult> = ws.manifest.checks.iter().filter(|c| c.round + 1 == round).cloned().collect();
+            let previous: Vec<CheckResult> = ws.manifest.checks.iter().filter(|c| c.round < round).cloned().collect();
             let checks = self.checks_with_a_retry(ws, kind, round)?;
             ws.manifest.checks.extend(checks.iter().cloned());
             ws.manifest.awaiting_check = false;
