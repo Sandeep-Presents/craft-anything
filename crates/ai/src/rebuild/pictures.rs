@@ -12,13 +12,15 @@ use craft_anything_engine::workspace::{CheckResult, Workspace};
 use std::path::{Path, PathBuf};
 
 /// The original's pictures for a run's first message, at most `max`, relative to the project
-/// folder: the person's pictures in reference/ first, then the captured screenshots (not the
+/// folder: the pictures the person attached to this request (`attached`, project-relative) first,
+/// then the person's pictures in reference/, then the captured screenshots (not the
 /// noise masks, which only say what moves) of the start page and of each other page studied
 /// (`capture/routes/<page>/`), every page's first picture before any page's second, so the other
 /// pages are shown too and not only the start page at every width. Returns the pictures and how
 /// many were left out.
-pub(super) fn for_first_message(ws: &Workspace, max: usize) -> (Vec<PathBuf>, usize) {
-    let references: Vec<Vec<PathBuf>> = ws.references().iter().filter_map(|p| p.strip_prefix(&ws.root).ok().map(|p| vec![p.to_path_buf()])).collect();
+pub(super) fn for_first_message(ws: &Workspace, attached: &[PathBuf], max: usize) -> (Vec<PathBuf>, usize) {
+    let references: Vec<Vec<PathBuf>> =
+        attached.iter().cloned().chain(ws.references().iter().filter_map(|p| p.strip_prefix(&ws.root).ok().map(Path::to_path_buf))).map(|p| vec![p]).collect();
     let mut page_dirs = vec![ws.capture_dir()];
     let mut routes: Vec<PathBuf> =
         std::fs::read_dir(ws.capture_dir().join("routes")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
@@ -101,6 +103,13 @@ fn take_in_turn(pages: &[Vec<Vec<PathBuf>>], max: usize, picked: &mut Vec<PathBu
         }
     }
     left_out
+}
+
+/// Pictures the person attached (their copies in the project, as notes and follow-ups carry
+/// them), relative to the project folder; one outside it is left out, so no path outside the
+/// project is ever named to a model.
+pub(super) fn in_project(root: &Path, files: &[PathBuf]) -> Vec<PathBuf> {
+    files.iter().filter_map(|f| f.strip_prefix(root).ok()).filter(|r| !r.as_os_str().is_empty()).map(Path::to_path_buf).collect()
 }
 
 /// The largest picture file read to be shrunk; past it a picture isn't shown.
@@ -309,7 +318,7 @@ mod tests {
         for f in ["screenshot-390.png", "screenshot-1280.png", "noise-1280.png", "README.md"] {
             std::fs::write(ws.capture_dir().join(f), png).unwrap();
         }
-        let picked: Vec<String> = for_first_message(&ws, 6).0.iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
+        let picked: Vec<String> = for_first_message(&ws, &[], 6).0.iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
         assert_eq!(picked, ["reference/picture-1.png", "capture/screenshot-1280.png", "capture/screenshot-390.png"]);
 
         // The other pages studied are shown too, each page's first picture before any second,
@@ -321,7 +330,7 @@ mod tests {
                 std::fs::write(dir.join(f), png).unwrap();
             }
         }
-        let (picked, left_out) = for_first_message(&ws, 5);
+        let (picked, left_out) = for_first_message(&ws, &[], 5);
         let picked: Vec<String> = picked.iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
         assert_eq!(
             picked,
@@ -338,7 +347,7 @@ mod tests {
 
         // Each is read and named by its path; one that can't be shown is said, not dropped silently.
         std::fs::write(ws.capture_dir().join("screenshot-390.png"), b"not a picture").unwrap();
-        let mut asked: Vec<PathBuf> = for_first_message(&ws, 6).0;
+        let mut asked: Vec<PathBuf> = for_first_message(&ws, &[], 6).0;
         asked.push(PathBuf::from("capture/gone.png"));
         let (shown, skipped) = load(&ws.root, &asked);
         let names: Vec<&str> = shown.iter().filter_map(|b| if let Block::Image { name, .. } = b { Some(name.as_str()) } else { None }).collect();

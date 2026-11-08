@@ -465,7 +465,7 @@ fn notes_added_while_it_works_reach_the_agent_at_its_next_step() {
     let mut first = note(1, "Make it faster");
     first.questions = vec![asked];
     notes.lock().unwrap().extend([first, note(2, "A blue sky")]);
-    let (p, more) = w.added(&mut ws, true, true).unwrap();
+    let (p, more, _) = w.added(&mut ws, true, true).unwrap();
     assert!(p.contains("where is the score kept") && p.contains("- Make it faster (pictures: a.png)\n- A blue sky"), "{p}");
     assert_eq!(more.len(), 1, "the question is marked told after the turn");
     assert!(notes.lock().unwrap().is_empty(), "each note goes in once");
@@ -2381,6 +2381,85 @@ mod picking_up_a_build {
         assert_eq!(names, ["capture/screenshot-1280.png", "checks/round-1/screenshot-1280.png"]);
     }
 
+    /// The pictures the person attaches go to a builder whose model sees with the message that
+    /// tells it about them: a follow-up's with the run's first message, ahead of the original's,
+    /// and a note's with the note.
+    #[test]
+    fn pictures_the_person_attaches_go_with_their_message_to_a_builder_that_sees() {
+        use crate::agent::tests::{Scripted, turn};
+        use crate::agent::{ApiConversation, EngineHost, LoopConfig, ModelSlot};
+        use crate::model::{Block, Msg, StopReason};
+        let pictures =
+            |m: &Msg| -> Vec<String> { m.blocks.iter().filter_map(|b| if let Block::Image { name, .. } = b { Some(name.clone()) } else { None }).collect() };
+        for vision in [crate::Vision::Yes, crate::Vision::No] {
+            let b = bench();
+            let mut ws = worked_on(&b);
+            std::fs::write(ws.capture_dir().join("screenshot-1280.png"), PNG).unwrap();
+            std::fs::create_dir_all(ws.attachments_dir()).unwrap();
+            let (asked, noted) = (ws.attachments_dir().join("picture-1.png"), ws.attachments_dir().join("picture-2.png"));
+            std::fs::write(&asked, PNG).unwrap();
+            std::fs::write(&noted, PNG).unwrap();
+            let seen = Arc::default();
+            // The note's turn and the fix after the check change app/, so the next check looks again.
+            let done = || turn(vec![Block::Text { text: "Done.".into() }], StopReason::EndTurn);
+            let write = |content: &str| {
+                let input = serde_json::json!({"path": "app/index.html", "content": content});
+                turn(vec![Block::ToolUse { id: "w".into(), name: "build_file_write".into(), input }], StopReason::ToolUse)
+            };
+            let turns = std::collections::VecDeque::from([done(), write("Blue"), done(), write("Bluer"), done()]);
+            let script = Scripted { turns, seen: Arc::clone(&seen) };
+            let worker = check_worker(&ws, false);
+            // A note waiting when the first turn ends, with a picture, and one from outside the
+            // project, which is never named to the model.
+            let outside = b._dir.path().join("elsewhere.png");
+            worker.notes.lock().unwrap().push(Note {
+                id: 7,
+                text: "Make the header like this.".into(),
+                shown: "Make the header like this.".into(),
+                pictures: vec![noted.clone(), outside],
+                questions: Vec::new(),
+            });
+            let slot = ModelSlot {
+                name: "Scripted".into(),
+                model: Box::new(script),
+                local: true,
+                effort: None,
+                max_turns: 10,
+                context_tokens: 0,
+                tools: Default::default(),
+                vision,
+            };
+            let mut worker = worker;
+            let build = std::collections::BTreeSet::from([craft_anything_engine::Toolset::Core, craft_anything_engine::Toolset::Build]);
+            let api = ApiConversation::start_with(Arc::new(EngineHost(worker.engine.clone())), vec![slot], LoopConfig::default(), build).unwrap();
+            let entry = crate::BackendEntry {
+                config: crate::BackendConfig {
+                    name: "Scripted".into(),
+                    kind: BackendKind::OpenaiCompatible,
+                    model: "scripted".into(),
+                    base_url: None,
+                    ssh_host: None,
+                    enabled: true,
+                },
+                options: Default::default(),
+            };
+            let mut opts = RunOptions { message: Some("Make it blue.".into()), shown_pictures: vec![asked.clone()], ..RunOptions::default() };
+            opts.kinds.register(Arc::new(PicturedKind));
+            worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory { in_mode: true, elsewhere: false }, &opts).unwrap();
+            let seen = seen.lock().unwrap();
+            let first = seen[0].last().unwrap();
+            let note = seen[1].last().unwrap();
+            assert!(note.text().contains("Make the header like this."), "{}", note.text());
+            if vision == crate::Vision::Yes {
+                assert_eq!(pictures(first), ["attachments/picture-1.png", "capture/screenshot-1280.png"]);
+                assert_eq!(pictures(note), ["attachments/picture-2.png"]);
+                assert!(!seen.iter().flatten().any(|m| m.text().contains("elsewhere.png")), "a path outside the project isn't named");
+            } else {
+                assert!(seen.iter().flatten().all(|m| pictures(m).is_empty()));
+            }
+        }
+    }
+
     #[test]
     fn new_notes_during_a_turn_or_check_get_their_own_attempt_but_empty_notes_do_not() {
         use crate::agent::tests::{Scripted, turn};
@@ -3959,7 +4038,7 @@ fn a_note_the_builder_took_at_a_step_joins_the_feed_and_isnt_sent_again() {
     assert_eq!(shown, ["make the header blue"], "it joins the feed as soon as the builder took it");
     assert!(!notes::was_read(&dir, 1), "its files are gone");
     // After the turn, only the note nobody took is sent, and no hook can hand it over again.
-    let (follow, _) = w.added(&mut ws, true, true).unwrap();
+    let (follow, _, _) = w.added(&mut ws, true, true).unwrap();
     assert!(follow.contains("add a footer") && !follow.contains("make the header blue"), "{follow}");
     assert!(notes::claim(&dir).is_empty());
 }
