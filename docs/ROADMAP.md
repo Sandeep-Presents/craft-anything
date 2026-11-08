@@ -591,6 +591,9 @@ been run live.
       starting, and the server's `/props` didn't answer for about a minute (seen live, a 512k model)
 - [x] Shrink a picture larger than `MAX_IMAGE_BYTES` (3.75 MB) before it's shown to a model,
       instead of refusing it (a 4K screenshot as PNG can be larger)
+      Seen live once: a 3840×2400 picture of 12.3 MB in reference/ went to a local Qwen as 1860×1162
+      (48%), named with that scale, and the builder's first words named the one change in it (the
+      icon's colour), which the request didn't mention
       — claimed: youkaicountry, branch feature/r5.4-shrink-pictures
 
 ### R5.5 API-key builds fail in words people can use
