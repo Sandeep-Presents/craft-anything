@@ -534,6 +534,15 @@ been run live.
       on a helper thread and the wait checks the job's cancel, so Stop beside "Connecting to…"
       ends it at once (`AiHub::add_server_until`); the request given up on ends by its own limits
       — claimed: FuryNocturn, branch bugfix/r5.4-stop-adding-a-server
+- [ ] A builder on an API backend can't be shown a picture: the model layer has no image block, so
+      the check's screenshot and the person's pictures of the original never reach the model, local
+      or paid, and every API builder is treated as blind. Add an image block that each API sends
+      the way it expects (OpenAI-style `image_url` data URIs, Anthropic's image source), capped in
+      size, kept out of saved transcripts as bytes, and counted toward the context budget
+      — claimed: youkaicountry, branch feature/r5.4-pictures-to-models
+- [ ] Say per AI whether its model sees pictures (`vision = auto | yes | no`; Auto asks the
+      server: llama.cpp's `/props` modalities, Ollama's capabilities), and let a builder whose model
+      sees get the check's screenshot and the person's pictures attached to its next message
 
 ### R5.5 API-key builds fail in words people can use
 Owner: open · Status: todo
