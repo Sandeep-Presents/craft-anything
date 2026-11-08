@@ -1176,6 +1176,12 @@ room throughout: nothing is pulled off the device or decoded.
       built for screens s61 to s119 couldn't be scored at all ("98% over 60 screen(s)"). Replay
       them all up to a cap far above a real map, and name any left out in the note and the
       unknowns. — claimed: rockmeister, branch bugfix/r2.12-check-every-screen
+- [ ] A turn that changed nothing is progress only past the best check so far: a TV player's run
+      sat at 80% for eight checks overnight (16 to 23), the builder saying each time there was
+      nothing in scope to fix, and never stopped: the device's picture noise moved the score up a
+      point every other check, and a rise over the last check (0.5 points) reset the
+      unchanged-turn count. Compare with the best of every earlier check of the same kind. —
+      claimed: rockmeister, branch bugfix/r2.12-progress-beats-best
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
