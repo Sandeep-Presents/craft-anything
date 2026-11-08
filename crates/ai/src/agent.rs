@@ -341,11 +341,13 @@ const WINDOW_ASKS: u8 = 2;
 /// person set (zero: none); `refused` the window a server named when it refused a request (#962);
 /// `read` the window it named when asked ahead of time. Each window keeps a quarter free for the
 /// answer. A refusal is the truth; a window read ahead may raise a local model's budget, but only
-/// lowers a paid service's, where a bigger window costs more on every request.
+/// lowers a paid service's default, where a bigger window costs more on every request. A budget
+/// the person set is kept up to the window, on any backend.
 pub(crate) fn context_budget_from(configured: u64, refused: Option<u64>, read: Option<u64>, local: bool) -> u64 {
     let room = |window: u64| window - window / 4;
-    let known = refused.map(room).or_else(|| read.map(room).map(|r| if local { r } else { r.min(context::CLOUD_CONTEXT_TOKENS) }));
+    let known = refused.map(room).or_else(|| read.map(room));
     match (configured, known) {
+        (0, Some(room)) if refused.is_none() && !local => room.min(context::CLOUD_CONTEXT_TOKENS),
         (0, Some(room)) => room,
         (n, Some(room)) => n.min(room),
         (0, None) if local => context::LOCAL_CONTEXT_TOKENS,
@@ -1494,6 +1496,11 @@ pub(crate) mod tests {
             (0, None, Some(1_000_000), false, cloud),
             (0, None, Some(32_768), false, 24_576),
             (0, None, None, false, cloud),
+            // A budget set on a paid service isn't cut to the default, only to the window.
+            (390_000, None, Some(1_000_000), false, 390_000),
+            (390_000, None, Some(200_000), false, 150_000),
+            (390_000, Some(1_000_000), None, false, 390_000),
+            (0, Some(1_000_000), None, false, 750_000),
         ] {
             assert_eq!(context_budget_from(configured, refused, read, local), budget, "{configured} {refused:?} {read:?} local {local}");
         }
