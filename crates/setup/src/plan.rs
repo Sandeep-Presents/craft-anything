@@ -418,15 +418,19 @@ pub fn verify(c: &Client, path: &Path, desired: &Value) -> Result<(), ToolError>
 pub struct UninstallReport {
     /// `removed`, `nothing_to_remove`, `blocked` or `partial`. `removed`
     /// also covers making the app config inert; `nothing_to_remove` means
-    /// nothing was removed and the app config was already inert or absent.
+    /// nothing was removed and the app config was already inert or absent;
+    /// `partial` means something was left live — a client entry that failed
+    /// to remove, or an app config that could not be made inert safely.
     pub status: &'static str,
     pub removed_entries: Vec<FileResult>,
     pub removed_skill_files: Vec<PathBuf>,
     /// The app's own `config.toml` when uninstall made it inert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neutralized_config: Option<PathBuf>,
-    /// Why the app's `config.toml` was left alone when it could not be made
-    /// inert safely (missing, already inert, malformed or newer).
+    /// Why the app's `config.toml` is still live: it was left alone because
+    /// it could not be made inert safely (unreadable, malformed or newer),
+    /// or the write/read-back failed. Absent when the file is missing or
+    /// already inert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app_config_error: Option<String>,
     /// Configs that stopped the uninstall (malformed or unreadable).
@@ -503,8 +507,8 @@ pub fn uninstall(host: &Host) -> UninstallReport {
     dirs.dedup();
     let removed_skill_files: Vec<PathBuf> = dirs.iter().flat_map(|d| skill::uninstall(d)).collect();
     let app_config = host.app_data().join("craft-anything").join("config.toml");
-    let (neutralized_config, app_config_error, app_config_failed) = neutralize_app_config(&app_config);
-    let status = if partial || app_config_failed {
+    let (neutralized_config, app_config_error, app_config_live) = neutralize_app_config(&app_config);
+    let status = if partial || app_config_live {
         "partial"
     } else if removed_entries.is_empty() && removed_skill_files.is_empty() && neutralized_config.is_none() {
         "nothing_to_remove"
@@ -614,20 +618,22 @@ fn disable_backend(table: &mut toml_edit::Table) -> Result<bool, String> {
 }
 
 /// Make the app's own `config.toml` inert in place, keeping every other
-/// setting. Returns `(neutralized path, note, failed)`: at most one of the
-/// first two is `Some`. A missing or already-inert file is `(None, None,
-/// false)`; a file left alone for a safe reason carries the reason as a note,
-/// while a failed write or read-back carries it as a failure.
+/// setting. Returns `(neutralized path, note, still_live)`: at most one of
+/// the first two is `Some`. A missing or already-inert file is `(None, None,
+/// false)`; a file left alone while possibly live (unreadable, malformed or
+/// newer) carries the reason as a note with `still_live` true, as does a
+/// failed write or read-back — either way the caller must not report
+/// success, since automatic execution may still be on.
 fn neutralize_app_config(path: &Path) -> (Option<PathBuf>, Option<String>, bool) {
     let old = match read_text(path) {
         Ok(Some(text)) => text,
         Ok(None) => return (None, None, false),
-        Err(e) => return (None, Some(format!("{} can't be read: {e}", path.display())), false),
+        Err(e) => return (None, Some(format!("{} can't be read: {e}", path.display())), true),
     };
     let new = match inert_config_text(&old) {
         Ok(Some(text)) => text,
         Ok(None) => return (None, None, false),
-        Err(e) => return (None, Some(format!("{} left alone: {e}", path.display())), false),
+        Err(e) => return (None, Some(format!("{} left alone: {e}", path.display())), true),
     };
     let backup = backup_path(path);
     let result = craft_anything_platform::backup_once(path, &backup)

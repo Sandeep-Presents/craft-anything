@@ -339,7 +339,9 @@ fn uninstall_leaves_malformed_app_config_alone() {
     let broken = "auto_mode = [broken\n";
     let p = write_app_config(&fx, broken);
     let u = uninstall(&fx.host);
-    assert_eq!(u.status, "nothing_to_remove", "{u:?}");
+    // Still live, so the uninstall is honestly partial, not a success:
+    // exit code 1, and the note tells the user the config was left alone.
+    assert_eq!(u.status, "partial", "{u:?}");
     assert_eq!(u.neutralized_config, None);
     assert!(u.app_config_error.is_some(), "{u:?}");
     assert_eq!(read(&p), broken);
@@ -351,6 +353,8 @@ fn uninstall_skips_newer_version_app_config() {
     let newer = APP_CONFIG.replace("version = 3", "version = 99");
     let p = write_app_config(&fx, &newer);
     let u = uninstall(&fx.host);
+    // The config is live and was skipped, so this is partial too.
+    assert_eq!(u.status, "partial", "{u:?}");
     assert_eq!(u.neutralized_config, None);
     assert!(u.app_config_error.is_some(), "{u:?}");
     assert_eq!(read(&p), newer);
