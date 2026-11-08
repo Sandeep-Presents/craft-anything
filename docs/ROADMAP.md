@@ -563,6 +563,12 @@ been run live.
       on a helper thread and the wait checks the job's cancel, so Stop beside "Connecting to…"
       ends it at once (`AiHub::add_server_until`); the request given up on ends by its own limits
       — claimed: FuryNocturn, branch bugfix/r5.4-stop-adding-a-server
+- [ ] Say per AI whether its model sees pictures (`vision = auto | yes | no` in `[[ai.backends]]`,
+      `ai vision`), Auto asking the server: a model list's `input_modalities`, llama.cpp's `/props`
+      `modalities` (through llama-swap's upstream route for a loaded model), LM Studio's model
+      `type`, Ollama's `capabilities`; Claude reads pictures. Unknown is treated as blind. A
+      builder starts using it once pictures can be attached (the next step)
+      — claimed: youkaicountry, branch feature/r5.4-vision-setting
 
 ### R5.5 API-key builds fail in words people can use
 Owner: open · Status: todo
