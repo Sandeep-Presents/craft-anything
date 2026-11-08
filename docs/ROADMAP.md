@@ -476,6 +476,7 @@ been run live.
 - [ ] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
       window is 64k or more and the lean builder list (#417) below that; the memory steps in the
       system prompt follow the same choice. Today every local builder is lean, whatever its window
+      — claimed: youkaicountry, branch feature/r5.4-tool-list-per-ai (stacked on #1155)
 - [x] A builder that can't see pictures (the API loop) is told it can't, then sent to open
       screenshots with Read: the website capture lines and the `--screenshot` and reference-picture
       lines in `brief.rs`, the website check's "Open each pair", the reminder after each round, the
