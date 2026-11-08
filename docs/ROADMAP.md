@@ -503,7 +503,10 @@ been run live.
       parts (OpenAI-style) and `image` blocks (Anthropic), for the check's screenshots beside the
       original's, the pictures in `reference/` and a PNG the builder reads. Each AI's Pictures
       setting is Auto, On or Off; Auto follows what the server reports (Ollama's capabilities,
-      LM Studio's model type, `input_modalities` in a model list)
+      LM Studio's model type, `input_modalities` in a model list). The image block and the setting
+      are in; what's left is attaching the pictures to a builder whose model sees, and treating it
+      as sighted (`BriefCx::sees_pictures`), with the setting in Settings → AI
+      — claimed: youkaicountry, branch feature/r5.4-pictures-to-builders
 - [x] When a server refuses a request for its context window and says the size (Ollama, llama.cpp,
       OpenAI-style), fit the conversation to that window and ask once more, else say how to raise it (#962)
 - [x] Ollama fits a long prompt to its context by dropping the oldest messages, and a Qwen 3.8 model
@@ -585,8 +588,6 @@ been run live.
       so under Auto a model it hasn't loaded yet reads as blind for the whole conversation. One it
       has just started reads the same: llama-swap lists it as loaded while its server is still
       starting, and the server's `/props` didn't answer for about a minute (seen live, a 512k model)
-- [ ] The vision setting in Settings → AI (a dropdown beside "Tools for building", with what Auto
-      works out to), added with the attachment step so the choice does something when it lands
 
 ### R5.5 API-key builds fail in words people can use
 Owner: open · Status: todo
