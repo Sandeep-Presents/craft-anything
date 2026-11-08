@@ -27,8 +27,6 @@ pub const ENV_KEYS: &[&str] = &[
     "KIMI_CODE_HOME",
     "FACTORY_HOME_OVERRIDE",
     "ANTIGRAVITY_HOME",
-    // Our own settings dir; `Host::settings_path` mirrors `Settings::path()`.
-    "CRAFT_ANYTHING_CONFIG_DIR",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -55,13 +53,20 @@ pub struct Host {
     pub home: PathBuf,
     pub env: BTreeMap<String, String>,
     pub os: Os,
+    /// `CRAFT_ANYTHING_CONFIG_DIR` as the engine reads it (`var_os`): kept
+    /// apart from `env` because a path is not always valid UTF-8, and an
+    /// explicitly empty value means the working directory. `None` when the
+    /// variable is unset; `Host::settings_path` falls through then.
+    pub config_dir_override: Option<PathBuf>,
 }
 
 impl Host {
     /// The real machine: the user's home and only the config-related environment variables. On
     /// Windows the apps keep their settings in the user profile and ignore HOME, which a shell such
     /// as MSYS2 or Cygwin points elsewhere, so USERPROFILE comes first there.
-    /// An explicitly empty `CRAFT_ANYTHING_CONFIG_DIR` is kept; see `capture_env`.
+    /// `CRAFT_ANYTHING_CONFIG_DIR` is captured separately with `var_os`, exactly as the
+    /// engine reads it, so a non-UTF-8 path stays usable and an explicitly empty value
+    /// still means the working directory.
     pub fn current() -> Host {
         let (first, second) = if cfg!(windows) { ("USERPROFILE", "HOME") } else { ("HOME", "USERPROFILE") };
         let home = std::env::var_os(first)
@@ -70,23 +75,23 @@ impl Host {
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("."));
         let env = Self::capture_env(ENV_KEYS.iter().filter_map(|k| std::env::var(k).ok().map(|v| (*k, v))));
-        Host { home, env, os: Os::current() }
+        let config_dir_override = std::env::var_os("CRAFT_ANYTHING_CONFIG_DIR").map(PathBuf::from);
+        Host { home, env, os: Os::current(), config_dir_override }
     }
 
     /// The config-related environment variables for this host, from
-    /// `(key, value)` pairs. An explicitly empty `CRAFT_ANYTHING_CONFIG_DIR`
-    /// is kept: the engine treats it as the working directory, so dropping it
-    /// would make uninstall fix the platform config while the app uses
-    /// another one. Every other empty value is dropped, since for those keys
-    /// empty means unset. Kept as a pure function so the rule is testable
-    /// without touching the process environment.
+    /// `(key, value)` pairs. An empty value is dropped: for these keys empty
+    /// means unset. (`CRAFT_ANYTHING_CONFIG_DIR` is not one of them; it is
+    /// captured separately as `config_dir_override`, because an empty value
+    /// there means the working directory.) Kept as a pure function so the rule
+    /// is testable without touching the process environment.
     pub(crate) fn capture_env(pairs: impl Iterator<Item = (&'static str, String)>) -> BTreeMap<String, String> {
-        pairs.filter(|(k, v)| *k == "CRAFT_ANYTHING_CONFIG_DIR" || !v.is_empty()).map(|(k, v)| (k.to_string(), v)).collect()
+        pairs.filter(|(_, v)| !v.is_empty()).map(|(k, v)| (k.to_string(), v)).collect()
     }
 
     /// A host rooted at `home` with no environment overrides (tests).
     pub fn with_home(home: impl Into<PathBuf>) -> Host {
-        Host { home: home.into(), env: BTreeMap::new(), os: Os::current() }
+        Host { home: home.into(), env: BTreeMap::new(), os: Os::current(), config_dir_override: None }
     }
 
     pub fn var(&self, k: &str) -> Option<PathBuf> {
@@ -121,14 +126,15 @@ impl Host {
     /// Where the app's own `config.toml` lives: `CRAFT_ANYTHING_CONFIG_DIR`,
     /// then a portable `portable.txt` marker next to the executable, then the
     /// platform config dir — the same order as `Settings::path()` in the
-    /// engine, so uninstall neutralizes the file the app actually loads. An
-    /// explicitly empty `CRAFT_ANYTHING_CONFIG_DIR` is kept: the engine treats
-    /// it as the working directory, so the config there is the live one, not
-    /// the platform fallback. A host with no environment (tests) falls through
-    /// to the platform dir.
+    /// engine, so uninstall neutralizes the file the app actually loads. The
+    /// override is read from `config_dir_override`, captured with `var_os`:
+    /// a non-UTF-8 path stays usable, and an explicitly empty value means the
+    /// working directory, so the config there is the live one, not the
+    /// platform fallback. A host with no override (tests) falls through to the
+    /// platform dir.
     pub fn settings_path(&self) -> PathBuf {
-        if let Some(dir) = self.env.get("CRAFT_ANYTHING_CONFIG_DIR") {
-            return PathBuf::from(dir).join("config.toml");
+        if let Some(dir) = &self.config_dir_override {
+            return dir.join("config.toml");
         }
         if let Some(exe_dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()))
             && exe_dir.join("portable.txt").exists()

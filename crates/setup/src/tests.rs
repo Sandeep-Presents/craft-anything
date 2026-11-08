@@ -403,7 +403,7 @@ fn uninstall_neutralizes_config_dir_env_var_location() {
     let custom = fx.host.home.join("elsewhere");
     std::fs::create_dir_all(&custom).unwrap();
     let mut host = fx.host.clone();
-    host.env.insert("CRAFT_ANYTHING_CONFIG_DIR".into(), custom.display().to_string());
+    host.config_dir_override = Some(custom.clone());
     // A live config in the platform location must be left alone: the app
     // loads the env-var location instead.
     let platform = write_app_config(&fx, APP_CONFIG);
@@ -449,11 +449,11 @@ impl Drop for ChangeDir {
 }
 
 #[test]
-fn host_env_keeps_empty_config_dir_but_drops_other_empty_values() {
-    let env = Host::capture_env([("CRAFT_ANYTHING_CONFIG_DIR", String::new()), ("XDG_CONFIG_HOME", String::new()), ("APPDATA", "/x".to_string())].into_iter());
-    assert_eq!(env.get("CRAFT_ANYTHING_CONFIG_DIR"), Some(&String::new()));
+fn host_env_drops_empty_values() {
+    let env = Host::capture_env([("XDG_CONFIG_HOME", String::new()), ("APPDATA", String::new()), ("LOCALAPPDATA", "/x".to_string())].into_iter());
     assert!(!env.contains_key("XDG_CONFIG_HOME"));
-    assert_eq!(env.get("APPDATA"), Some(&"/x".to_string()));
+    assert!(!env.contains_key("APPDATA"));
+    assert_eq!(env.get("LOCALAPPDATA"), Some(&"/x".to_string()));
 }
 
 #[test]
@@ -469,7 +469,7 @@ fn uninstall_neutralizes_config_in_working_directory_when_config_dir_is_empty() 
     // A live platform config must be left alone: the app is not using it.
     let platform = write_app_config(&fx, APP_CONFIG);
     let mut host = fx.host.clone();
-    host.env.insert("CRAFT_ANYTHING_CONFIG_DIR".into(), String::new());
+    host.config_dir_override = Some(PathBuf::from(""));
     let u = {
         let _guard = change_dir(&cwd);
         uninstall(&host)
@@ -479,6 +479,36 @@ fn uninstall_neutralizes_config_in_working_directory_when_config_dir_is_empty() 
     assert_eq!(u.neutralized_pending_config.as_deref(), Some(Path::new("config.pending.toml")));
     assert!(read(cwd.join("config.toml")).contains("auto_mode = false"), "{}", read(cwd.join("config.toml")));
     let after_pending = read(cwd.join("config.pending.toml"));
+    assert!(after_pending.contains("auto_mode = false") && after_pending.contains("language = \"de\""), "{after_pending}");
+    assert_eq!(read(&platform), APP_CONFIG);
+}
+
+#[test]
+#[cfg(unix)]
+fn uninstall_neutralizes_non_utf8_config_dir() {
+    use std::os::unix::ffi::OsStringExt;
+    let fx = fixture();
+    // A config dir whose bytes are not valid UTF-8: the engine still reads it
+    // (`var_os`), so uninstall must neutralize it, not the platform config.
+    let non_utf8 = fx.host.home.join(std::ffi::OsString::from_vec(b"cfg\xffdir".to_vec()));
+    std::fs::create_dir_all(&non_utf8).unwrap();
+    let real = non_utf8.join("config.toml");
+    std::fs::write(&real, APP_CONFIG).unwrap();
+    let real_pending = non_utf8.join("config.pending.toml");
+    let pending = "version = 3\nlanguage = \"de\"\nauto_mode = true\n";
+    std::fs::write(&real_pending, pending).unwrap();
+    // A live platform config must be left alone: the app is not using it.
+    let platform = write_app_config(&fx, APP_CONFIG);
+    let mut host = fx.host.clone();
+    host.config_dir_override = Some(non_utf8.clone());
+    assert_eq!(host.settings_path(), real);
+    let u = uninstall(&host);
+    assert_eq!(u.status, "removed", "{u:?}");
+    assert_eq!(u.neutralized_config.as_deref(), Some(real.as_path()));
+    assert_eq!(u.neutralized_pending_config.as_deref(), Some(real_pending.as_path()));
+    let after = read(&real);
+    assert!(after.contains("auto_mode = false"), "{after}");
+    let after_pending = read(&real_pending);
     assert!(after_pending.contains("auto_mode = false") && after_pending.contains("language = \"de\""), "{after_pending}");
     assert_eq!(read(&platform), APP_CONFIG);
 }
