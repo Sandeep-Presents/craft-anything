@@ -140,6 +140,10 @@ pub fn message_json(m: &Msg) -> Value {
                 Block::ToolResult { tool_use_id, content, is_error } => {
                     json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content, "is_error": is_error})
                 }
+                Block::Image { name, data, .. } if data.is_empty() => json!({"type": "text", "text": Block::image_note(name)}),
+                Block::Image { media_type, data, .. } => {
+                    json!({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}})
+                }
             })
         })
         .collect();

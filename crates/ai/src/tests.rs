@@ -1454,6 +1454,87 @@ fn a_qwen_markup_call_to_a_missing_tool_is_answered_and_the_build_goes_on() {
 }
 
 #[test]
+fn a_picture_reaches_each_api_the_way_it_expects() {
+    use crate::model::{Block, Effort, Msg, Speaker, Stop, TurnRequest};
+    let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+    let data = "iVBORw0KGgoAAAANSUhEUg==";
+    let message = |picture: Block| Msg {
+        role: Speaker::User,
+        blocks: vec![Block::Text { text: "Here's how it looks now. ".into() }, picture, Block::Text { text: "Close the gap.".into() }],
+    };
+    let shown = message(Block::image("now.png", png).unwrap());
+    let resumed = message(Block::Image { media_type: "image/png".into(), name: "now.png".into(), data: String::new() });
+    let note = Block::image_note("now.png");
+
+    // OpenAI-style servers (llama.cpp, LM Studio, Ollama, OpenRouter): the content becomes parts.
+    for react in [false, true] {
+        let reply = chat_sse(&[json!({"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]})]);
+        let (url, seen) = mock(vec![(200, "text/event-stream", reply.clone()), (200, "text/event-stream", reply)]);
+        let mut model = openai::OpenAi::compatible("Local", &url, None, "scripted");
+        model.react = react;
+        for messages in [std::slice::from_ref(&shown), std::slice::from_ref(&resumed)] {
+            let request = TurnRequest { system: "S", messages, tools: &[], effort: Effort::Low, max_tokens: 100 };
+            model.turn(&request, &mut |_| {}, &Stop::default()).unwrap();
+        }
+        let seen = seen.lock().unwrap();
+        let sent = |i: usize| seen[i].body["messages"].as_array().unwrap().last().unwrap().clone();
+        assert_eq!(
+            sent(0),
+            json!({"role": "user", "content": [
+                {"type": "text", "text": "Here's how it looks now. "},
+                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{data}")}},
+                {"type": "text", "text": "Close the gap."},
+            ]}),
+            "react={react}"
+        );
+        // Once its bytes are gone, the note goes in its place, and the content is a string again.
+        assert_eq!(sent(1), json!({"role": "user", "content": format!("Here's how it looks now. {note}Close the gap.")}), "react={react}");
+    }
+
+    // Anthropic: an image block with a base64 source.
+    let reply = sse(&[
+        json!({"type":"message_start","message":{"model":"claude-opus-5-5","usage":{"input_tokens":10,"output_tokens":1}}}),
+        json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}),
+        json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Done."}}),
+        json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}),
+        json!({"type":"message_stop"}),
+    ]);
+    let (url, seen) = mock(vec![(200, "text/event-stream", reply.clone()), (200, "text/event-stream", reply)]);
+    let mut model = anthropic::Anthropic::new(Some(&url), "sk-test-123".into(), "claude-opus-5-5");
+    for messages in [std::slice::from_ref(&shown), std::slice::from_ref(&resumed)] {
+        let request = TurnRequest { system: "S", messages, tools: &[], effort: Effort::Low, max_tokens: 100 };
+        model.turn(&request, &mut |_| {}, &Stop::default()).unwrap();
+    }
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].body["messages"][0]["content"][1], json!({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}));
+    assert_eq!(seen[1].body["messages"][0]["content"][1], json!({"type": "text", "text": note}));
+}
+
+#[test]
+fn a_message_without_a_picture_is_sent_as_before() {
+    use crate::model::{Block, Msg, Speaker};
+    // Every request that has no picture keeps its plain-string content.
+    let user = Msg { role: Speaker::User, blocks: vec![Block::Text { text: "Hi".into() }] };
+    assert_eq!(openai::messages_json(&user, false), [json!({"role": "user", "content": "Hi"})]);
+    let results = Msg {
+        role: Speaker::User,
+        blocks: vec![Block::ToolResult { tool_use_id: "c1".into(), content: "ok".into(), is_error: false }, Block::Text { text: "Next.".into() }],
+    };
+    assert_eq!(
+        openai::messages_json(&results, false),
+        [json!({"role": "tool", "tool_call_id": "c1", "content": "ok"}), json!({"role": "user", "content": "Next."})]
+    );
+    // A picture after tool results goes in the person's message that follows them.
+    let mut with_picture = results.clone();
+    with_picture.blocks.push(Block::image("now.png", b"\x89PNG\r\n\x1a\n").unwrap());
+    let sent = openai::messages_json(&with_picture, false);
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[0]["role"], "tool");
+    assert_eq!(sent[1]["content"][0], json!({"type": "text", "text": "Next."}));
+    assert_eq!(sent[1]["content"][1]["type"], "image_url");
+}
+
+#[test]
 fn json_text_recovery_preserves_non_actions_and_stop_reasons() {
     use crate::model::{Effort, Msg, Stop, StopReason, ToolDef, TurnRequest};
     let tools = [ToolDef { name: "look".into(), description: "Look at a file".into(), schema: json!({"type":"object"}) }];
