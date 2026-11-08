@@ -420,17 +420,24 @@ pub struct UninstallReport {
     /// also covers making the app config inert; `nothing_to_remove` means
     /// nothing was removed and the app config was already inert or absent;
     /// `partial` means something was left live — a client entry that failed
-    /// to remove, or an app config that could not be made inert safely.
+    /// to remove, or an app config (or its pending sidecar) that could not
+    /// be made inert safely.
     pub status: &'static str,
     pub removed_entries: Vec<FileResult>,
     pub removed_skill_files: Vec<PathBuf>,
     /// The app's own `config.toml` when uninstall made it inert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neutralized_config: Option<PathBuf>,
-    /// Why the app's `config.toml` is still live: it was left alone because
-    /// it could not be made inert safely (unreadable, malformed or newer),
-    /// or the write/read-back failed. Absent when the file is missing or
-    /// already inert.
+    /// The deferred `config.pending.toml` sidecar when uninstall made it
+    /// inert. A shutdown may defer non-AI edits there; the next
+    /// `Settings::load()` merges them back into `config.toml`, so the sidecar
+    /// is neutralized in place too, keeping its other edits.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutralized_pending_config: Option<PathBuf>,
+    /// Why the app's `config.toml` (or its pending sidecar) is still live:
+    /// it was left alone because it could not be made inert safely
+    /// (unreadable, malformed or newer), or the write/read-back failed.
+    /// Absent when the file is missing or already inert.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app_config_error: Option<String>,
     /// Configs that stopped the uninstall (malformed or unreadable).
@@ -441,6 +448,9 @@ pub struct UninstallReport {
 /// Remove our registrations and skill files, and make the app's own config inert so the
 /// app stops executing tools on its own. If any client config can't be read safely,
 /// nothing at all is removed. A malformed or newer app config is left alone and reported.
+/// The settings path is the one the app actually loads (`Host::settings_path`),
+/// and a deferred `config.pending.toml` sidecar is neutralized in place too,
+/// keeping its unrelated edits.
 pub fn uninstall(host: &Host) -> UninstallReport {
     let all = clients(host);
     let mut blocking = Vec::new();
@@ -473,6 +483,7 @@ pub fn uninstall(host: &Host) -> UninstallReport {
             removed_entries: Vec::new(),
             removed_skill_files: Vec::new(),
             neutralized_config: None,
+            neutralized_pending_config: None,
             app_config_error: None,
             blocking,
             kept,
@@ -506,16 +517,27 @@ pub fn uninstall(host: &Host) -> UninstallReport {
     dirs.sort();
     dirs.dedup();
     let removed_skill_files: Vec<PathBuf> = dirs.iter().flat_map(|d| skill::uninstall(d)).collect();
-    let app_config = host.app_data().join("craft-anything").join("config.toml");
+    let app_config = host.settings_path();
     let (neutralized_config, app_config_error, app_config_live) = neutralize_app_config(&app_config);
-    let status = if partial || app_config_live {
+    // A busy shutdown defers non-AI edits to `config.pending.toml`, and the
+    // next `Settings::load()` merges them back into `config.toml` — so a
+    // sidecar with auto_mode on would undo the neutralization above. Make it
+    // inert in place too, keeping its unrelated edits; if it cannot be made
+    // safe, the uninstall is partial rather than a success.
+    let pending_path = app_config.with_extension("pending.toml");
+    let (neutralized_pending_config, pending_error, pending_live) = neutralize_app_config(&pending_path);
+    let app_config_error = match (app_config_error, pending_error) {
+        (Some(a), Some(b)) => Some(format!("{a}; {b}")),
+        (a, b) => a.or(b),
+    };
+    let status = if partial || app_config_live || pending_live {
         "partial"
-    } else if removed_entries.is_empty() && removed_skill_files.is_empty() && neutralized_config.is_none() {
+    } else if removed_entries.is_empty() && removed_skill_files.is_empty() && neutralized_config.is_none() && neutralized_pending_config.is_none() {
         "nothing_to_remove"
     } else {
         "removed"
     };
-    UninstallReport { status, removed_entries, removed_skill_files, neutralized_config, app_config_error, blocking, kept }
+    UninstallReport { status, removed_entries, removed_skill_files, neutralized_config, neutralized_pending_config, app_config_error, blocking, kept }
 }
 
 /// Make a `config.toml` text inert: `auto_mode = false` and every
@@ -528,12 +550,12 @@ pub fn uninstall(host: &Host) -> UninstallReport {
 fn inert_config_text(text: &str) -> Result<Option<String>, String> {
     let mut doc: toml_edit::DocumentMut = text.parse().map_err(|e| format!("not valid TOML: {e}"))?;
     // Same version rules as `Settings::read_settings`: missing means 0, a
-    // non-integer version is broken, a newer version is left alone.
+    // non-integer or negative version is broken, a newer version is left alone.
     let version = match doc.get("version") {
         None => 0,
-        Some(v) => v.as_integer().ok_or_else(|| format!("its version ({v}) isn't a whole number"))?,
+        Some(v) => v.as_integer().and_then(|n| u32::try_from(n).ok()).ok_or_else(|| format!("its version ({v}) isn't a whole number"))?,
     };
-    if version > i64::from(SETTINGS_VERSION) {
+    if version > SETTINGS_VERSION {
         return Err(format!("version {version} is newer than this build understands (max {SETTINGS_VERSION}); left alone"));
     }
     let mut changed = false;

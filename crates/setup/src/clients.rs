@@ -27,6 +27,8 @@ pub const ENV_KEYS: &[&str] = &[
     "KIMI_CODE_HOME",
     "FACTORY_HOME_OVERRIDE",
     "ANTIGRAVITY_HOME",
+    // Our own settings dir; `Host::settings_path` mirrors `Settings::path()`.
+    "CRAFT_ANYTHING_CONFIG_DIR",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -102,6 +104,23 @@ impl Host {
             Os::Macos => self.home.join("Library").join("Application Support"),
             Os::Linux => self.xdg_config(),
         }
+    }
+
+    /// Where the app's own `config.toml` lives: `CRAFT_ANYTHING_CONFIG_DIR`,
+    /// then a portable `portable.txt` marker next to the executable, then the
+    /// platform config dir — the same order as `Settings::path()` in the
+    /// engine, so uninstall neutralizes the file the app actually loads. A
+    /// host with no environment (tests) falls through to the platform dir.
+    pub fn settings_path(&self) -> PathBuf {
+        if let Some(dir) = self.env.get("CRAFT_ANYTHING_CONFIG_DIR").filter(|v| !v.is_empty()) {
+            return PathBuf::from(dir).join("config.toml");
+        }
+        if let Some(exe_dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            && exe_dir.join("portable.txt").exists()
+        {
+            return exe_dir.join("CraftAnythingData").join("config.toml");
+        }
+        self.app_data().join("craft-anything").join("config.toml")
     }
 
     /// The shared skills folder used by clients without their own.
