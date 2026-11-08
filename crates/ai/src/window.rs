@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(read("http://h/v1", "m", &f, true), None);
         // Not through its upstream route, and not as llama.cpp's `/props?model=` either: llama-swap
         // starts a model for that too (seen live), so only the list is read.
-        assert!(f.asked.borrow().iter().all(|u| u == "http://h/v1/models"), "{:?}", f.asked.borrow());
+        assert!(!f.asked.borrow().is_empty() && f.asked.borrow().iter().all(|u| u == "http://h/v1/models"), "{:?}", f.asked.borrow());
     }
 
     #[test]
