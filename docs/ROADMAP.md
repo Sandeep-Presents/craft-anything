@@ -1171,6 +1171,11 @@ room throughout: nothing is pulled off the device or decoded.
       AM/PM, day names and month names as one each, folds words that repeat straight after
       themselves, and is cut after that (a longer number moved the 80-byte cut). — claimed:
       rockmeister, branch feature/r2.12-clock-claims
+- [ ] The device check replays every mapped screen: it took the first 60 of a map's screens and
+      said nothing of the rest, so once a second study grew a TV player's map to 119, a round
+      built for screens s61 to s119 couldn't be scored at all ("98% over 60 screen(s)"). Replay
+      them all up to a cap far above a real map, and name any left out in the note and the
+      unknowns. — claimed: rockmeister, branch bugfix/r2.12-check-every-screen
 - [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
       round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
 - [ ] A gate that can't be checked says so where the person looks: on the first real run the test
