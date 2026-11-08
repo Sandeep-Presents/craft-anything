@@ -12,8 +12,14 @@ use std::path::PathBuf;
 
 /// Draws the Settings modal and the content for its selected tab.
 pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
+    let shown = egui::Id::new("settings-shown");
     if !app.state.settings_open {
+        ctx.data_mut(|d| d.remove::<bool>(shown));
         return;
+    }
+    if ctx.data(|d| d.get_temp::<bool>(shown)).is_none() {
+        ctx.data_mut(|d| d.insert_temp(shown, true));
+        crate::builders::forget_windowless(&mut app.server_windows);
     }
     let t = Tokens::get(ctx);
     let mut open = true;

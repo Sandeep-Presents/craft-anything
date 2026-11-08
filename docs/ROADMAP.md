@@ -469,6 +469,10 @@ been run live.
       turn. Keep 24k when the server says nothing, and a budget the person set stays the most.
       `context_tokens` is in Settings → AI and `ai context`
       — claimed: youkaicountry, branch feature/r5.4-server-context-window — PR #1155
+- [ ] Settings → AI and `ai context` don't ask a server reached over ssh (`ssh_host`) for its
+      window, so they show Auto as "its server doesn't say" while a build, which opens the
+      tunnel, may read a large window and use more. Ask through the tunnel, or say the window is
+      read when a build starts
 - [ ] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
       window is 64k or more and the lean builder list (#417) below that; the memory steps in the
       system prompt follow the same choice. Today every local builder is lean, whatever its window

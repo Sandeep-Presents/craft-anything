@@ -537,6 +537,12 @@ pub fn budget_label(n: u64) -> String {
     }
 }
 
+/// Forget each server answer that named no window, so Settings asks again: Ollama and LM Studio
+/// say it only once the model is loaded, which may have happened since. Asks still going stay.
+pub fn forget_windowless(windows: &mut std::collections::BTreeMap<String, (String, Option<Option<craft_anything_ai::ServerWindow>>)>) {
+    windows.retain(|_, (_, answer)| !matches!(answer, Some(None) | Some(Some(craft_anything_ai::ServerWindow { window: None, .. }))));
+}
+
 #[cfg(test)]
 mod context_budget_tests {
     use super::{budget_label, context_budget, token_count};
@@ -562,5 +568,19 @@ mod context_budget_tests {
         for bad in ["0", "-5", "12k", "1.5", "lots", "99999999999999999999999"] {
             assert_eq!(context_budget(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn opening_settings_forgets_only_the_answers_without_a_window() {
+        use craft_anything_ai::{ServerWindow, window::Window};
+        let known = ServerWindow { window: Some(Window { tokens: 524_288, source: "llama.cpp" }), local: true };
+        let unknown = ServerWindow { window: None, local: true };
+        let mut windows: std::collections::BTreeMap<String, (String, Option<Option<ServerWindow>>)> =
+            [("known", Some(Some(known))), ("unknown", Some(Some(unknown))), ("unreachable", Some(None)), ("asking", None)]
+                .into_iter()
+                .map(|(name, answer)| (name.to_string(), ("m".to_string(), answer)))
+                .collect();
+        super::forget_windowless(&mut windows);
+        assert_eq!(windows.keys().map(String::as_str).collect::<Vec<_>>(), ["asking", "known"]);
     }
 }
