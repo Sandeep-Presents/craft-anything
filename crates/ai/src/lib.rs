@@ -1224,20 +1224,29 @@ impl AiHub {
     /// every toolset is enabled, so it can look inside the original with all of them.
     /// `transcript`: where the conversation is kept, and resumed from when it's there in this
     /// mode. `deep` is the run's mode, given by the caller: a tool that starts a build holds the
-    /// session (#1102).
-    pub fn start_builder(&self, entry: &BackendEntry, beginner: bool, transcript: Option<PathBuf>, deep: bool) -> Result<ApiConversation, ToolError> {
+    /// session (#1102). `project` is the folder being built: a picture the builder opens there is
+    /// shown to a model that sees.
+    pub fn start_builder(
+        &self,
+        entry: &BackendEntry,
+        beginner: bool,
+        transcript: Option<PathBuf>,
+        deep: bool,
+        project: Option<PathBuf>,
+    ) -> Result<ApiConversation, ToolError> {
         use craft_anything_engine::Toolset;
         let toolsets = if deep { self.engine.registry().toolsets() } else { vec![Toolset::Core, Toolset::Build] };
-        self.start_loop(entry, beginner, transcript, deep, &toolsets, true)
+        self.start_loop(entry, beginner, transcript, deep, &toolsets, true, project)
     }
 
     /// Start the asset extractor: our agent loop with the Build tools and the game archive tools.
     pub fn start_extractor(&self, entry: &BackendEntry, beginner: bool, transcript: Option<PathBuf>) -> Result<ApiConversation, ToolError> {
         use craft_anything_engine::Toolset;
-        self.start_loop(entry, beginner, transcript, true, &[Toolset::Core, Toolset::Build, Toolset::Formats], false)
+        self.start_loop(entry, beginner, transcript, true, &[Toolset::Core, Toolset::Build, Toolset::Formats], false, None)
     }
 
     /// Start one loop with these toolsets, keeping its transcript and resuming it only in `deep`.
+    #[allow(clippy::too_many_arguments)]
     fn start_loop(
         &self,
         entry: &BackendEntry,
@@ -1246,6 +1255,7 @@ impl AiHub {
         deep: bool,
         toolsets: &[craft_anything_engine::Toolset],
         lean_for_local: bool,
+        project: Option<PathBuf>,
     ) -> Result<ApiConversation, ToolError> {
         let mut slot = self.build_model(entry)?;
         slot.max_turns = slot.max_turns.max(agent::BUILDER_MAX_TURNS);
@@ -1253,7 +1263,7 @@ impl AiHub {
         ApiConversation::start_with(
             host,
             vec![slot],
-            LoopConfig { beginner, prices: self.config().prices.clone(), transcript, deep, lean_for_local, ..LoopConfig::default() },
+            LoopConfig { beginner, prices: self.config().prices.clone(), transcript, deep, lean_for_local, project, ..LoopConfig::default() },
             toolsets.iter().copied().collect(),
         )
     }

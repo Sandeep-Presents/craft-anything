@@ -47,7 +47,7 @@ pub mod kinds;
 mod locate;
 pub mod notes;
 mod output;
-mod pictures;
+pub(crate) mod pictures;
 pub mod project;
 pub mod question;
 pub mod runs;
@@ -295,7 +295,7 @@ impl RebuildRun {
                 if !continuing && !ws.capture_dir().exists() {
                     let _ = std::fs::remove_file(ws.transcript_path());
                 }
-                Some(hub.start_builder(&entry, opts.beginner, Some(ws.transcript_path()), run_deep)?)
+                Some(hub.start_builder(&entry, opts.beginner, Some(ws.transcript_path()), run_deep, Some(ws.root.clone()))?)
             }
         };
         // A chosen extractor (an API backend, e.g. Kimi K3) takes a game's files out after a fresh
@@ -1568,7 +1568,7 @@ fn kept_session(ws: &Workspace) -> Option<String> {
 const API_BUILDER: &str = "Your tools: build_files_list, build_file_read, build_file_write and build_file_edit for the project's files (paths relative to the project folder, e.g. app/src/main.rs), and build_command_run for commands, which run in app/ (never start dev servers or watchers). Where the steps below mention Read, Write, Edit or Bash, use these. For the checklist step use build_checklist (the same shape as TodoWrite: todos with content, activeForm and status) and call it again as you go. Ask the person with core_person_ask only when a choice really changes the result. Other Craft Anything tools are available too; enable a toolset with enable_toolset when you need it. rebuild_check isn't available in this loop: Craft Anything checks your build after each turn instead.";
 
 /// Added to the API loop's note for a builder whose model sees pictures: they come attached.
-const SIGHTED_API_BUILDER: &str = " You can't open a picture with build_file_read, but you're shown the ones that matter, each after a line naming it: the person's pictures in reference/ and the original's screenshots in capture/ with this message, and after each check its pictures of your build beside the original's. Where the steps below say to open a picture with Read, look at the one shown under that name; you can't take or open new screenshots yourself.";
+const SIGHTED_API_BUILDER: &str = " You're shown the pictures that matter, each after a line naming it: the person's pictures in reference/ and the original's screenshots in capture/ with this message, and after each check its pictures of your build beside the original's. To look at another picture in the project, open it with build_file_read: it's shown after the result. Where the steps below say to open a picture with Read, use build_file_read, or look at the one already shown under that name.";
 
 /// Added to the API loop's note for a builder that can't look at pictures.
 const BLIND_BUILDER: &str = " You can't look at pictures: use capture/README.md, capture/capture.json and the evidence instead.";

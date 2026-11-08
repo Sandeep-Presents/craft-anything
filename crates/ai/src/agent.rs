@@ -276,12 +276,15 @@ pub struct LoopConfig {
     /// A builder conversation: it may be offered the tools for building rather than the whole Core
     /// set, as each backend's tool list says (see [`offers_lean`] and [`lean_for_local`]).
     pub lean_for_local: bool,
+    /// The project folder the build tools' paths are relative to: a picture a tool opens there
+    /// (`build_file_read`'s `picture`) is shown to a model that sees, after that step's results.
+    pub project: Option<std::path::PathBuf>,
 }
 
 impl Default for LoopConfig {
     /// Deep, so a conversation started without an explicit mode keeps the old, safe behavior.
     fn default() -> Self {
-        Self { beginner: false, prices: BTreeMap::new(), transcript: None, deep: true, context_tokens: 0, lean_for_local: false }
+        Self { beginner: false, prices: BTreeMap::new(), transcript: None, deep: true, context_tokens: 0, lean_for_local: false, project: None }
     }
 }
 
@@ -356,6 +359,8 @@ pub struct AgentLoop {
     /// Whether each backend's model sees pictures, by chain position, once worked out (see
     /// [`AgentLoop::sees_pictures`]).
     sights: BTreeMap<usize, bool>,
+    /// Pictures the tools opened in this step (project-relative), to show after its results.
+    opened: Vec<String>,
 }
 
 /// What the agent's worker is asked to do.
@@ -840,7 +845,35 @@ impl AgentLoop {
             self.emit(AgentEvent::ToolFinished { call_id: id.clone(), tool: name.clone(), ok, summary, evidence_id });
             out.push(Block::ToolResult { tool_use_id: id.clone(), content, is_error: !ok });
         }
+        let opened = std::mem::take(&mut self.opened);
+        if !opened.is_empty() {
+            self.show_opened(&mut out, &opened);
+        }
         out
+    }
+
+    /// After a step's tool results, the pictures its tools opened: each after a line naming it to
+    /// a model that sees (shrunk to fit, at most [`MAX_PICTURES`]), or a line saying it isn't shown.
+    fn show_opened(&mut self, out: &mut Vec<Block>, opened: &[String]) {
+        let sees = self.sees_pictures();
+        let note = |text: String| Block::Text { text: format!("{text}\n") };
+        let Some(root) = self.cfg.project.clone().filter(|_| sees) else {
+            let why = if sees { "pictures can't be shown here" } else { "this model isn't shown pictures" };
+            out.extend(opened.iter().map(|p| note(format!("[{p} is a picture, but {why}.]"))));
+            return;
+        };
+        let paths: Vec<std::path::PathBuf> = opened.iter().map(std::path::PathBuf::from).collect();
+        let (shown, skipped) = crate::rebuild::pictures::load(&root, paths.get(..MAX_PICTURES).unwrap_or(&paths));
+        for picture in shown {
+            if let Block::Image { name, .. } = &picture {
+                out.push(Block::Text { text: format!("Picture: {name}") });
+            }
+            out.push(picture);
+        }
+        out.extend(skipped.into_iter().map(|s| note(format!("[Couldn't show {s}.]"))));
+        if let Some(rest) = opened.get(MAX_PICTURES..).filter(|r| !r.is_empty()) {
+            out.push(note(format!("[Not shown: {} (at most {MAX_PICTURES} pictures a step); open them in the next.]", rest.join(", "))));
+        }
     }
 
     fn run_one(&mut self, call_id: &str, name: &str, input: Value) -> (String, bool, String, Option<String>) {
@@ -910,6 +943,11 @@ impl AgentLoop {
                         Some(false) => self.failed_builds = self.failed_builds.saturating_add(1),
                         None => {}
                     }
+                }
+                if let ToolOutput::Value(v) = &out
+                    && let Some(picture) = v.get("picture").and_then(Value::as_str)
+                {
+                    self.opened.push(picture.to_string());
                 }
                 let (text, summary, ev) = compact(&out);
                 (text, true, summary, ev)
@@ -1005,6 +1043,7 @@ impl ApiConversation {
             server_windows: BTreeMap::new(),
             read_windows: BTreeMap::new(),
             sights: BTreeMap::new(),
+            opened: Vec::new(),
         };
         let busy2 = busy.clone();
         std::thread::Builder::new()
@@ -1286,6 +1325,12 @@ pub(crate) mod tests {
                     json!({"command": "cargo build", "exit_code": 0, "succeeded": input.get("ok").and_then(Value::as_bool) == Some(true)}),
                 ));
             }
+            // As build_file_read answers for a picture: named by its typed `picture` field.
+            if id == "look"
+                && let Some(p) = input.get("picture").and_then(Value::as_str)
+            {
+                return Ok(ToolOutput::Value(json!({"path": p, "picture": p, "media_type": "image/png", "note": "It's a picture."})));
+            }
             if id == "look" && input.get("large").and_then(Value::as_bool) == Some(true) {
                 return Ok(ToolOutput::Value(json!({"content": "n".repeat(8000)})));
             }
@@ -1510,6 +1555,57 @@ pub(crate) mod tests {
             let sight: Vec<_> = journal.iter().filter(|(k, _)| k == "sight").collect();
             assert_eq!(sight.len(), 1, "{case}");
             assert_eq!(sight[0].1["sees"], sees, "{case}");
+        }
+    }
+
+    #[test]
+    fn a_picture_a_tool_opens_is_shown_after_its_result_to_a_model_that_sees() {
+        let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+        let project = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(project.path().join("app")).unwrap();
+        std::fs::write(project.path().join("app/shot.png"), png).unwrap();
+        for vision in [Vision::Yes, Vision::No] {
+            let host = Arc::new(FakeHost { calls: Mutex::default(), journal: Mutex::default() });
+            let seen = Arc::new(Mutex::new(Vec::new()));
+            let open = |id: &str, p: &str| Block::ToolUse { id: id.into(), name: "look".into(), input: json!({"picture": p}) };
+            let script = Scripted {
+                turns: VecDeque::from([
+                    turn(
+                        vec![open("a", "app/shot.png"), open("b", "app/gone.png"), Block::ToolUse { id: "c".into(), name: "look".into(), input: json!({}) }],
+                        StopReason::ToolUse,
+                    ),
+                    turn(vec![Block::Text { text: "done".into() }], StopReason::EndTurn),
+                ]),
+                seen: seen.clone(),
+            };
+            let slot = ModelSlot {
+                name: "Local".into(),
+                model: Box::new(script),
+                local: true,
+                effort: None,
+                max_turns: 5,
+                context_tokens: 0,
+                tools: Default::default(),
+                vision,
+            };
+            let cfg = LoopConfig { project: Some(project.path().to_path_buf()), ..LoopConfig::default() };
+            let mut c = ApiConversation::start(host, vec![slot], cfg).unwrap();
+            c.send("Look at your build.");
+            drain_until_done(&mut c, |_, _| {});
+            let seen = seen.lock().unwrap();
+            let after = &seen[1].last().unwrap().blocks;
+            // Every result first, then what the tools opened.
+            assert!(after.iter().take(3).all(|b| matches!(b, Block::ToolResult { .. })), "{vision:?}: {after:?}");
+            let rest = &after[3..];
+            let text: String = rest.iter().filter_map(|b| if let Block::Text { text } = b { Some(text.as_str()) } else { None }).collect();
+            if vision == Vision::Yes {
+                assert!(matches!(&rest[0], Block::Text { text } if text == "Picture: app/shot.png"), "{rest:?}");
+                assert!(matches!(&rest[1], Block::Image { name, .. } if name == "app/shot.png"), "{rest:?}");
+                assert!(text.contains("[Couldn't show app/gone.png ("), "{text}");
+            } else {
+                assert!(!rest.iter().any(|b| matches!(b, Block::Image { .. })), "{rest:?}");
+                assert!(text.contains("[app/shot.png is a picture, but this model isn't shown pictures.]"), "{text}");
+            }
         }
     }
 
@@ -1758,6 +1854,7 @@ pub(crate) mod tests {
             server_windows: BTreeMap::new(),
             read_windows: BTreeMap::new(),
             sights: BTreeMap::new(),
+            opened: Vec::new(),
         };
         let tools = [ToolDef { name: "look".into(), description: "x".repeat(4000), schema: json!({"type": "object"}) }];
 

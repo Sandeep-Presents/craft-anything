@@ -369,10 +369,10 @@ fn an_api_transcript_is_resumed_only_in_its_mode() {
     let path = dir.path().join("transcript.json");
     let history = vec![crate::model::Msg::user_text("a Deep conversation")];
     crate::context::save(&path, &history, true).unwrap();
-    assert!(h.start_builder(&entry, false, Some(path.clone()), true).unwrap().resumed(), "Deep continues a Deep transcript");
-    assert!(!h.start_builder(&entry, false, Some(path.clone()), false).unwrap().resumed(), "Clean room starts fresh");
+    assert!(h.start_builder(&entry, false, Some(path.clone()), true, None).unwrap().resumed(), "Deep continues a Deep transcript");
+    assert!(!h.start_builder(&entry, false, Some(path.clone()), false, None).unwrap().resumed(), "Clean room starts fresh");
     crate::context::save(&path, &history, false).unwrap();
-    assert!(!h.start_builder(&entry, false, Some(path), true).unwrap().resumed(), "Deep doesn't continue a Clean room transcript");
+    assert!(!h.start_builder(&entry, false, Some(path), true, None).unwrap().resumed(), "Deep doesn't continue a Clean room transcript");
 }
 
 /// Compare checks either position; enabled named and automatic chat choices still work.

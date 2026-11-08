@@ -62,17 +62,7 @@ pub const IMAGE_TOKENS: u64 = 1_600;
 
 /// The kind of picture `bytes` hold, read from their first bytes, or `None` for anything else.
 pub fn image_media_type(bytes: &[u8]) -> Option<&'static str> {
-    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-        Some("image/png")
-    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        Some("image/jpeg")
-    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
-        Some("image/gif")
-    } else if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP".as_slice()) {
-        Some("image/webp")
-    } else {
-        None
-    }
+    craft_anything_engine::tools::web_common::picture_media_type(bytes)
 }
 
 impl Block {

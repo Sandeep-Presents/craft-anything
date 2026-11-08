@@ -111,7 +111,7 @@ const MAX_SOURCE_BYTES: u64 = 64_000_000;
 /// says at what scale it's shown, so sizes
 /// read off it can be scaled back. Those that can't be shown (missing, not a picture, too large
 /// to read) come back with why, to be said.
-pub(super) fn load(root: &Path, paths: &[PathBuf]) -> (Vec<Block>, Vec<String>) {
+pub(crate) fn load(root: &Path, paths: &[PathBuf]) -> (Vec<Block>, Vec<String>) {
     load_within(root, paths, MAX_IMAGE_BYTES)
 }
 
