@@ -510,6 +510,7 @@ been run live.
       pictures, so it sees only what the run attaches (the original's with the first message, each
       check's after it), not a screenshot it takes of its own build mid-turn or one in reference/
       that went past the six a message carries
+      — claimed: youkaicountry, branch feature/r5.4-builder-opens-pictures
 - [ ] Show the pictures a person adds while a build runs (a note's pictures, a follow-up's) to an
       API builder whose model sees, with the message that tells it about them; it's shown only
       what reference/ and capture/ hold when a run starts, and each check's pictures
