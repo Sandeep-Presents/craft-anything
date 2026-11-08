@@ -1182,7 +1182,7 @@ room throughout: nothing is pulled off the device or decoded.
       point every other check, and a rise over the last check (0.5 points) reset the
       unchanged-turn count. Compare with the best of every earlier check of the same kind. —
       claimed: rockmeister, branch bugfix/r2.12-progress-beats-best
-- [ ] A map's screens can wait for a later round: a person building an app page by page studied
+- [x] A map's screens can wait for a later round: a person building an app page by page studied
       the pages of every round at once, and the check then scored all of them, so the pages left
       for later rounds held the score at 80% under a 90% bar, and every pass took twice as long.
       A state marked `"later"` in screens.json (with why) isn't replayed or counted until the mark

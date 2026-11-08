@@ -526,8 +526,7 @@ impl DeviceCheck {
         let states_dir = dir.join("states");
         std::fs::create_dir_all(&states_dir).map_err(|e| ToolError::io(states_dir.display(), e))?;
         let mut states = Vec::new();
-        let (kept, _) = replayed(screens);
-        for state in kept {
+        for state in replayed(screens).kept {
             cx.stop().check()?;
             let id = state.get("id").and_then(Value::as_str).unwrap_or("?").to_string();
             let name = state.get("name").and_then(Value::as_str).unwrap_or("").to_string();
@@ -713,11 +712,15 @@ impl Check for DeviceCheck {
         if crashed {
             note.push_str(&format!(" {package} crashed on the device: see the crash claim."));
         }
-        let (_, left_out) = replayed(&screens);
-        if left_out > 0 {
-            let past = format!("{left_out} mapped screen(s) past the first {MAX_REPLAYED} weren't replayed");
+        let replay = replayed(&screens);
+        if replay.left_out > 0 {
+            let past = format!("{} mapped screen(s) past the first {MAX_REPLAYED} weren't replayed", replay.left_out);
             note.push_str(&format!(" {past}."));
             unknowns.push(past);
+        }
+        // A person's choice, not something the check couldn't see: it goes in the note only.
+        if replay.later > 0 {
+            note.push_str(&format!(" {} mapped screen(s) marked \"later\" wait for their round and weren't replayed.", replay.later));
         }
         let mut gate = None;
         let mut gate_ok = true;
@@ -763,14 +766,25 @@ impl Check for DeviceCheck {
 /// reached 119), so this sits far above a real one; it only bounds a hostile screens.json.
 const MAX_REPLAYED: usize = 1000;
 
-/// The map's screens a pass replays (every one not skipped, up to [`MAX_REPLAYED`]) and how many
-/// were left out past that cap, for the note.
-fn replayed(screens: &Value) -> (Vec<&Value>, usize) {
-    let mut kept: Vec<&Value> =
-        screens.get("states").and_then(Value::as_array).into_iter().flatten().filter(|s| s.get("skipped").is_none_or(Value::is_null)).collect();
+/// The map's screens a pass replays, and how many it doesn't, for the note.
+struct Replayed<'a> {
+    /// Every screen neither skipped nor marked later, up to [`MAX_REPLAYED`].
+    kept: Vec<&'a Value>,
+    /// Past the cap.
+    left_out: usize,
+    /// Marked `"later"`: a person building page by page leaves a round's screens for that round,
+    /// so they neither hold the score under the bar nor take a pass's time before it.
+    later: usize,
+}
+
+fn replayed(screens: &Value) -> Replayed<'_> {
+    let unset = |s: &Value, field: &str| s.get(field).is_none_or(Value::is_null);
+    let mapped: Vec<&Value> = screens.get("states").and_then(Value::as_array).into_iter().flatten().filter(|s| unset(s, "skipped")).collect();
+    let later = mapped.iter().filter(|s| !unset(s, "later")).count();
+    let mut kept: Vec<&Value> = mapped.into_iter().filter(|s| unset(s, "later")).collect();
     let left_out = kept.len().saturating_sub(MAX_REPLAYED);
     kept.truncate(MAX_REPLAYED);
-    (kept, left_out)
+    Replayed { kept, left_out, later }
 }
 
 #[cfg(test)]
@@ -782,22 +796,39 @@ mod tests {
     fn every_mapped_screen_is_replayed_past_sixty() {
         let states: Vec<Value> = (1..=119).map(|i| json!({"id": format!("s{i:02}"), "skipped": if i == 7 { json!("exit") } else { Value::Null }})).collect();
         let map = json!({"states": states});
-        let (kept, left_out) = replayed(&map);
-        assert_eq!(kept.len(), 118);
-        assert_eq!(left_out, 0);
-        assert_eq!(kept.last().and_then(|s| s["id"].as_str()), Some("s119"));
-        assert!(kept.iter().all(|s| s["id"] != "s07"));
+        let r = replayed(&map);
+        assert_eq!(r.kept.len(), 118);
+        assert_eq!((r.left_out, r.later), (0, 0));
+        assert_eq!(r.kept.last().and_then(|s| s["id"].as_str()), Some("s119"));
+        assert!(r.kept.iter().all(|s| s["id"] != "s07"));
     }
 
     #[test]
     fn a_map_past_the_cap_says_how_many_were_left_out() {
         let states: Vec<Value> = (0..MAX_REPLAYED + 5).map(|i| json!({"id": format!("s{i}")})).collect();
         let map = json!({"states": states});
-        let (kept, left_out) = replayed(&map);
-        assert_eq!((kept.len(), left_out), (MAX_REPLAYED, 5));
+        let r = replayed(&map);
+        assert_eq!((r.kept.len(), r.left_out), (MAX_REPLAYED, 5));
         let odd = json!({"states": "not a list"});
-        assert_eq!(replayed(&odd).0.len(), 0);
-        assert_eq!(replayed(&Value::Null), (Vec::new(), 0));
+        assert_eq!(replayed(&odd).kept.len(), 0);
+        let none = replayed(&Value::Null);
+        assert_eq!((none.kept.len(), none.left_out, none.later), (0, 0, 0));
+    }
+
+    #[test]
+    fn screens_marked_later_wait_for_their_round() {
+        let map = json!({"states": [
+            {"id": "s01"},
+            {"id": "s02", "later": "the Appearance round"},
+            {"id": "s03", "later": null},
+            {"id": "s04", "later": "the Playback round", "skipped": "exit"},
+            {"id": "s05", "later": true},
+        ]});
+        let r = replayed(&map);
+        let ids: Vec<&str> = r.kept.iter().filter_map(|s| s["id"].as_str()).collect();
+        assert_eq!(ids, ["s01", "s03"], "a null mark is no mark");
+        assert_eq!(r.later, 2, "a skipped screen counts as skipped, not later");
+        assert_eq!(r.left_out, 0);
     }
 
     fn picture(w: u32, h: u32, f: &dyn Fn(u32, u32) -> [u8; 3]) -> Image {
