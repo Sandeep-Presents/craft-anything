@@ -514,6 +514,7 @@ been run live.
 - [ ] Show the pictures a person adds while a build runs (a note's pictures, a follow-up's) to an
       API builder whose model sees, with the message that tells it about them; it's shown only
       what reference/ and capture/ hold when a run starts, and each check's pictures
+      — claimed: youkaicountry, branch feature/r5.4-added-pictures
 - [x] When a server refuses a request for its context window and says the size (Ollama, llama.cpp,
       OpenAI-style), fit the conversation to that window and ask once more, else say how to raise it (#962)
 - [x] Ollama fits a long prompt to its context by dropping the oldest messages, and a Qwen 3.8 model
