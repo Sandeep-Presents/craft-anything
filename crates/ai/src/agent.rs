@@ -353,9 +353,11 @@ pub struct AgentLoop {
     /// What each backend's server said its window is when asked ahead of time, by chain position:
     /// how many times it was asked and the window it named (see [`AgentLoop::ask_window`]).
     read_windows: BTreeMap<usize, (u8, Option<u64>)>,
-    /// Whether each backend's model sees pictures, by chain position, once worked out (see
+    /// Whether each backend's model sees pictures, by chain position, once worked out, and whether
+    /// that's settled: an answer from the setting or the server is; Auto with nothing from the
+    /// server isn't, and is asked again after the model's next reply (see
     /// [`AgentLoop::sees_pictures`]).
-    sights: BTreeMap<usize, bool>,
+    sights: BTreeMap<usize, (bool, bool)>,
 }
 
 /// What the agent's worker is asked to do.
@@ -455,14 +457,14 @@ impl AgentLoop {
     /// Whether the current backend's model is shown pictures: its setting, and under Auto what
     /// its server says (asked once, then kept). Journaled as `sight` the first time.
     fn sees_pictures(&mut self) -> bool {
-        if let Some(sees) = self.sights.get(&self.current) {
+        if let Some((sees, _)) = self.sights.get(&self.current) {
             return *sees;
         }
         let Some(slot) = self.chain.get(self.current) else { return false };
         let read = if slot.vision == Vision::Auto { slot.model.sees_pictures() } else { None };
         let sees = crate::sight::sees(slot.vision, read);
         self.host.journal("sight", json!({"backend": slot.name, "sees": sees, "vision": slot.vision.as_str(), "source": read.map(|r| r.source)}));
-        self.sights.insert(self.current, sees);
+        self.sights.insert(self.current, (sees, slot.vision != Vision::Auto || read.is_some()));
         sees
     }
 
@@ -524,6 +526,9 @@ impl AgentLoop {
             let tools = self.tool_defs();
             let system = self.system.clone().unwrap_or_default();
             let Some(result) = self.one_turn(&system, &tools, effort, &mut msg_usage, &mut msg_cost) else { break };
+            // The model answered, so its server has it running now: one that said nothing about
+            // pictures before (llama-swap answers only for a model it has started) is asked again.
+            self.sights.retain(|_, (_, settled)| *settled);
             self.last_input = result.usage.input_tokens + result.usage.cache_read_tokens + result.usage.cache_write_tokens;
             self.last_history_estimate = context::estimate_tokens(&self.history).max(1);
             let (slot_name, local, model_id) = match self.chain.get(self.current) {
@@ -1039,17 +1044,6 @@ impl ApiConversation {
         self.resumed
     }
 
-    /// Whether the model is shown pictures attached to a message: its setting, and under Auto
-    /// what its server says. Waits for the worker (at most [`SIGHT_WAIT`]), so call it from a
-    /// worker of your own, never the UI thread; no answer is a no.
-    pub fn sees_pictures(&self) -> bool {
-        let (tx, rx) = std::sync::mpsc::channel();
-        if self.to_worker.send(Job::Sight(tx)).is_err() {
-            return false;
-        }
-        rx.recv_timeout(SIGHT_WAIT).unwrap_or(false)
-    }
-
     fn submit(&mut self, text: Option<String>) {
         *self.failure.lock().unwrap_or_else(PoisonError::into_inner) = None;
         self.busy.store(true, Ordering::SeqCst);
@@ -1076,6 +1070,17 @@ impl Conversation for ApiConversation {
 
     fn attach(&mut self, pictures: Vec<Block>) {
         self.pictures.extend(pictures);
+    }
+
+    /// Its setting, and under Auto what its server says; an Auto answer the server didn't give
+    /// is asked again after the model's next reply. Waits for the worker (at most
+    /// [`SIGHT_WAIT`]); no answer is a no.
+    fn sees_pictures(&self) -> bool {
+        let (tx, rx) = std::sync::mpsc::channel();
+        if self.to_worker.send(Job::Sight(tx)).is_err() {
+            return false;
+        }
+        rx.recv_timeout(SIGHT_WAIT).unwrap_or(false)
     }
 
     fn last_failure(&self) -> Option<TurnFailure> {
@@ -1511,6 +1516,71 @@ pub(crate) mod tests {
             assert_eq!(sight.len(), 1, "{case}");
             assert_eq!(sight[0].1["sees"], sees, "{case}");
         }
+    }
+
+    /// A model whose server says nothing about pictures until the model has answered once (as
+    /// llama-swap does for a model it hadn't started), then that it sees, if `wakes`.
+    pub struct Waking {
+        pub script: Scripted,
+        pub wakes: bool,
+        pub asked: Arc<std::sync::atomic::AtomicU32>,
+    }
+
+    impl ChatModel for Waking {
+        fn turn(&mut self, req: &TurnRequest<'_>, on_delta: &mut dyn FnMut(Delta), stop: &Stop) -> Result<TurnResult, ToolError> {
+            self.script.turn(req, on_delta, stop)
+        }
+        fn model(&self) -> String {
+            self.script.model()
+        }
+        fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+            self.asked.fetch_add(1, Ordering::SeqCst);
+            let started = !self.script.seen.lock().unwrap().is_empty();
+            (started && self.wakes).then_some(crate::sight::Sight { sees: true, source: "test" })
+        }
+    }
+
+    #[test]
+    fn a_model_its_server_said_nothing_about_is_asked_again_after_it_replies() {
+        let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+        let name = "checks/round-1/screenshot.png";
+        let host = Arc::new(FakeHost { calls: Mutex::default(), journal: Mutex::default() });
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let asked = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let done = || turn(vec![Block::Text { text: "done".into() }], StopReason::EndTurn);
+        let model = Waking { script: Scripted { turns: VecDeque::from([done(), done(), done()]), seen: seen.clone() }, wakes: true, asked: asked.clone() };
+        let slot = ModelSlot {
+            name: "Local".into(),
+            model: Box::new(model),
+            local: true,
+            effort: None,
+            max_turns: 5,
+            context_tokens: 0,
+            tools: Default::default(),
+            vision: Vision::Auto,
+        };
+        let mut c = ApiConversation::start(host.clone(), vec![slot], LoopConfig::default()).unwrap();
+        // Before the model has run, its server says nothing: blind, and asked only once.
+        assert!(!c.sees_pictures());
+        assert!(!c.sees_pictures());
+        assert_eq!(asked.load(Ordering::SeqCst), 1, "an answer is kept until the model replies");
+        c.send("Build it.");
+        drain_until_done(&mut c, |_, _| {});
+        // Now it's running, the server says it sees, and the next pictures are shown.
+        assert!(c.sees_pictures());
+        c.attach(vec![Block::image(name, png).unwrap()]);
+        c.send("Here's your build.");
+        drain_until_done(&mut c, |_, _| {});
+        let shown = seen.lock().unwrap()[1].last().unwrap().blocks.clone();
+        assert!(shown.iter().any(|b| matches!(b, Block::Image { .. })), "{shown:?}");
+        // A settled answer isn't asked again after later replies.
+        c.send("Once more.");
+        drain_until_done(&mut c, |_, _| {});
+        assert!(c.sees_pictures());
+        assert_eq!(asked.load(Ordering::SeqCst), 2);
+        let journal = host.journal.lock().unwrap();
+        let sight: Vec<_> = journal.iter().filter(|(k, _)| k == "sight").map(|(_, v)| v["sees"].clone()).collect();
+        assert_eq!(sight, [json!(false), json!(true)]);
     }
 
     #[test]

@@ -406,6 +406,12 @@ pub trait Conversation: Send {
     fn attach(&mut self, pictures: Vec<model::Block>) {
         let _ = pictures;
     }
+    /// Whether pictures attached to a message are shown to the model. An agent app opens
+    /// pictures with its own tools, so it counts as seeing. May wait on the conversation's
+    /// worker: call it from a worker of your own, never the UI thread.
+    fn sees_pictures(&self) -> bool {
+        true
+    }
     /// Retry an interrupted turn. Stateless adapters resend `text`; a conversation that keeps
     /// its own history can continue it without appending the user's message again.
     fn retry(&mut self, text: &str) {

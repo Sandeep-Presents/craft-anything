@@ -2381,6 +2381,68 @@ mod picking_up_a_build {
         assert_eq!(names, ["capture/screenshot-1280.png", "checks/round-1/screenshot-1280.png"]);
     }
 
+    /// llama-swap answers whether a model sees only once it has started it, so a build on Auto
+    /// can begin blind with a model that sees.
+    #[test]
+    fn an_api_builder_that_started_blind_is_shown_pictures_once_its_server_says_it_sees() {
+        use crate::agent::tests::{Scripted, Waking, turn};
+        use crate::agent::{ApiConversation, EngineHost, LoopConfig, ModelSlot};
+        use crate::model::{Block, Msg, StopReason};
+        let pictures =
+            |m: &Msg| -> Vec<String> { m.blocks.iter().filter_map(|b| if let Block::Image { name, .. } = b { Some(name.clone()) } else { None }).collect() };
+        for wakes in [true, false] {
+            let b = bench();
+            let mut ws = worked_on(&b);
+            std::fs::write(ws.capture_dir().join("screenshot-1280.png"), PNG).unwrap();
+            let seen = Arc::default();
+            // The refinement changes app/, so the next check looks again (a round that worked stands
+            // while nothing it looks at changes).
+            let done = || turn(vec![Block::Text { text: "Done.".into() }], StopReason::EndTurn);
+            let write =
+                Block::ToolUse { id: "w".into(), name: "build_file_write".into(), input: serde_json::json!({"path": "app/index.html", "content": "Closer"}) };
+            let script =
+                Scripted { turns: std::collections::VecDeque::from([done(), turn(vec![write], StopReason::ToolUse), done()]), seen: Arc::clone(&seen) };
+            let model = Waking { script, wakes, asked: Arc::default() };
+            let mut worker = check_worker(&ws, false);
+            let slot = ModelSlot {
+                name: "Scripted".into(),
+                model: Box::new(model),
+                local: true,
+                effort: None,
+                max_turns: 10,
+                context_tokens: 0,
+                tools: Default::default(),
+                vision: crate::Vision::Auto,
+            };
+            let build = std::collections::BTreeSet::from([craft_anything_engine::Toolset::Core, craft_anything_engine::Toolset::Build]);
+            let api = ApiConversation::start_with(Arc::new(EngineHost(worker.engine.clone())), vec![slot], LoopConfig::default(), build).unwrap();
+            let entry = crate::BackendEntry {
+                config: crate::BackendConfig {
+                    name: "Scripted".into(),
+                    kind: BackendKind::OpenaiCompatible,
+                    model: "scripted".into(),
+                    base_url: None,
+                    ssh_host: None,
+                    enabled: true,
+                },
+                options: Default::default(),
+            };
+            let mut opts = RunOptions::default();
+            opts.kinds.register(Arc::new(PicturedKind));
+            worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory::default(), &opts).unwrap();
+            let seen = seen.lock().unwrap();
+            assert_eq!(seen.len(), 3, "{wakes}: a build turn, then one refinement that writes a file and answers");
+            let (first, refined) = (seen[0].last().unwrap(), seen[1].last().unwrap());
+            assert!(pictures(first).is_empty() && first.text().contains(BLIND_BUILDER.trim()), "{}", first.text());
+            if wakes {
+                assert_eq!(pictures(refined), ["capture/screenshot-1280.png", "checks/round-1/screenshot-1280.png"]);
+                assert!(refined.text().starts_with(NOW_SIGHTED.trim()), "{}", refined.text());
+            } else {
+                assert!(pictures(refined).is_empty() && !refined.text().contains(NOW_SIGHTED.trim()), "{}", refined.text());
+            }
+        }
+    }
+
     #[test]
     fn new_notes_during_a_turn_or_check_get_their_own_attempt_but_empty_notes_do_not() {
         use crate::agent::tests::{Scripted, turn};

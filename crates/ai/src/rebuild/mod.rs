@@ -865,11 +865,6 @@ impl Worker {
         // A coding agent resumes its own session; our loop resumes its kept transcript.
         let resumable = api.as_ref().is_none_or(crate::agent::ApiConversation::resumed);
         let api_loop = api.is_some();
-        // Agent apps open pictures with their Read tool. In the API loop the model is shown them
-        // attached to its messages when it sees (its vision setting, or what its server says);
-        // one that doesn't is told what to use instead.
-        let sees_pictures = api.as_ref().is_none_or(crate::agent::ApiConversation::sees_pictures);
-        let attaches = api_loop && sees_pictures;
         // A session another coding agent saved can't be continued by this one (#469).
         if !api_loop && ws.manifest.agent_session_by.as_deref() != Some(entry.config.model.as_str()) {
             ws.manifest.agent_session = ws.manifest.agent_session_for(&entry.config.model).map(str::to_string);
@@ -898,6 +893,11 @@ impl Worker {
             Some(a) => Box::new(a),
             None => crate::cli_agents::builder_conversation(spec, self.approver(ws)),
         };
+        // Agent apps open pictures with their Read tool. In the API loop the model is shown them
+        // attached to its messages when it sees (its vision setting, or what its server says);
+        // one that doesn't is told what to use instead.
+        let mut sees_pictures = agent.sees_pictures();
+        let mut attaches = api_loop && sees_pictures;
         // The builder's tool server is started in this run's mode (`--deep` or `--clean-room`).
         let s = self.engine.session();
         let ghidra = s.settings.ghidra_launcher().is_some();
@@ -1086,8 +1086,19 @@ impl Worker {
             refinements += 1;
             // Nothing written yet: a fix for a build that doesn't exist sends the builder looking for one.
             // It is asked to write the project and to show its build output (#736).
+            // A model its server said nothing about when the build started (llama-swap answers
+            // only for one it's running) is asked again now it has replied, and is shown the
+            // pictures from here on if it sees.
+            let now_sees = api_loop && !sees_pictures && agent.sees_pictures();
+            if now_sees {
+                (sees_pictures, attaches) = (true, true);
+                self.emit(RunEvent::Agent(AgentEvent::Status { text: "The builder's model sees pictures after all: it's shown them from now on.".into() }));
+            }
             let refined = if app_is_empty(ws) { NO_PROJECT_PROMPT.to_string() } else { kind.refine(check, sees_pictures) };
             prompt = refined + &pictures_reminder(ws, sees_pictures);
+            if now_sees {
+                prompt.insert_str(0, NOW_SIGHTED);
+            }
             if attaches {
                 let root = ws.root.clone();
                 self.show_pictures(agent.as_mut(), ws, pictures::for_check(&checks, opts.good_enough, crate::agent::MAX_PICTURES, |p| root.join(p).is_file()));
@@ -1569,6 +1580,9 @@ const API_BUILDER: &str = "Your tools: build_files_list, build_file_read, build_
 
 /// Added to the API loop's note for a builder whose model sees pictures: they come attached.
 const SIGHTED_API_BUILDER: &str = " You can't open a picture with build_file_read, but you're shown the ones that matter, each after a line naming it: the person's pictures in reference/ and the original's screenshots in capture/ with this message, and after each check its pictures of your build beside the original's. Where the steps below say to open a picture with Read, look at the one shown under that name; you can't take or open new screenshots yourself.";
+
+/// Told to an API builder that started blind when its server says it sees after all.
+const NOW_SIGHTED: &str = "Your model's server now says it sees pictures (it hadn't started the model when this build began), so from here on you're shown them, each after a line naming it: with this message the check's pictures of your build, each after the original's picture of the same page and width, and the same after each check. Where the steps below say to open a picture with Read, look at the one shown under that name; you can't open or take new ones yourself.\n\n";
 
 /// Added to the API loop's note for a builder that can't look at pictures.
 const BLIND_BUILDER: &str = " You can't look at pictures: use capture/README.md, capture/capture.json and the evidence instead.";
