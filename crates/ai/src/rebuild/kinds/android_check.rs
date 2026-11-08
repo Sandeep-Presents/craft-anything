@@ -507,7 +507,7 @@ impl DeviceCheck {
         })
     }
 
-    /// One pass on one device: install, every kept screen, the crash log. `dir` is this pass's
+    /// One pass on one device: install, every replayed screen (see [`replayed`]), the crash log. `dir` is this pass's
     /// folder; returns the states, whether it crashed, and the installed APK.
     fn pass(cx: &mut CheckCx, serial: &str, package: &str, apk: &Path, screens: &Value, dir: &Path) -> Result<(Vec<StateScore>, bool), ToolError> {
         let build = cx.build_settings();
@@ -526,7 +526,7 @@ impl DeviceCheck {
         let states_dir = dir.join("states");
         std::fs::create_dir_all(&states_dir).map_err(|e| ToolError::io(states_dir.display(), e))?;
         let mut states = Vec::new();
-        let kept = screens.get("states").and_then(Value::as_array).into_iter().flatten().filter(|s| s.get("skipped").is_none_or(Value::is_null)).take(60);
+        let (kept, _) = replayed(screens);
         for state in kept {
             cx.stop().check()?;
             let id = state.get("id").and_then(Value::as_str).unwrap_or("?").to_string();
@@ -713,6 +713,12 @@ impl Check for DeviceCheck {
         if crashed {
             note.push_str(&format!(" {package} crashed on the device: see the crash claim."));
         }
+        let (_, left_out) = replayed(&screens);
+        if left_out > 0 {
+            let past = format!("{left_out} mapped screen(s) past the first {MAX_REPLAYED} weren't replayed");
+            note.push_str(&format!(" {past}."));
+            unknowns.push(past);
+        }
         let mut gate = None;
         let mut gate_ok = true;
         if let Some((gs, gstates, gcrashed)) = gate_pass {
@@ -753,10 +759,46 @@ impl Check for DeviceCheck {
     }
 }
 
+/// The most mapped screens a pass replays. A map is studied in parts and merged (a TV player's
+/// reached 119), so this sits far above a real one; it only bounds a hostile screens.json.
+const MAX_REPLAYED: usize = 1000;
+
+/// The map's screens a pass replays (every one not skipped, up to [`MAX_REPLAYED`]) and how many
+/// were left out past that cap, for the note.
+fn replayed(screens: &Value) -> (Vec<&Value>, usize) {
+    let mut kept: Vec<&Value> =
+        screens.get("states").and_then(Value::as_array).into_iter().flatten().filter(|s| s.get("skipped").is_none_or(Value::is_null)).collect();
+    let left_out = kept.len().saturating_sub(MAX_REPLAYED);
+    kept.truncate(MAX_REPLAYED);
+    (kept, left_out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use craft_anything_engine::tools::web_common::encode_png;
+
+    #[test]
+    fn every_mapped_screen_is_replayed_past_sixty() {
+        let states: Vec<Value> = (1..=119).map(|i| json!({"id": format!("s{i:02}"), "skipped": if i == 7 { json!("exit") } else { Value::Null }})).collect();
+        let map = json!({"states": states});
+        let (kept, left_out) = replayed(&map);
+        assert_eq!(kept.len(), 118);
+        assert_eq!(left_out, 0);
+        assert_eq!(kept.last().and_then(|s| s["id"].as_str()), Some("s119"));
+        assert!(kept.iter().all(|s| s["id"] != "s07"));
+    }
+
+    #[test]
+    fn a_map_past_the_cap_says_how_many_were_left_out() {
+        let states: Vec<Value> = (0..MAX_REPLAYED + 5).map(|i| json!({"id": format!("s{i}")})).collect();
+        let map = json!({"states": states});
+        let (kept, left_out) = replayed(&map);
+        assert_eq!((kept.len(), left_out), (MAX_REPLAYED, 5));
+        let odd = json!({"states": "not a list"});
+        assert_eq!(replayed(&odd).0.len(), 0);
+        assert_eq!(replayed(&Value::Null), (Vec::new(), 0));
+    }
 
     fn picture(w: u32, h: u32, f: &dyn Fn(u32, u32) -> [u8; 3]) -> Image {
         let mut rgba = Vec::new();
