@@ -776,6 +776,13 @@ own budget was compared with it, so a 390k budget on a service with a 1M window 
 the loop, the Settings note and `ai context` alike (found in review of #1155). Apply a default's
 limit only on the path where no value was set, and test a set value above that limit.
 
+**A question that started what it asked about.** The window probe skipped llama-swap's upstream
+route for an unloaded model, but went on to llama.cpp's `/props?model=…` on the same server, and
+llama-swap starts a model for that too: asking about a model with no window in the list unloaded
+the one in use and loaded the other (seen live; the test had only checked that the upstream route
+wasn't asked). Once a server is known to start models on request, ask it nothing but its list
+about one that isn't loaded, and test the whole list of URLs asked, not one of them.
+
 **One field, two meanings.** `TurnDone`'s `input_tokens` included cached tokens from every coding agent but not
 from the built-in loop, which keeps them apart as Anthropic reports them. Once Ollama 0.40 reported its cache, a
 local build's `usage.json` said 5,323 input tokens for 75,014. When several producers fill one field, say on the

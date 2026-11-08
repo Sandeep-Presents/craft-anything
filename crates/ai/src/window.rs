@@ -79,10 +79,17 @@ pub fn read_window(server: &Server<'_>, fetch: &dyn Fetch, probes: &[Box<dyn Win
     probes.iter().find_map(|p| p.window(server, fetch).filter(|n| (MIN_WINDOW..=MAX_WINDOW).contains(n)).map(|tokens| Window { tokens, source: p.source() }))
 }
 
+/// Ask with the built-in probes. A model llama-swap lists but hasn't loaded is asked about only
+/// through the list: llama-swap starts a model for almost any request naming it (`/props?model=`
+/// too), unloading the one in use.
+pub fn ask(server: &Server<'_>, fetch: &dyn Fetch, on_this_network: bool) -> Option<Window> {
+    read_window(server, fetch, &probes(on_this_network && !would_start_it(server, fetch)))
+}
+
 /// Ask the server with `headers` (its key, when it has one). Each address is asked once.
 pub fn read_from_server(server: &Server<'_>, headers: &[(&'static str, String)], on_this_network: bool) -> Option<Window> {
     let fetch = HttpFetch { agent: crate::http::quick_agent(ASK_TIMEOUT), headers, seen: RefCell::new(BTreeMap::new()) };
-    read_window(server, &fetch, &probes(on_this_network))
+    ask(server, &fetch, on_this_network)
 }
 
 struct HttpFetch<'a> {
@@ -130,20 +137,7 @@ impl WindowProbe for LlamaSwap {
         "llama-swap"
     }
     fn window(&self, server: &Server<'_>, fetch: &dyn Fetch) -> Option<u64> {
-        let m = server.listed(fetch)?;
-        let swap = m.get("meta")?.get("llamaswap")?;
-        // An alias is served by the model it names.
-        let id = swap.get("modelID").and_then(Value::as_str).unwrap_or(server.model);
-        if id != server.model {
-            let list = fetch.get(&format!("{}/models", server.base.trim_end_matches('/')))?;
-            let entries = list.get("data").and_then(Value::as_array)?;
-            let target = entries.iter().find(|e| e.get("id").and_then(Value::as_str) == Some(id))?;
-            if !loaded(target) {
-                return None;
-            }
-        } else if !loaded(&m) {
-            return None;
-        }
+        let id = loaded_swap_model(server, fetch)?;
         let upstream = format!("{}/upstream/{id}", server.root());
         let props = fetch.get(&format!("{upstream}/props"));
         props.as_ref().and_then(props_window).or_else(|| {
@@ -151,6 +145,32 @@ impl WindowProbe for LlamaSwap {
             inner.get("data")?.as_array()?.iter().find_map(|e| number(e, &["meta", "n_ctx"]))
         })
     }
+}
+
+/// The model llama-swap serves `server.model` with (an alias is served by the model it names),
+/// when its list says that one is loaded; `None` for any other server, or an unloaded model.
+pub(crate) fn loaded_swap_model(server: &Server<'_>, fetch: &dyn Fetch) -> Option<String> {
+    let m = server.listed(fetch)?;
+    let swap = m.get("meta")?.get("llamaswap")?;
+    let id = swap.get("modelID").and_then(Value::as_str).unwrap_or(server.model);
+    if id != server.model {
+        let list = fetch.get(&format!("{}/models", server.base.trim_end_matches('/')))?;
+        let entries = list.get("data").and_then(Value::as_array)?;
+        let target = entries.iter().find(|e| e.get("id").and_then(Value::as_str) == Some(id))?;
+        if !loaded(target) {
+            return None;
+        }
+    } else if !loaded(&m) {
+        return None;
+    }
+    Some(id.to_string())
+}
+
+/// Whether llama-swap lists the model but hasn't loaded it, so asking its server anything about
+/// the model would start it.
+pub(crate) fn would_start_it(server: &Server<'_>, fetch: &dyn Fetch) -> bool {
+    let is_swaps = server.listed(fetch).is_some_and(|m| m.get("meta").and_then(|meta| meta.get("llamaswap")).is_some());
+    is_swaps && loaded_swap_model(server, fetch).is_none()
 }
 
 fn loaded(entry: &Value) -> bool {
@@ -242,7 +262,7 @@ mod tests {
     }
 
     fn read(base: &str, model: &str, fetch: &Canned, local: bool) -> Option<Window> {
-        read_window(&Server { base, model }, fetch, &probes(local))
+        ask(&Server { base, model }, fetch, local)
     }
 
     #[test]
@@ -306,7 +326,9 @@ mod tests {
     fn an_unloaded_llama_swap_model_is_not_started_by_asking() {
         let f = Canned::new(&[("http://h/v1/models", json!({"data": [{"id": "m", "meta": {"llamaswap": {}}, "status": {"value": "unloaded"}}]}))]);
         assert_eq!(read("http://h/v1", "m", &f, true), None);
-        assert!(f.asked.borrow().iter().all(|u| !u.contains("/upstream/")), "{:?}", f.asked.borrow());
+        // Not through its upstream route, and not as llama.cpp's `/props?model=` either: llama-swap
+        // starts a model for that too (seen live), so only the list is read.
+        assert!(f.asked.borrow().iter().all(|u| u == "http://h/v1/models"), "{:?}", f.asked.borrow());
     }
 
     #[test]
