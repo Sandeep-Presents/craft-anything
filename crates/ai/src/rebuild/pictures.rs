@@ -103,21 +103,89 @@ fn take_in_turn(pages: &[Vec<Vec<PathBuf>>], max: usize, picked: &mut Vec<PathBu
     left_out
 }
 
-/// Read pictures (project-relative paths) as image blocks named by their path. Those that can't
-/// be shown (missing, not a picture, over [`MAX_IMAGE_BYTES`]) come back with why, to be said.
+/// The largest picture file read to be shrunk; past it a picture isn't shown.
+const MAX_SOURCE_BYTES: u64 = 64_000_000;
+
+/// Read pictures (project-relative paths) as image blocks named by their path. One larger than
+/// [`MAX_IMAGE_BYTES`] is shrunk to fit, and its name says at what scale it's shown, so sizes
+/// read off it can be scaled back. Those that can't be shown (missing, not a picture, too large
+/// to read) come back with why, to be said.
 pub(super) fn load(root: &Path, paths: &[PathBuf]) -> (Vec<Block>, Vec<String>) {
+    load_within(root, paths, MAX_IMAGE_BYTES)
+}
+
+fn load_within(root: &Path, paths: &[PathBuf], max: usize) -> (Vec<Block>, Vec<String>) {
     use std::io::Read as _;
     let (mut shown, mut skipped) = (Vec::new(), Vec::new());
     for rel in paths {
-        let name = rel.display().to_string().replace('\\', "/");
+        let mut name = rel.display().to_string().replace('\\', "/");
         let mut bytes = Vec::new();
-        let read = std::fs::File::open(root.join(rel)).and_then(|f| f.take(MAX_IMAGE_BYTES as u64 + 1).read_to_end(&mut bytes));
-        match read.map_err(|e| e.to_string()).and_then(|_| Block::image(name.clone(), &bytes).map_err(|e| e.message)) {
+        let read = std::fs::File::open(root.join(rel)).and_then(|f| f.take(MAX_SOURCE_BYTES + 1).read_to_end(&mut bytes));
+        let fitted = read.map_err(|e| e.to_string()).and_then(|_| {
+            if bytes.len() as u64 > MAX_SOURCE_BYTES {
+                return Err(format!("larger than the {} MB read to be shrunk", MAX_SOURCE_BYTES / 1_000_000));
+            }
+            fit(bytes, max)
+        });
+        match fitted.and_then(|f| {
+            if let Some(s) = f.shrunk {
+                name = format!("{name} (shown at {}%: {}×{} of {}×{} px)", s.percent(), s.width, s.height, s.from_width, s.from_height);
+            }
+            Block::image(name.clone(), &f.bytes).map_err(|e| e.message)
+        }) {
             Ok(b) => shown.push(b),
             Err(why) => skipped.push(format!("{name} ({why})")),
         }
     }
     (shown, skipped)
+}
+
+/// A picture's bytes as they'll be shown, and how it was shrunk to fit, if it was.
+pub(super) struct Fitted {
+    pub bytes: Vec<u8>,
+    pub shrunk: Option<Shrunk>,
+}
+
+/// The size a picture is shown at and the size it was.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Shrunk {
+    pub width: u32,
+    pub height: u32,
+    pub from_width: u32,
+    pub from_height: u32,
+}
+
+impl Shrunk {
+    /// The scale it's shown at, in whole percent (at least 1).
+    pub fn percent(&self) -> u32 {
+        (u64::from(self.width) * 100 / u64::from(self.from_width.max(1))).clamp(1, 100) as u32
+    }
+}
+
+/// `bytes` as they are when they fit in `max`; otherwise the picture decoded and scaled down,
+/// keeping its shape, until it fits as a PNG. Each try scales by the square root of how far the
+/// last was over, a little smaller, so a few tries do it.
+pub(super) fn fit(bytes: Vec<u8>, max: usize) -> Result<Fitted, String> {
+    use craft_anything_engine::tools::web_common::{decode_picture, encode_png_within, resize};
+    if bytes.len() <= max {
+        return Ok(Fitted { bytes, shrunk: None });
+    }
+    let img = decode_picture(&bytes).map_err(|e| e.message)?;
+    let (from_width, from_height) = (img.width.max(1), img.height.max(1));
+    let mut scale = (max as f64 / bytes.len() as f64).sqrt() * 0.9;
+    for _ in 0..8 {
+        let width = ((f64::from(from_width) * scale) as u32).max(1);
+        let height = ((f64::from(from_height) * scale) as u32).max(1);
+        let small = resize(&img, width, height);
+        if let Some(png) = encode_png_within(&small, max).map_err(|e| e.message)? {
+            return Ok(Fitted { bytes: png, shrunk: Some(Shrunk { width, height, from_width, from_height }) });
+        }
+        if width == 1 && height == 1 {
+            break;
+        }
+        scale *= 0.7;
+    }
+    Err(format!("couldn't be made smaller than {} MB", max as f64 / 1_000_000.0))
 }
 
 fn file_name(p: &Path) -> String {
@@ -270,5 +338,52 @@ mod tests {
         assert_eq!(names, ["reference/picture-1.png", "capture/screenshot-1280.png"]);
         assert_eq!(skipped.len(), 2, "{skipped:?}");
         assert!(skipped[0].starts_with("capture/screenshot-390.png (") && skipped[1].starts_with("capture/gone.png ("), "{skipped:?}");
+    }
+
+    /// A PNG of noise (which hardly compresses), `w`×`h`.
+    fn noise_png(w: u32, h: u32) -> Vec<u8> {
+        use craft_anything_engine::tools::web_common::{Image, encode_png};
+        let mut x = 0x2545_f491_u32;
+        let rgba = (0..w * h * 4)
+            .map(|i| {
+                x ^= x << 13;
+                x ^= x >> 17;
+                x ^= x << 5;
+                if i % 4 == 3 { 255 } else { x as u8 }
+            })
+            .collect();
+        encode_png(&Image { width: w, height: h, rgba }).unwrap()
+    }
+
+    #[test]
+    fn a_picture_over_the_limit_is_shrunk_to_fit_keeping_its_shape() {
+        use craft_anything_engine::tools::web_common::png_dimensions;
+        let big = noise_png(300, 200);
+        let max = big.len() / 5;
+        let f = fit(big.clone(), max).unwrap();
+        let s = f.shrunk.unwrap();
+        assert!(f.bytes.len() <= max, "{} > {max}", f.bytes.len());
+        assert_eq!(png_dimensions(&f.bytes).unwrap(), (s.width, s.height));
+        assert_eq!((s.from_width, s.from_height), (300, 200));
+        let shape = f64::from(s.width) / f64::from(s.height);
+        assert!((shape - 1.5).abs() < 0.05, "{s:?}");
+        assert!(s.percent() < 100, "{s:?}");
+        // One that fits is left exactly as it is.
+        let same = fit(big.clone(), big.len()).unwrap();
+        assert!(same.shrunk.is_none() && same.bytes == big);
+        // Something over the limit that isn't a picture can't be shrunk, and says so.
+        assert!(fit(vec![7; 100], 10).is_err());
+    }
+
+    #[test]
+    fn a_shrunk_picture_is_named_with_the_scale_its_shown_at() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(d.path().join("capture")).unwrap();
+        let big = noise_png(300, 200);
+        std::fs::write(d.path().join("capture/screenshot-3840.png"), &big).unwrap();
+        let (shown, skipped) = load_within(d.path(), &[PathBuf::from("capture/screenshot-3840.png")], big.len() / 5);
+        assert!(skipped.is_empty(), "{skipped:?}");
+        let Some(Block::Image { name, .. }) = shown.first() else { panic!("{shown:?}") };
+        assert!(name.starts_with("capture/screenshot-3840.png (shown at ") && name.ends_with(" of 300×200 px)"), "{name}");
     }
 }
