@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	(รายการแบบย่อ)
 (the lean list until its server says it holds more)	(รายการแบบย่อ จนกว่าเซิร์ฟเวอร์จะบอกว่ารองรับได้มากกว่านี้)
 Set which tools an AI is offered	ตั้งเครื่องมือที่ AI ได้รับ
+Sees pictures	ดูรูปได้
+Yes	ใช่
+No	ไม่
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	จะให้ผู้สร้างบน AI นี้ดูรูปหรือไม่: ภาพหน้าจอของต้นฉบับ รูปของคุณที่ถ่ายต้นฉบับ และรูปของงานที่สร้างซึ่งการตรวจถ่ายไว้ อัตโนมัติ: ตามที่เซิร์ฟเวอร์บอก ถ้าเซิร์ฟเวอร์ไม่บอกอะไรเกี่ยวกับโมเดล จะไม่ให้ดูรูป
+(its server says it sees)	(เซิร์ฟเวอร์บอกว่าดูได้)
+(its server says it doesn't)	(เซิร์ฟเวอร์บอกว่าดูไม่ได้)
+(its server doesn't say: not shown pictures)	(เซิร์ฟเวอร์ไม่บอก: ไม่ให้ดูรูป)
+Set whether an AI sees pictures	ตั้งค่าว่า AI ดูรูปได้หรือไม่

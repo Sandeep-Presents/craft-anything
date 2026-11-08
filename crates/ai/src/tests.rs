@@ -680,7 +680,11 @@ fn an_ais_context_budget_is_set_and_cleared() {
 /// it, and with no window the defaults apply.
 #[test]
 fn a_budget_is_worked_out_from_the_servers_window() {
-    let w = |tokens: Option<u64>, local| crate::ServerWindow { window: tokens.map(|tokens| crate::window::Window { tokens, source: "model list" }), local };
+    let w = |tokens: Option<u64>, local| crate::ServerWindow {
+        window: tokens.map(|tokens| crate::window::Window { tokens, source: "model list" }),
+        local,
+        sight: None,
+    };
     assert_eq!(w(Some(524_288), true).budget(None), 393_216);
     assert_eq!(w(Some(524_288), true).budget(Some(131_072)), 131_072);
     assert_eq!(w(Some(262_144), true).budget(Some(1_048_576)), 196_608, "held to what the server holds");

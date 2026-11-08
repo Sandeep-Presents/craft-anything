@@ -1335,8 +1335,10 @@ fn an_ais_context_budget_is_set_in_settings() {
     let mut h = harness(move || {
         let mut a = demo::app(demo::engine(Mode::Experienced, true));
         a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
-        // Its tool list shows Lean, so the last dropdown showing "Auto" is its context budget.
+        // Its tool list shows Lean and its vision Yes, so the last dropdown showing "Auto" is its
+        // context budget.
         a.hub.set_tools("Box", Some(craft_anything_ai::ToolList::Lean)).unwrap();
+        a.hub.set_vision("Box", Some(craft_anything_ai::Vision::Yes)).unwrap();
         a.state.settings_open = true;
         a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
         a
@@ -1391,6 +1393,8 @@ fn an_ais_tool_list_is_chosen_in_settings() {
     let mut h = harness(move || {
         let mut a = demo::app(demo::engine(Mode::Experienced, true));
         a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
+        // Its vision shows Yes, so the last dropdown showing "Auto" is its tool list.
+        a.hub.set_vision("Box", Some(craft_anything_ai::Vision::Yes)).unwrap();
         a.state.settings_open = true;
         a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
         a
@@ -1402,7 +1406,7 @@ fn an_ais_tool_list_is_chosen_in_settings() {
     h.run_steps(2);
     // The stand-in server names no window, so Auto is lean on the local default budget, for now.
     h.get_by_label("(the lean list until its server says it holds more)");
-    // Box's tool list is the last dropdown in Settings (it follows its context budget's).
+    // Box's tool list is the last dropdown showing "Auto" (its vision, below it, shows Yes).
     let open = |h: &mut Harness<'static, CraftApp>, showing: &str| {
         h.get_all_by_value(showing).last().unwrap().scroll_to_me();
         h.run_steps(3);
@@ -1433,6 +1437,53 @@ fn an_ais_tool_list_is_chosen_in_settings() {
     assert!(wait(&mut h, |a| a.backend_options.get("Box").and_then(|o| o.context_tokens) == Some(65_536)));
     h.run_steps(2);
     h.get_by_label("(every tool)");
+}
+
+/// Settings → AI: whether an AI's model is shown pictures is Auto, Yes or No, and beside Auto is
+/// what its server says.
+#[test]
+fn whether_an_ai_sees_pictures_is_chosen_in_settings() {
+    let url = model_server();
+    let mut h = harness(move || {
+        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+        a.hub.add_server("Box", &url, Some("qwen3:8b"), None).unwrap();
+        // Its tool list shows Lean, so the last dropdown showing "Auto" is its vision.
+        a.hub.set_tools("Box", Some(craft_anything_ai::ToolList::Lean)).unwrap();
+        a.state.settings_open = true;
+        a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        a
+    });
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Box")));
+    let vision = |a: &CraftApp| a.backend_options.get("Box").and_then(|o| o.vision);
+    assert!(wait(&mut h, |a| a.server_windows.get("Box").is_some_and(|(_, w)| w.is_some())));
+    h.run_steps(2);
+    // The stand-in server says nothing about pictures, so Auto shows it none, and says so.
+    h.get_by_label("(its server doesn't say: not shown pictures)");
+    let open = |h: &mut Harness<'static, CraftApp>, showing: &str| {
+        h.get_all_by_value(showing).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_value(showing).last().unwrap().click();
+        h.run_steps(2);
+    };
+    let pick = |h: &mut Harness<'static, CraftApp>, label: &str| {
+        h.get_all_by_label(label).last().unwrap().scroll_to_me();
+        h.run_steps(3);
+        h.get_all_by_label(label).last().unwrap().click();
+        h.run_steps(2);
+    };
+    open(&mut h, "Auto");
+    pick(&mut h, "Yes");
+    assert!(wait(&mut h, |a| vision(a) == Some(craft_anything_ai::Vision::Yes)), "{:?}", vision(h.state()));
+    h.run_steps(2);
+    assert!(h.query_by_label("(its server doesn't say: not shown pictures)").is_none(), "a chosen answer needs no note");
+    open(&mut h, "Yes");
+    pick(&mut h, "No");
+    assert!(wait(&mut h, |a| vision(a) == Some(craft_anything_ai::Vision::No)), "{:?}", vision(h.state()));
+    h.run_steps(2);
+    open(&mut h, "No");
+    pick(&mut h, "Auto");
+    assert!(wait(&mut h, |a| vision(a).is_none()), "Auto isn't written: {:?}", vision(h.state()));
 }
 
 /// #123, #127: the model an AI uses is changed in Settings → AI from the ones it lists.

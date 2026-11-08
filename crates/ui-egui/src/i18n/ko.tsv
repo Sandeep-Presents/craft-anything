@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	(간소 목록)
 (the lean list until its server says it holds more)	(서버가 더 많이 담는다고 알려 줄 때까지 간소 목록)
 Set which tools an AI is offered	AI가 받는 도구 설정
+Sees pictures	이미지 보기
+Yes	예
+No	아니요
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	이 AI로 빌드하는 빌더에게 이미지를 보여줄지 정합니다: 원본의 스크린샷, 원본을 담은 사용자의 이미지, 확인 단계가 찍은 빌드 이미지. 자동: 서버가 알려주는 대로 하며, 서버가 아무것도 알려주지 않는 모델에는 보여주지 않습니다.
+(its server says it sees)	(서버가 볼 수 있다고 함)
+(its server says it doesn't)	(서버가 볼 수 없다고 함)
+(its server doesn't say: not shown pictures)	(서버가 알려주지 않음: 이미지 없음)
+Set whether an AI sees pictures	AI가 이미지를 보는지 설정

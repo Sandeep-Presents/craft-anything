@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	（精簡清單）
 (the lean list until its server says it holds more)	（精簡清單，直到它的伺服器說能容納更多）
 Set which tools an AI is offered	設定 AI 可用的工具
+Sees pictures	能看圖片
+Yes	是
+No	否
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	是否給在這個 AI 上建置的助手看圖片：原版的截圖、你提供的原版圖片，以及檢查時給建置拍的圖片。自動：依它的伺服器所說；伺服器什麼都沒說的模型不給看。
+(its server says it sees)	（伺服器說它能看）
+(its server says it doesn't)	（伺服器說它不能看）
+(its server doesn't say: not shown pictures)	（伺服器沒說：不給看圖片）
+Set whether an AI sees pictures	設定 AI 是否能看圖片

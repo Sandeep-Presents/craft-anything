@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	(сокращённый список)
 (the lean list until its server says it holds more)	(сокращённый список, пока его сервер не скажет, что вмещает больше)
 Set which tools an AI is offered	Задать, какие инструменты получает ИИ
+Sees pictures	Видит изображения
+Yes	Да
+No	Нет
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	Показывать ли сборщику на этом ИИ изображения: снимки оригинала, ваши изображения оригинала и снимки сборки, сделанные проверкой. Авто: как говорит его сервер; модели, о которой сервер ничего не говорит, изображения не показываются.
+(its server says it sees)	(сервер говорит, что видит)
+(its server says it doesn't)	(сервер говорит, что нет)
+(its server doesn't say: not shown pictures)	(сервер не говорит: изображения не показываются)
+Set whether an AI sees pictures	Задать, видит ли ИИ изображения

@@ -315,6 +315,14 @@ impl CraftApp {
         });
     }
 
+    pub fn set_vision(&mut self, name: &str, vision: craft_anything_ai::Vision) {
+        let (hub, name) = (self.hub.clone(), name.to_string());
+        self.jobs.spawn(tr("Set whether an AI sees pictures"), false, move |_| {
+            hub.set_vision(&name, Some(vision)).map_err(|e| e.message)?;
+            Ok(crate::backends(&hub))
+        });
+    }
+
     /// Ask an AI's server how large its context window is, so Settings → AI can say what Auto
     /// works out to. Asked again when the AI's model changes.
     pub fn ask_server_window(&mut self, name: &str, model: &str) {
@@ -582,8 +590,8 @@ mod context_budget_tests {
     #[test]
     fn opening_settings_forgets_only_the_answers_without_a_window() {
         use craft_anything_ai::{ServerWindow, window::Window};
-        let known = ServerWindow { window: Some(Window { tokens: 524_288, source: "llama.cpp" }), local: true };
-        let unknown = ServerWindow { window: None, local: true };
+        let known = ServerWindow { window: Some(Window { tokens: 524_288, source: "llama.cpp" }), local: true, sight: None };
+        let unknown = ServerWindow { window: None, local: true, sight: None };
         let mut windows: std::collections::BTreeMap<String, (String, Option<Option<ServerWindow>>)> =
             [("known", Some(Some(known))), ("unknown", Some(Some(unknown))), ("unreachable", Some(None)), ("asking", None)]
                 .into_iter()

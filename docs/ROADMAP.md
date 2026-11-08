@@ -499,7 +499,7 @@ been run live.
       to check its work with rebuild_check, which the loop refuses while it builds; only its first
       message says so. Say "Craft Anything checks it after your turn" there instead
       — claimed: Afloat16, branch bugfix/r5.4-api-follow-up-check
-- [ ] Models that can see get pictures: an image block in the conversation, sent as `image_url`
+- [x] Models that can see get pictures: an image block in the conversation, sent as `image_url`
       parts (OpenAI-style) and `image` blocks (Anthropic), for the check's screenshots beside the
       original's, the pictures in `reference/` and a PNG the builder reads. Each AI's Pictures
       setting is Auto, On or Off; Auto follows what the server reports (Ollama's capabilities,
@@ -507,6 +507,13 @@ been run live.
       are in; what's left is attaching the pictures to a builder whose model sees, and treating it
       as sighted (`BriefCx::sees_pictures`), with the setting in Settings → AI
       — claimed: youkaicountry, branch feature/r5.4-pictures-to-builders
+- [ ] Let an API builder whose model sees open a picture itself: `build_file_read` refuses
+      pictures, so it sees only what the run attaches (the original's with the first message, each
+      check's after it), not a screenshot it takes of its own build mid-turn or one in reference/
+      that went past the six a message carries
+- [ ] Show the pictures a person adds while a build runs (a note's pictures, a follow-up's) to an
+      API builder whose model sees, with the message that tells it about them; it's shown only
+      what reference/ and capture/ hold when a run starts, and each check's pictures
 - [x] When a server refuses a request for its context window and says the size (Ollama, llama.cpp,
       OpenAI-style), fit the conversation to that window and ask once more, else say how to raise it (#962)
 - [x] Ollama fits a long prompt to its context by dropping the oldest messages, and a Qwen 3.8 model

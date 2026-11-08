@@ -344,7 +344,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
     let mut key_drafts = std::mem::take(&mut app.backend_key_inputs);
     let (mut pick_model, mut chosen_model, mut close_picker) = (None, None, false);
-    let (mut chosen_effort, mut save_context, mut save_tools) = (None, None, None);
+    let (mut chosen_effort, mut save_context, mut save_tools, mut save_vision) = (None, None, None, None);
     // AIs whose server is to be asked how much it holds (Settings → AI's context budget line).
     let mut ask_window: Vec<(String, String)> = Vec::new();
     let (mut pick_agent_model, mut chosen_agent_model, mut remote_program) = (None, None, None);
@@ -646,6 +646,37 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
                                 }
                             });
+                            // Whether its model is shown pictures (the check's screenshots, the
+                            // person's pictures); beside Auto, what its server says.
+                            use craft_anything_ai::Vision;
+                            let vision = app.backend_options.get(&b.name).and_then(|o| o.vision).unwrap_or_default();
+                            ui.horizontal_wrapped(|ui| {
+                                ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
+                                let label = ui.label(RichText::new(tr("Sees pictures")).color(t.text_faint).size(theme::CAPTION));
+                                let named = |v: Vision| match v {
+                                    Vision::Auto => tr("Auto"),
+                                    Vision::Yes => tr("Yes"),
+                                    Vision::No => tr("No"),
+                                };
+                                let combo = egui::ComboBox::from_id_salt(("vision", &b.name)).icon(widgets::combo_icon).selected_text(named(vision)).show_ui(ui, |ui| {
+                                    for v in Vision::ALL {
+                                        if ui.selectable_label(v == vision, named(v)).clicked() && v != vision {
+                                            save_vision = Some((b.name.clone(), v));
+                                        }
+                                    }
+                                });
+                                combo.response.labelled_by(label.id).on_hover_text(tr("Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any."));
+                                if vision == Vision::Auto
+                                    && let Some(Some(Some(server))) = server
+                                {
+                                    let works_out = match server.sight {
+                                        Some(s) if s.sees => tr("(its server says it sees)"),
+                                        Some(_) => tr("(its server says it doesn't)"),
+                                        None => tr("(its server doesn't say: not shown pictures)"),
+                                    };
+                                    ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
+                                }
+                            });
                         }
                     }
                     if craft_anything_ai::model_options::supported(b) {
@@ -857,6 +888,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     if let Some((name, tools)) = save_tools {
         app.set_tools(&name, tools);
+    }
+    if let Some((name, vision)) = save_vision {
+        app.set_vision(&name, vision);
     }
     if close_picker {
         app.model_picker = None;

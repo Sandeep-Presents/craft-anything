@@ -1530,7 +1530,7 @@ pub(crate) mod tests {
             vision: Vision::Yes,
         };
         let mut c = ApiConversation::start(host, vec![slot], LoopConfig::default()).unwrap();
-        c.attach((0..MAX_PICTURES + 3).map(|i| Block::image(&format!("p{i}.png"), png).unwrap()).collect());
+        c.attach((0..MAX_PICTURES + 3).map(|i| Block::image(format!("p{i}.png"), png).unwrap()).collect());
         c.send("Look.");
         drain_until_done(&mut c, |_, _| {});
         let seen = seen.lock().unwrap();

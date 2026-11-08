@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	(a lista enxuta)
 (the lean list until its server says it holds more)	(a lista enxuta até o servidor dizer que comporta mais)
 Set which tools an AI is offered	Definir quais ferramentas uma IA recebe
+Sees pictures	Vê imagens
+Yes	Sim
+No	Não
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	Se quem constrói com esta IA recebe imagens: as capturas do original, as suas imagens dele e as imagens da build feitas pela verificação. Auto: o que o servidor dele diz; um modelo sobre o qual ele não diz nada não recebe nenhuma.
+(its server says it sees)	(o servidor diz que vê)
+(its server says it doesn't)	(o servidor diz que não)
+(its server doesn't say: not shown pictures)	(o servidor não diz: sem imagens)
+Set whether an AI sees pictures	Definir se uma IA vê imagens

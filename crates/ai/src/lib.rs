@@ -33,13 +33,16 @@ pub mod window;
 /// The context budgets offered in Settings → AI besides Auto and a number of your own.
 pub const CONTEXT_PRESETS: &[u64] = &[8_192, 16_384, 32_768, 65_536, 131_072, 262_144, 524_288, 1_048_576];
 
-/// What a backend's server said about its context window ([`AiHub::server_window`]).
+/// What a backend's server said about its context window and whether its model sees pictures
+/// ([`AiHub::server_window`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServerWindow {
     /// The window, when the server named one.
     pub window: Option<window::Window>,
     /// A server on this computer or its network (its budget may rise to fill a large window).
     pub local: bool,
+    /// Whether its model sees pictures, when the server says ([`sight`]).
+    pub sight: Option<sight::Sight>,
 }
 
 impl ServerWindow {
@@ -877,7 +880,7 @@ impl AiHub {
         let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
         let slot = if over_ssh { None } else { self.build_model(&e).ok() };
         let local = slot.as_ref().map_or(e.config.kind == BackendKind::OpenaiCompatible, |s| s.local);
-        Ok(ServerWindow { window: slot.and_then(|s| s.model.context_window()), local })
+        Ok(ServerWindow { window: slot.as_ref().and_then(|s| s.model.context_window()), local, sight: slot.as_ref().and_then(|s| s.model.sees_pictures()) })
     }
 
     /// The models a backend can be set to: the API's or registered agent's list.

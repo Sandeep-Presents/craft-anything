@@ -121,6 +121,7 @@ const ACTIONS: &[Action] = &[
     a("set_context_tokens",  "set how much of the conversation an AI is sent", Cli("ai context <name> <tokens|auto>")),
     a("ask_server_window",   "show what an AI's context budget works out to with its server's window", Cli("ai context <name>")),
     a("set_tools",           "choose which tools a builder on an AI is offered", Cli("ai tools <name> <auto|lean|full>")),
+    a("set_vision",          "choose whether a builder on an AI is shown pictures", Cli("ai vision <name> <auto|yes|no>")),
     a("pick_agent_model",    "list an agent's visible models and thinking depths", Tool(&["ai_models_list"])),
     a("reload_agent_model",  "reload model-specific thinking choices",         Tool(&["ai_models_list"])),
     a("set_agent_model",     "choose an agent's model and thinking depth",     Tool(&["ai_model_set"])),
