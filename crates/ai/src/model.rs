@@ -86,12 +86,9 @@ impl Block {
                 .with_remediation("Save it as a PNG or JPEG and try again."));
         };
         if bytes.len() > MAX_IMAGE_BYTES {
-            return Err(ToolError::invalid(format!(
-                "{name} is {} MB, more than the {} MB a picture shown to a model may be.",
-                bytes.len() / 1_000_000,
-                MAX_IMAGE_BYTES as f64 / 1_000_000.0
-            ))
-            .with_remediation("Use a smaller picture: a lower resolution, or a JPEG."));
+            // Only the limit: `image_file` reads one byte past it, so the size read isn't the file's.
+            return Err(ToolError::invalid(format!("{name} is more than the {} MB a picture shown to a model may be.", MAX_IMAGE_BYTES as f64 / 1_000_000.0))
+                .with_remediation("Use a smaller picture: a lower resolution, or a JPEG."));
         }
         Ok(Block::Image { media_type: media_type.into(), name, data: base64::engine::general_purpose::STANDARD.encode(bytes) })
     }
@@ -405,7 +402,8 @@ mod tests {
         let mut bytes = PNG.to_vec();
         bytes.resize(MAX_IMAGE_BYTES * 2, 0);
         std::fs::write(&huge, &bytes).unwrap();
-        assert!(Block::image_file(&huge).unwrap_err().message.contains("more than"));
+        let e = Block::image_file(&huge).unwrap_err();
+        assert_eq!(e.message, "huge.png is more than the 3.75 MB a picture shown to a model may be.");
         assert!(Block::image_file(&dir.path().join("gone.png")).is_err());
         assert!(Block::image_file(dir.path()).is_err(), "a folder isn't a picture");
     }
