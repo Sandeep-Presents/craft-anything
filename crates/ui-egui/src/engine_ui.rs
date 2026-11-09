@@ -418,7 +418,7 @@ impl CraftApp {
 
     /// Let the builder generate pictures and 3D models, or not: for the open project on its screen
     /// (through the project_assets_allow tool), else for the game being set up on Make. Turning it
-    /// on without a fal.ai key asks for one.
+    /// on without a fal.ai key asks for one, unless pictures come from the person's ComfyUI server.
     pub fn set_generate_assets(&mut self, on: bool) {
         let project = self.workspace.as_ref().filter(|_| self.state.screen == Screen::Project).map(|w| w.root.clone());
         match project {
@@ -428,7 +428,7 @@ impl CraftApp {
             }
             None => self.state.make.generate_assets = on,
         }
-        if on && self.fal_key() == Some(false) {
+        if on && self.fal_key() == Some(false) && !self.settings.assets.comfyui_ready() {
             self.state.modal = Some(Modal::Assets);
         }
     }
@@ -464,9 +464,12 @@ pub fn assets_toggle(app: &mut CraftApp, ui: &mut Ui, mut on: bool) {
     if widgets::toggle(ui, &mut on, "Generate custom pictures and models").changed() {
         app.set_generate_assets(on);
     }
-    let no_key = on && app.fal_key() == Some(false);
+    let comfy = app.settings.assets.comfyui_ready();
+    let no_key = on && app.fal_key() == Some(false) && !comfy;
     let note = if no_key {
         tr("Needs a fal.ai key. Until then the game is built without them.")
+    } else if comfy {
+        tr("No key needed; pictures are made on your server.")
     } else {
         let p = AssetPrices::of(app);
         trf(

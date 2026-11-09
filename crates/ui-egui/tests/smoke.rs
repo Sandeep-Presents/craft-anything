@@ -204,6 +204,21 @@ fn turning_on_generated_assets_without_a_fal_key_asks_for_one() {
     h.get_by_label("Generate custom pictures and models").click();
     h.run_steps(3);
     assert!(h.state().state.make.generate_assets && h.state().state.modal.is_none());
+    // No key, but a ComfyUI server makes the pictures: nothing is asked, and the note says so.
+    h.get_by_label("Generate custom pictures and models").click();
+    h.run_steps(2);
+    {
+        let a = &mut h.state_mut().settings.assets;
+        a.image_model = Some(craft_anything_engines::assets::comfyui::ID.into());
+        a.comfyui.address = "http://127.0.0.1:9".into();
+        a.comfyui.checkpoint = "a.safetensors".into();
+    }
+    h.state_mut().asset_keys = Some(fal_key(false));
+    h.get_by_label("Generate custom pictures and models").click();
+    h.run_steps(3);
+    assert!(h.state().state.make.generate_assets && h.state().state.modal.is_none(), "a ComfyUI server needs no key");
+    h.get_by_label("No key needed; pictures are made on your server.");
+    assert!(h.query_by_label_contains("Needs a fal.ai key").is_none());
 }
 
 #[test]

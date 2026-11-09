@@ -205,6 +205,14 @@ impl AssetSettings {
     pub fn budget(&self) -> f64 {
         if self.budget_usd.is_finite() && self.budget_usd >= 0.0 { self.budget_usd } else { crate::workspace::ASSET_BUDGET_USD }
     }
+
+    /// Pictures come from the person's own ComfyUI server: it's the picture model, with the same
+    /// two fields the asset tools need before they send anything (an address and a checkpoint).
+    pub fn comfyui_ready(&self) -> bool {
+        self.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID)
+            && !self.comfyui.address.trim().is_empty()
+            && !self.comfyui.checkpoint.trim().is_empty()
+    }
 }
 
 impl Default for Settings {

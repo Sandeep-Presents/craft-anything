@@ -675,7 +675,7 @@ impl Worker {
         let keys = crate::keys::asset_keys(store, &providers);
         // The brief offers the built-in models, so a key for another provider doesn't count; the
         // person's own ComfyUI server needs no key.
-        self.assets = crate::comfyui_ready(&session.settings.assets)
+        self.assets = session.settings.assets.comfyui_ready()
             || craft_anything_engines::assets::AssetProviders::built_in().ids().into_iter().any(|id| keys.get(id).is_some());
         session.ext.insert(Arc::new(keys));
     }
