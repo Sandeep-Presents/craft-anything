@@ -472,6 +472,36 @@ fn an_agent_apps_program_is_set_and_cleared() {
     assert_eq!(program(&h), None, "blank finds it by its usual name again");
 }
 
+/// #1060: an agent the scan didn't find is added by choosing its program: one backend, with that
+/// program, named after the agent. A second one gets a number, and nothing is replaced.
+#[test]
+fn an_agent_is_added_by_its_program() {
+    let (h, d) = hub();
+    let file = d.path().join("opencode-cli");
+    std::fs::write(&file, "#!/bin/sh\n").unwrap();
+    let path = file.display().to_string();
+    let name = h.add_agent_program("opencode", &format!("  {path} ")).unwrap();
+    assert_eq!(name, "OpenCode");
+    let entry = h.config().backends.into_iter().find(|b| b.config.name == name).unwrap();
+    assert_eq!((entry.config.kind, entry.config.model.as_str(), entry.config.enabled), (BackendKind::AgentCli, "opencode", true));
+    assert_eq!(entry.options.command.as_deref(), Some(path.as_str()));
+    let again = h.add_agent_program("opencode", &path).unwrap();
+    assert_eq!(again, "OpenCode 2", "the first one stays");
+    assert_eq!(h.config().backends.len(), 2);
+}
+
+/// #1060: what can't be an agent is refused and nothing is saved: an agent we don't know, no
+/// program, a folder (a Mac app).
+#[test]
+fn adding_an_agent_by_program_refuses_what_cannot_run() {
+    let (h, d) = hub();
+    let bad = |agent: &str, program: &str| h.add_agent_program(agent, program).unwrap_err().code;
+    assert_eq!(bad("not-an-agent", "/x/y"), ErrorCode::BadInput);
+    assert_eq!(bad("opencode", "  "), ErrorCode::BadInput);
+    assert_eq!(bad("opencode", &d.path().display().to_string()), ErrorCode::BadInput, "a folder");
+    assert!(h.config().backends.is_empty(), "nothing saved");
+}
+
 /// #467: a folder or app bundle can't be an agent's program (the file picker returns
 /// `Antigravity.app` on a Mac); it's refused and the saved program stays as it was.
 #[test]
