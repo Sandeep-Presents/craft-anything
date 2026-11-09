@@ -91,6 +91,10 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
     }
     let path = Path::new(chosen);
     let bare = path.parent().is_none_or(|p| p.as_os_str().is_empty());
+    // A saved bare `codex` needs the same bundle fallback as detection after a Dock launch.
+    if local && usual == "codex" && chosen == "codex" {
+        return Ok(usual_program(&usual, search)?.unwrap_or(usual));
+    }
     // A saved `claude`, by name or as the desktop app's own file, is looked up as the usual one is,
     // so it never starts the desktop app.
     let named_claude = bare && path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(&usual));
@@ -122,7 +126,7 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
 fn usual_program(usual: &str, search: Option<std::ffi::OsString>) -> Result<Option<String>, ToolError> {
     let first = craft_anything_platform::which::which_in(usual, search.clone()).into_iter().next();
     match (first, find_program_in(usual, search)) {
-        (None, _) => Ok(desktop_cli(usual, local_app_data().as_deref()).map(|cli| cli.display().to_string())),
+        (None, _) => Ok(local_desktop_cli(usual).map(|cli| cli.display().to_string())),
         (Some(first), Some(real)) => Ok(Some(if first == real { usual.to_string() } else { real.display().to_string() })),
         (Some(app), None) => Err(desktop_app_error(&app)),
     }
@@ -140,7 +144,40 @@ fn desktop_app_error(app: &Path) -> ToolError {
 /// really it. Detection, the desktop app hint and starting a run all look through this, so what's
 /// offered is what runs.
 pub fn find_program(program: &str) -> Option<PathBuf> {
-    find_program_in(program, craft_anything_platform::which::search_path()).or_else(|| desktop_cli(program, local_app_data().as_deref()))
+    find_program_in(program, craft_anything_platform::which::search_path()).or_else(|| local_desktop_cli(program))
+}
+
+fn local_desktop_cli(program: &str) -> Option<PathBuf> {
+    let windows = desktop_cli(program, local_app_data().as_deref());
+    #[cfg(target_os = "macos")]
+    if windows.is_none() && program == "codex" {
+        let roots = dirs::home_dir().map(|home| home.join("Applications")).into_iter().chain([PathBuf::from("/Applications")]);
+        return macos_codex_in(roots);
+    }
+    windows
+}
+
+/// Dock launches do not inherit a terminal's PATH. Look only in known app-bundle locations,
+/// never run an app's GUI executable as a CLI, and leave an explicit/PATH installation first.
+#[cfg(any(target_os = "macos", all(test, unix)))]
+fn macos_codex_in(roots: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    const INSIDE: &[&str] = &[
+        "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "ChatGPT.app/Contents/Resources/codex",
+        "Codex.app/Contents/Resources/codex",
+        "Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+    ];
+    roots.into_iter().flat_map(|root| INSIDE.iter().map(move |inside| root.join(inside))).find(|path| {
+        let Ok(meta) = std::fs::metadata(path) else { return false };
+        if !meta.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            meta.permissions().mode() & 0o111 != 0
+        }
+    })
 }
 
 /// Agents whose Windows desktop app keeps the command-line program in its own folder, under
@@ -1590,6 +1627,58 @@ mod tests {
         assert!(adapter.mcp_env(&mcp).unwrap().is_some());
     }
 
+    /// Reject non-executable candidates and prefer the user's application installation.
+    #[cfg(unix)]
+    #[test]
+    fn macos_bundled_codex_needs_an_executable_and_respects_application_root_order() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let user = d.path().join("User Applications");
+        let system = d.path().join("Applications");
+        let relative = "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex";
+        let user_cli = user.join(relative);
+        let system_cli = system.join("Codex.app/Contents/Resources/codex");
+        assert!(macos_codex_in([user.clone(), system.clone()]).is_none());
+        std::fs::create_dir_all(user_cli.parent().unwrap()).unwrap();
+        std::fs::write(&user_cli, b"not executable").unwrap();
+        std::fs::set_permissions(&user_cli, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(macos_codex_in([user.clone()]).is_none());
+        std::fs::create_dir_all(system_cli.parent().unwrap()).unwrap();
+        std::fs::write(&system_cli, b"stand-in").unwrap();
+        std::fs::set_permissions(&system_cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(macos_codex_in([user.clone(), system.clone()]), Some(system_cli));
+        std::fs::set_permissions(&user_cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(macos_codex_in([user, system]), Some(user_cli));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn every_supported_macos_codex_bundle_layout_is_found_without_the_gui() {
+        use std::os::unix::fs::PermissionsExt;
+        for relative in [
+            "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "ChatGPT.app/Contents/Resources/codex",
+            "Codex.app/Contents/Resources/codex",
+            "Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        ] {
+            let d = tempfile::tempdir().unwrap();
+            let cli = d.path().join(relative);
+            std::fs::create_dir_all(cli.parent().unwrap()).unwrap();
+            // A directory and an app GUI executable are never CLI candidates.
+            std::fs::create_dir_all(&cli).unwrap();
+            assert!(macos_codex_in([d.path().into()]).is_none());
+            std::fs::remove_dir(&cli).unwrap();
+            let gui = d.path().join("ChatGPT.app/Contents/MacOS/ChatGPT");
+            std::fs::create_dir_all(gui.parent().unwrap()).unwrap();
+            std::fs::write(&gui, b"stand-in GUI, never run").unwrap();
+            std::fs::set_permissions(&gui, std::fs::Permissions::from_mode(0o700)).unwrap();
+            assert!(macos_codex_in([d.path().into()]).is_none());
+            std::fs::write(&cli, b"stand-in CLI, never run").unwrap();
+            std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(macos_codex_in([d.path().into()]), Some(cli));
+        }
+    }
+
     /// #1060: OpenCode's desktop app keeps its CLI in its own folder, as `opencode-cli.exe`.
     #[test]
     fn a_cli_inside_its_desktop_app_is_found() {
@@ -2241,6 +2330,8 @@ mod tests {
         assert!(matches!(&ev[1], AgentEvent::ToolFinished { ok: true, .. }));
         assert!(matches!(&ev[2], AgentEvent::TextDelta { text } if text.starts_with("It lists")));
         assert!(p.saw_result && p.output_tokens == 4);
+        let auth = p.line(&json!({"type":"turn.failed","error":{"message":"authentication expired"}}).to_string());
+        assert!(auth.iter().any(|event| matches!(event, AgentEvent::Error { remediation: Some(fix), .. } if fix.contains("Sign in with ChatGPT"))));
         let mut g = StreamParser::new(adapter_for("gemini-cli"));
         let ev: Vec<_> = [
             json!({"type":"message","role":"assistant","content":"Hi","delta":true}),

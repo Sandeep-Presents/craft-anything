@@ -172,6 +172,33 @@ fn a_coding_agent_test_says_it_only_checked_the_version() {
     assert_eq!((r.program.as_deref(), r.saved_program_replaced), (Some("cargo"), None), "the saved program ran");
 }
 
+#[cfg(unix)]
+#[test]
+fn codex_connection_test_checks_login_without_sending_a_prompt() {
+    use std::os::unix::fs::PermissionsExt;
+    let (h, _d) = hub();
+    let dir = tempfile::tempdir().unwrap();
+    let program = dir.path().join("codex");
+    let signed_in = dir.path().join("connected");
+    let script = format!(
+        "#!/bin/sh\nif [ \"$1\" = --version ]; then echo codex-test; exit 0; fi\nif [ \"$1\" = login ] && [ \"$2\" = status ]; then\n if [ -f '{}' ]; then echo 'Logged in using ChatGPT LOGIN_STATUS_TEST_ONLY' >&2; exit 0; fi\n echo 'Not logged in' >&2; exit 1\nfi\nexit 99\n",
+        signed_in.display()
+    );
+    std::fs::write(&program, script).unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let config = BackendConfig { name: "Codex test".into(), kind: BackendKind::AgentCli, model: "codex".into(), base_url: None, ssh_host: None, enabled: true };
+    let options = BackendOptions { command: Some(program.display().to_string()), ..Default::default() };
+    h.add_backend_with(BackendEntry { config, options }, None).unwrap();
+    let error = h.test_backend("Codex test").unwrap_err();
+    assert!(error.message.contains("not signed in"));
+    assert!(error.remediation.unwrap().contains("Sign in with ChatGPT"));
+    std::fs::write(signed_in, b"test marker, not a credential").unwrap();
+    let result = h.test_backend("Codex test").unwrap();
+    assert!(result.version_only, "login is not a model/quota test");
+    assert!(result.reply.contains("signed in"));
+    assert!(!serde_json::to_string(&result).unwrap().contains("LOGIN_STATUS_TEST_ONLY"), "raw login-status output never enters the report");
+}
+
 /// #721: a saved path an update removed. A test that passes through the usual program says so, and
 /// doctor doesn't blame PATH when nothing can be found.
 #[test]

@@ -783,6 +783,16 @@ impl AgentAdapter for Codex {
         &["codex"]
     }
 
+    fn signed_in(&self, program: &str) -> Option<bool> {
+        // Ask the selected CLI, not its auth file or keychain: no credentials enter this app.
+        let out = Process::new(program).args(["login", "status"]).timeout(Duration::from_secs(10)).stdout_cap(16 * 1024).run().ok()?;
+        codex_login_status(out.success, &out.stdout_text(), &out.stderr_text())
+    }
+
+    fn sign_in_fix(&self) -> Option<String> {
+        Some("Run the selected Codex program with `login` in a terminal, choose Sign in with ChatGPT, then test it again in Settings → AI.".into())
+    }
+
     /// `codex exec -` reads the message from stdin, so a long one can't pass Windows'
     /// command-line limit (os error 206, #528).
     fn prompt_on_stdin(&self) -> bool {
@@ -886,11 +896,24 @@ impl AgentAdapter for Codex {
             }
             ("turn.failed", _) | ("error", _) => {
                 let m = v.pointer("/error/message").or_else(|| v.get("message")).and_then(Value::as_str).unwrap_or("unknown error");
-                out.push(AgentEvent::Error { message: format!("Codex: {m}"), remediation: None, log: None });
+                let auth = ["unauthorized", "not logged", "authentication", "login", "token expired"].iter().any(|word| m.to_ascii_lowercase().contains(word));
+                out.push(AgentEvent::Error { message: format!("Codex: {m}"), remediation: if auth { self.sign_in_fix() } else { None }, log: None });
             }
             _ => {}
         }
         out
+    }
+}
+
+/// Unknown output (including future CLI formats) is not a claim that the account is connected.
+fn codex_login_status(success: bool, stdout: &str, stderr: &str) -> Option<bool> {
+    let text = format!("{stdout}\n{stderr}").to_ascii_lowercase();
+    if text.contains("not logged in") {
+        Some(false)
+    } else if success && text.contains("logged in") {
+        Some(true)
+    } else {
+        None
     }
 }
 
@@ -1021,4 +1044,19 @@ pub(super) fn remote_failure(host: &str, out: &craft_anything_platform::Output) 
         } else {
             format!("ssh said: {snippet}")
         })
+}
+
+#[cfg(test)]
+mod codex_login_tests {
+    use super::codex_login_status;
+
+    #[test]
+    fn login_status_reads_both_streams_without_inferring_success_from_exit_alone() {
+        assert_eq!(codex_login_status(true, "", "Logged in using ChatGPT"), Some(true));
+        assert_eq!(codex_login_status(true, "Logged in using an API key", ""), Some(true));
+        assert_eq!(codex_login_status(false, "", "Not logged in"), Some(false));
+        assert_eq!(codex_login_status(true, "Not logged in", ""), Some(false));
+        assert_eq!(codex_login_status(false, "", "could not read credentials"), None);
+        assert_eq!(codex_login_status(true, "", ""), None);
+    }
 }

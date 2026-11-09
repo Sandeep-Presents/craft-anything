@@ -331,6 +331,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     let (mut pick, mut builds, mut extracts, mut toggle, mut remove) = (None, None, None, None, None);
     let (mut choose_program, mut usual_program) = (None, None);
+    let mut check_codex = None;
     let mut save_folder = None;
     // Taken out while the rows borrow the app, and put back after them.
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
@@ -581,6 +582,14 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                         extracts = Some(Some(b.name.clone()));
                     }
                 }
+                if b.kind == BackendKind::AgentCli && b.model == "codex" && b.ssh_host.as_deref().is_none_or(|host| host.trim().is_empty()) {
+                    let pending = app.codex_connections.get(&b.name) == Some(&None);
+                    ui.add_enabled_ui(!pending, |ui| {
+                        if widgets::secondary(ui, None, if pending { "Checking" } else { "Check" }).clicked() {
+                            check_codex = Some(b.name.clone());
+                        }
+                    });
+                }
                 // Off: kept with its key, but nothing uses it.
                 let (label, tip) = if b.enabled {
                     ("Turn off", "Nothing uses it until it's on again; it keeps its key.")
@@ -604,11 +613,21 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
             if !b.enabled {
                 ui.label(RichText::new(tr("Off")).color(t.text_faint).size(theme::CAPTION));
             }
+            if let Some(Some(result)) = app.codex_connections.get(&b.name) {
+                let (message, color) = match result {
+                    Ok(message) => (message, t.text_dim),
+                    Err(message) => (message, t.danger),
+                };
+                ui.label(RichText::new(message).color(color).size(theme::CAPTION));
+            }
         });
         ui.add_space(6.0);
     }
     if let Some((name, on)) = toggle {
         app.set_backend_enabled(&name, on);
+    }
+    if let Some(name) = check_codex {
+        app.check_codex_connection(name);
     }
     if let Some(name) = choose_program {
         app.picking_program_for = Some(name);
@@ -1025,6 +1044,35 @@ mod tests {
     use super::*;
     use crate::{Done, builders::AgentModelPicker, demo, jobs::Finished};
     use craft_anything_ai::{BackendConfig, BackendKind};
+
+    #[test]
+    fn codex_connection_check_and_its_result_are_visible_in_settings() {
+        let mut app = demo::app(demo::engine(craft_anything_engine::Mode::Experienced, true));
+        app.backends = vec![BackendConfig {
+            name: "Codex test".into(),
+            kind: BackendKind::AgentCli,
+            model: "codex".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        }];
+        app.codex_connections.insert("Codex test".into(), Some(Err("Codex is installed but is not signed in.".into())));
+        let context = egui::Context::default();
+        theme::install_fonts(&context);
+        let mut output = context.run_ui(Default::default(), |ui| ai(&mut app, ui));
+        output.textures_delta.clear();
+        let text = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Check"));
+        assert!(text.contains("Codex is installed but is not signed in."));
+    }
 
     #[test]
     fn identical_model_names_are_shown_once_in_the_shared_picker() {

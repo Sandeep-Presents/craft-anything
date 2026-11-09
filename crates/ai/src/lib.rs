@@ -1007,11 +1007,23 @@ impl AiHub {
                 None => craft_anything_platform::Process::new(&program).arg("--version"),
             };
             let out = p.timeout(Duration::from_secs(15)).run_checked()?;
+            let mut reply = out.stdout_text().lines().next().unwrap_or_default().trim().to_string();
+            if e.config.ssh_host.as_deref().is_none_or(|host| host.trim().is_empty()) && e.config.model == "codex" {
+                let adapter = cli_agents::adapter_for(&e.config.model);
+                match adapter.signed_in(&program) {
+                    Some(true) => reply.push_str(" · signed in (model access is checked when you send a message)"),
+                    Some(false) => {
+                        return Err(ToolError::new(ErrorCode::BadSettings, "Codex is installed but is not signed in.")
+                            .with_remediation(adapter.sign_in_fix().unwrap_or_default()));
+                    }
+                    None => reply.push_str(" · sign-in status could not be verified; try Codex login status in a terminal"),
+                }
+            }
             return Ok(TestReport {
                 backend: e.config.name.clone(),
                 model: e.config.model.clone(),
                 latency_ms: start.elapsed().as_millis() as u64,
-                reply: out.stdout_text().lines().next().unwrap_or_default().trim().to_string(),
+                reply,
                 version_only: true,
                 saved_program_replaced: crate::cli_agents::replaced_program(&e.options, &program),
                 program: Some(program),

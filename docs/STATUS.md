@@ -6,6 +6,20 @@ workspace clippy, layers, fmt and the secret scan of all history were clean. Chi
 
 ## What works, and how it was checked
 
+### Local Codex discovery and sign-in (R2.2)
+
+macOS Dock launches can find an executable Codex CLI bundled with ChatGPT.app or
+Codex.app after checking PATH; a selected program remains first. Settings → AI
+offers a worker-backed Check action through the same headless API as `ai test`.
+Known signed-out and unknown states are distinct, with guidance for reconnecting.
+The check reads no credential files, sends no prompt and does not claim model or
+quota access. Fixture tests cover bundle layouts, permissions, root order, status
+parsing, the selected CLI and rendered results. See [Codex setup and limits](codex.md).
+Local Apple Silicon verification: 771 AI/GUI unit, integration and smoke tests
+passed with four existing ignored (four test threads), including headless parity.
+All-target clippy with warnings denied, formatting, layers, locks, translation
+coverage and secrets passed. The companion CLI was built with locked dependencies.
+
 | Area | State | Verified by |
 |---|---|---|
 | PyInstaller archives | CArchive members cannot read the table, cookie or appended signing data. Legacy PYZ data members unpack with their original bytes and names. Empty namespace packages are listed as metadata; older namespaces with code still unpack as packages. | CArchive range fixtures cover both cookies, cross-boundary members, signed tails and empty options; PYZ fixtures cover mixed member types. Verified source `a5bcfaed`: [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226891917); [layers, locks, secrets, wasm and unchanged Cargo.lock](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663); [unchanged-code regression failures](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582). |
