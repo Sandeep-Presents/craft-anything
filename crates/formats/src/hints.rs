@@ -48,18 +48,13 @@ pub fn detect(b: &Binary, data: &[u8]) -> Vec<Hint> {
     } else if sec(".gopclntab") || sec("__gopclntab") || sym("runtime.main") {
         push(&mut out, hint("go", "language", "Go", "strong", "Go runtime symbols or pclntab section"));
     }
-    if out.iter().any(|h| h.id == "go")
-        && let Some(at) = find_bytes(data, b"go1.", SCAN_LIMIT)
-    {
-        let v: String = data
-            .get(at..(at + 16).min(data.len()))
-            .unwrap_or(&[])
-            .iter()
-            .take_while(|c| c.is_ascii_alphanumeric() || **c == b'.')
-            .map(|&c| c as char)
-            .collect();
-        if let Some(h) = out.iter_mut().find(|h| h.id == "go") {
+    if let Some(h) = out.iter_mut().find(|h| h.id == "go") {
+        let version = crate::go::inline_version(data, SCAN_LIMIT)
+            .map(|v| (v, "the build information"))
+            .or_else(|| go_release_in(data).map(|v| (v, "a Go release name in the data")));
+        if let Some((v, from)) = version {
             h.label = format!("Go ({v})");
+            h.evidence = format!("{}; version from {from}", h.evidence);
         }
     }
     // Rust
@@ -204,9 +199,88 @@ pub fn detect(b: &Binary, data: &[u8]) -> Vec<Hint> {
     out
 }
 
+/// The first Go release name (`go1.N`, `go1.N.P`, `go1.NrcK`, `go1.NbetaK`) standing on its own in
+/// the data. Other text after a `go1.` (long digit runs, identifiers) isn't taken as a version.
+fn go_release_in(data: &[u8]) -> Option<String> {
+    let mut from = 0usize;
+    for _ in 0..4096 {
+        let at = from.checked_add(find_bytes(data.get(from..)?, b"go1.", SCAN_LIMIT.saturating_sub(from))?)?;
+        let starts_word = at.checked_sub(1).and_then(|p| data.get(p)).is_none_or(|c| !c.is_ascii_alphanumeric());
+        if starts_word && let Some(len) = data.get(at..).and_then(go_release_len) {
+            return data.get(at..at.checked_add(len)?).map(|v| String::from_utf8_lossy(v).into_owned());
+        }
+        from = at.checked_add(1)?;
+    }
+    None
+}
+
+/// The length of the Go release name at the start of `s`, when one ends cleanly there.
+fn go_release_len(s: &[u8]) -> Option<usize> {
+    let digits = |at: usize, most: usize| {
+        let n = s.get(at..).unwrap_or_default().iter().take(most + 1).take_while(|c| c.is_ascii_digit()).count();
+        (1..=most).contains(&n).then_some(at + n)
+    };
+    let mut end = digits(4, 3)?;
+    if s.get(end) == Some(&b'.') {
+        end = digits(end + 1, 3)?;
+    }
+    if let Some(tag) = [&b"rc"[..], b"beta"].into_iter().find(|tag| s.get(end..).is_some_and(|rest| rest.starts_with(tag))) {
+        end = digits(end + tag.len(), 2)?;
+    }
+    let continues = s.get(end).is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_'));
+    (!continues).then_some(end)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An inline (Go 1.18+) build information block holding `version` and an empty module.
+    fn inline_buildinfo(version: &str) -> Vec<u8> {
+        let mut block = b"\xff Go buildinf:\x08\x02".to_vec();
+        block.resize(32, 0);
+        block.push(version.len() as u8);
+        block.extend_from_slice(version.as_bytes());
+        block.push(0);
+        block
+    }
+
+    #[test]
+    fn go_version_comes_from_the_build_information_before_stray_text() {
+        let (elf, _) = craft_anything_testkit::elf64(craft_anything_testkit::ElfArch::X86_64, true);
+        let b = crate::parse_binary(&elf).unwrap();
+        let mut go = elf;
+        go.extend_from_slice(b"\0go1.190119941996\0go1.21.0\0");
+        go.extend_from_slice(&inline_buildinfo("go1.25.0"));
+        let hints = detect(&b, &go);
+        let g = hints.iter().find(|h| h.id == "go").unwrap();
+        assert_eq!(g.label, "Go (go1.25.0)");
+        assert!(g.evidence.ends_with("version from the build information"), "{}", g.evidence);
+    }
+
+    #[test]
+    fn go_version_from_the_data_is_a_whole_release_name() {
+        let found = |s: &[u8]| go_release_in(s);
+        assert_eq!(found(b"go1.190119941996"), None);
+        assert_eq!(found(b"\0go1.190119941996\0go1.25.0\0"), Some("go1.25.0".into()));
+        assert_eq!(found(b"cargo1.2 go1.2.3.4 go1.x go1. go1.22_x"), None);
+        assert_eq!(found(b"built with go1.21rc2 today"), Some("go1.21rc2".into()));
+        assert_eq!(found(b"go1.20beta1"), Some("go1.20beta1".into()));
+        assert_eq!(found(b"go1.9"), Some("go1.9".into()));
+        assert_eq!(found(b"go1.21.0 X:boringcrypto"), Some("go1.21.0".into()));
+        assert_eq!(found(b"go1.21rc"), None);
+    }
+
+    #[test]
+    fn go_inline_version_skips_stray_magic_and_odd_strings() {
+        let mut data = b"\xff Go buildinf:\x08\x00".to_vec(); // pointer form: not read here
+        data.extend_from_slice(&inline_buildinfo("not a version"));
+        assert_eq!(crate::go::inline_version(&data, usize::MAX), None);
+        data.extend_from_slice(&inline_buildinfo("devel go1.26-abc"));
+        assert_eq!(crate::go::inline_version(&data, usize::MAX).as_deref(), Some("devel go1.26-abc"));
+        assert_eq!(crate::go::inline_version(&data[..data.len() - 4], usize::MAX), None);
+        assert_eq!(crate::go::inline_version(&data, 10), None);
+    }
 
     #[test]
     fn finds_markers() {

@@ -1821,6 +1821,9 @@ Owner: open · Status: in progress
 - [x] Name the glyph weight (26) and glyph size (27) key attributes of asset catalogs, which hold
       SF Symbol style images; they're listed as `attribute-26` and `attribute-27` today.
       — claimed: Chr0mium24, branch bugfix/r3.12-car-glyph-attributes
+- [x] Take a Go program's version in triage from its build information, and otherwise only from a whole
+      `go1.N[.P]` release name, so a stray `go1.` followed by other digits isn't shown as the version (#1397).
+      — claimed: bflatastic, branch bugfix/r3.12-go-version-from-build-info
 
 ### R3.13 Web inspection correctness
 Owner: open · Status: in progress

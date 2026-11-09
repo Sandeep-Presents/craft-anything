@@ -177,6 +177,36 @@ fn uint(r: &Reader<'_>, off: usize, size: u8, big: bool) -> Option<u64> {
     }
 }
 
+/// The Go version in an inline (Go 1.18 and later) build information block within the first
+/// `limit` bytes, read without mapping the file, for quick hints. Older pointer-based blocks give
+/// `None`; `inspect` resolves those.
+pub fn inline_version(data: &[u8], limit: usize) -> Option<String> {
+    let hay = data.get(..limit.min(data.len()))?;
+    let r = Reader::new(data);
+    let mut from = 0usize;
+    // A few stray copies of the magic (in strings or tests) may come before the real block.
+    for _ in 0..64 {
+        let at = from.checked_add(crate::find_bytes(hay.get(from..)?, MAGIC, usize::MAX)?)?;
+        if let Some(version) = inline_version_at(&r, at) {
+            return Some(version);
+        }
+        from = at.checked_add(1)?;
+    }
+    None
+}
+
+fn inline_version_at(r: &Reader<'_>, at: usize) -> Option<String> {
+    if r.u8(at.checked_add(15)?)? & 2 == 0 {
+        return None;
+    }
+    let p = at.checked_add(32)?;
+    let (n, used) = r.uleb128(p)?;
+    let n = usize::try_from(n).ok().filter(|n| (1..=64).contains(n))?;
+    let version = std::str::from_utf8(r.slice(p.checked_add(used)?, n)?).ok()?;
+    let printable = version.bytes().all(|c| c.is_ascii_graphic() || c == b' ');
+    (printable && (version.starts_with("go") || version.starts_with("devel"))).then(|| version.to_owned())
+}
+
 /// The function names and entries in a Go program's function table, or none for other programs.
 /// Cheap for them: only a file with Go's build-information marker or a `gopclntab` section is read.
 pub fn functions(data: &[u8]) -> Vec<GoFunction> {
