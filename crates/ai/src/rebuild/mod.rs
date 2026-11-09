@@ -947,7 +947,7 @@ impl Worker {
         // Each run's conversation starts without the pictures' bytes (a kept transcript has only
         // their names), so the original's go with its first message.
         if attaches {
-            self.show_pictures(agent.as_mut(), ws, &pictures::for_first_message(ws));
+            self.show_pictures(agent.as_mut(), ws, pictures::for_first_message(ws, crate::agent::MAX_PICTURES));
         }
         let mut refinements = 0;
         let mut reminded = false;
@@ -1089,7 +1089,7 @@ impl Worker {
             prompt = refined + &pictures_reminder(ws, sees_pictures);
             if attaches {
                 let root = ws.root.clone();
-                self.show_pictures(agent.as_mut(), ws, &pictures::for_check(&checks, opts.good_enough, |p| root.join(p).is_file()));
+                self.show_pictures(agent.as_mut(), ws, pictures::for_check(&checks, opts.good_enough, crate::agent::MAX_PICTURES, |p| root.join(p).is_file()));
             }
             if !api_loop {
                 prompt.push_str(CHECK_BEFORE_REPLYING);
@@ -1121,13 +1121,15 @@ impl Worker {
         Ok(summary)
     }
 
-    /// Attach pictures (project-relative) to the builder's next message, at most
-    /// [`crate::agent::MAX_PICTURES`]; saying in the feed which couldn't be shown and why.
-    fn show_pictures(&self, agent: &mut dyn Conversation, ws: &Workspace, paths: &[PathBuf]) {
+    /// Attach pictures (project-relative, picked within [`crate::agent::MAX_PICTURES`], with
+    /// `left_out` more that didn't fit) to the builder's next message; saying in the feed which
+    /// couldn't be shown and why.
+    fn show_pictures(&self, agent: &mut dyn Conversation, ws: &Workspace, (paths, mut left_out): (Vec<PathBuf>, usize)) {
         let max = crate::agent::MAX_PICTURES;
-        let (shown, mut skipped) = pictures::load(&ws.root, paths.get(..max).unwrap_or(paths));
-        if paths.len() > max {
-            skipped.push(format!("{} more (at most {max} go with one message)", paths.len() - max));
+        left_out += paths.len().saturating_sub(max);
+        let (shown, mut skipped) = pictures::load(&ws.root, paths.get(..max).unwrap_or(&paths));
+        if left_out > 0 {
+            skipped.push(format!("{left_out} more (at most {max} go with one message)"));
         }
         if !skipped.is_empty() {
             self.emit(RunEvent::Agent(AgentEvent::Status { text: format!("Not shown to the builder: {}.", skipped.join(", ")) }));

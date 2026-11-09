@@ -11,46 +11,96 @@ use crate::model::{Block, MAX_IMAGE_BYTES};
 use craft_anything_engine::workspace::{CheckResult, Workspace};
 use std::path::{Path, PathBuf};
 
-/// The original's pictures for a run's first message, relative to the project folder: the
-/// person's pictures in reference/ first, then the captured screenshots (not the noise masks,
-/// which only say what moves).
-pub(super) fn for_first_message(ws: &Workspace) -> Vec<PathBuf> {
-    let mut v: Vec<PathBuf> = ws.references().iter().filter_map(|p| p.strip_prefix(&ws.root).ok().map(Path::to_path_buf)).collect();
-    let mut shots: Vec<PathBuf> = std::fs::read_dir(ws.capture_dir())
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.is_file() && is_png(p) && !file_name(p).starts_with("noise-"))
-        .filter_map(|p| p.strip_prefix(&ws.root).ok().map(Path::to_path_buf))
+/// The original's pictures for a run's first message, at most `max`, relative to the project
+/// folder: the person's pictures in reference/ first, then the captured screenshots (not the
+/// noise masks, which only say what moves) of the start page and of each other page studied
+/// (`capture/routes/<page>/`), every page's first picture before any page's second, so the other
+/// pages are shown too and not only the start page at every width. Returns the pictures and how
+/// many were left out.
+pub(super) fn for_first_message(ws: &Workspace, max: usize) -> (Vec<PathBuf>, usize) {
+    let references: Vec<Vec<PathBuf>> = ws.references().iter().filter_map(|p| p.strip_prefix(&ws.root).ok().map(|p| vec![p.to_path_buf()])).collect();
+    let mut page_dirs = vec![ws.capture_dir()];
+    let mut routes: Vec<PathBuf> =
+        std::fs::read_dir(ws.capture_dir().join("routes")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+    routes.sort();
+    page_dirs.extend(routes);
+    let pages: Vec<Vec<Vec<PathBuf>>> = page_dirs
+        .iter()
+        .map(|dir| {
+            let mut shots: Vec<PathBuf> = std::fs::read_dir(dir)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_file() && is_png(p) && !file_name(p).starts_with("noise-"))
+                .filter_map(|p| p.strip_prefix(&ws.root).ok().map(Path::to_path_buf))
+                .collect();
+            shots.sort();
+            shots.into_iter().map(|p| vec![p]).collect()
+        })
         .collect();
-    shots.sort();
-    v.extend(shots);
-    v
+    let mut picked = Vec::new();
+    let mut left_out = take_in_turn(&[references], max, &mut picked);
+    left_out += take_in_turn(&pages, max, &mut picked);
+    (picked, left_out)
 }
 
-/// A round's pictures of the build, those of the checks that weren't good enough first, each
-/// after the original's picture at the same place under capture/ when there is one.
-/// `exists` says whether a project-relative file is there.
-pub(super) fn for_check(checks: &[CheckResult], good_enough: f64, exists: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
+/// A round's pictures of the build, at most `max`: those of the checks that weren't good enough
+/// first, and in each check the pages that look least alike first, every page's first picture
+/// before any page's second (a site's start page at three widths would otherwise fill a message,
+/// and its other pages would never be shown). Each build picture comes after the original's
+/// picture at the same place under capture/ when there is one, and the two go together or not at
+/// all. `exists` says whether a project-relative file is there. Returns the pictures and how many
+/// were left out.
+pub(super) fn for_check(checks: &[CheckResult], good_enough: f64, max: usize, exists: impl Fn(&Path) -> bool) -> (Vec<PathBuf>, usize) {
     let mut ordered: Vec<&CheckResult> = checks.iter().filter(|c| !c.good(good_enough)).collect();
     ordered.extend(checks.iter().filter(|c| c.good(good_enough)));
-    let mut v = Vec::new();
+    let mut picked = Vec::new();
+    let mut left_out = 0;
     for c in ordered {
         let round = PathBuf::from("checks").join(format!("round-{}", c.round));
+        // The check's pictures by page (the folder under checks/round-N/), in the order it lists them.
+        let mut pages: Vec<(PathBuf, Vec<Vec<PathBuf>>)> = Vec::new();
         for built in c.artifacts.iter().filter(|p| is_picture(p)) {
-            if let Ok(rel) = built.strip_prefix(&round) {
-                let original = PathBuf::from("capture").join(rel);
-                if exists(&original) && !v.contains(&original) {
-                    v.push(original);
-                }
+            let rel = built.strip_prefix(&round).ok();
+            let mut pair = Vec::new();
+            if let Some(original) = rel.map(|r| PathBuf::from("capture").join(r)).filter(|o| exists(o)) {
+                pair.push(original);
             }
-            if !v.contains(built) {
-                v.push(built.clone());
+            pair.push(built.clone());
+            let dir = rel.and_then(Path::parent).map(Path::to_path_buf).unwrap_or_default();
+            match pages.iter_mut().find(|(d, _)| *d == dir) {
+                Some((_, pairs)) => pairs.push(pair),
+                None => pages.push((dir, vec![pair])),
+            }
+        }
+        // Least alike first; a page the check gave no score keeps its place after those it did.
+        let alike = |dir: &Path| c.pages.iter().find(|p| Path::new(&p.dir) == dir).map_or(f64::INFINITY, |p| p.similarity);
+        pages.sort_by(|a, b| alike(&a.0).total_cmp(&alike(&b.0)));
+        let pages: Vec<Vec<Vec<PathBuf>>> = pages.into_iter().map(|(_, pairs)| pairs).collect();
+        left_out += take_in_turn(&pages, max, &mut picked);
+    }
+    (picked, left_out)
+}
+
+/// Add groups of pictures (a picture, or an original and the build's picture of the same place)
+/// to `picked` while they fit in `max`: each page's first group, then each page's second, and so
+/// on. A group goes in whole or not at all; a picture already picked isn't added again. Returns
+/// how many pictures didn't fit.
+fn take_in_turn(pages: &[Vec<Vec<PathBuf>>], max: usize, picked: &mut Vec<PathBuf>) -> usize {
+    let mut left_out = 0;
+    let deepest = pages.iter().map(Vec::len).max().unwrap_or(0);
+    for k in 0..deepest {
+        for group in pages.iter().filter_map(|p| p.get(k)) {
+            let new: Vec<PathBuf> = group.iter().filter(|p| !picked.contains(p)).cloned().collect();
+            if picked.len() + new.len() <= max {
+                picked.extend(new);
+            } else {
+                left_out += new.len();
             }
         }
     }
-    v
+    left_out
 }
 
 /// Read pictures (project-relative paths) as image blocks named by their path. Those that can't
@@ -107,22 +157,69 @@ mod tests {
             ],
         );
         let program = check("screenshot", 3, Some(95.0), &["checks/round-3/program/screenshot.png"]);
-        let picked = for_check(&[program, web], 80.0, |p| originals.contains(p));
+        let (picked, left_out) = for_check(&[program, web], 80.0, 6, |p| originals.contains(p));
         let picked: Vec<String> = picked.iter().map(|p| p.display().to_string()).collect();
         assert_eq!(
             picked,
             [
                 // The check that wasn't good enough first, each build picture after the original's
-                // (the about page beside the about page, not the start page); one with no original
-                // stands alone, and a text file isn't a picture.
+                // (the about page beside the about page, not the start page); each page's first
+                // picture before any page's second; one with no original stands alone, and a text
+                // file isn't a picture.
                 "capture/screenshot-1280.png",
                 "checks/round-3/screenshot-1280.png",
-                "checks/round-3/screenshot-390.png",
                 "capture/routes/about/screenshot-1280.png",
                 "checks/round-3/routes/about/screenshot-1280.png",
+                "checks/round-3/screenshot-390.png",
                 "checks/round-3/program/screenshot.png",
             ]
         );
+        assert_eq!(left_out, 0);
+    }
+
+    /// A site checked at three widths: its start page alone would fill a message, so its other
+    /// pages were never shown. Within the limit, the least alike pages come first at their first
+    /// width, a pair is never split, and what didn't fit is counted.
+    #[test]
+    fn a_sites_other_pages_are_shown_within_the_limit() {
+        use craft_anything_engine::workspace::PageLikeness;
+        let mut artifacts = Vec::new();
+        let mut pages = Vec::new();
+        for (dir, similarity) in [("", 85.0), ("routes/about", 40.0), ("routes/shop", 60.0), ("routes/blog", 90.0)] {
+            for w in [1440, 768, 390] {
+                artifacts.push(format!("checks/round-2/{dir}{}screenshot-{w}.png", if dir.is_empty() { "" } else { "/" }));
+            }
+            let name = if dir.is_empty() { "start page".to_string() } else { format!("/{}", &dir[7..]) };
+            pages.push(PageLikeness { name, dir: dir.into(), similarity });
+        }
+        let artifacts: Vec<&str> = artifacts.iter().map(String::as_str).collect();
+        let web = CheckResult { pages, ..check(CheckResult::WEB_VISUAL, 2, Some(69.0), &artifacts) };
+        let every_original = |p: &Path| p.starts_with("capture");
+
+        let (picked, left_out) = for_check(std::slice::from_ref(&web), 80.0, 6, every_original);
+        let picked: Vec<String> = picked.iter().map(|p| p.display().to_string()).collect();
+        assert_eq!(
+            picked,
+            [
+                "capture/routes/about/screenshot-1440.png",
+                "checks/round-2/routes/about/screenshot-1440.png",
+                "capture/routes/shop/screenshot-1440.png",
+                "checks/round-2/routes/shop/screenshot-1440.png",
+                "capture/screenshot-1440.png",
+                "checks/round-2/screenshot-1440.png",
+            ]
+        );
+        assert_eq!(left_out, 24 - 6, "four pages at three widths, each with its original");
+
+        // An odd limit leaves the next pair out whole rather than its original alone.
+        let (picked, left_out) = for_check(std::slice::from_ref(&web), 80.0, 5, every_original);
+        assert_eq!(picked.len(), 4);
+        assert_eq!(left_out, 20);
+        // With room for everything, every picture goes, each page's widths in turn.
+        let (picked, left_out) = for_check(std::slice::from_ref(&web), 80.0, 100, every_original);
+        assert_eq!((picked.len(), left_out), (24, 0));
+        assert_eq!(picked[6].display().to_string(), "capture/routes/blog/screenshot-1440.png", "the most alike page last in each turn");
+        assert_eq!(picked[8].display().to_string(), "capture/routes/about/screenshot-768.png");
     }
 
     #[test]
@@ -137,12 +234,36 @@ mod tests {
         for f in ["screenshot-390.png", "screenshot-1280.png", "noise-1280.png", "README.md"] {
             std::fs::write(ws.capture_dir().join(f), png).unwrap();
         }
-        let picked: Vec<String> = for_first_message(&ws).iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
+        let picked: Vec<String> = for_first_message(&ws, 6).0.iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
         assert_eq!(picked, ["reference/picture-1.png", "capture/screenshot-1280.png", "capture/screenshot-390.png"]);
+
+        // The other pages studied are shown too, each page's first picture before any second,
+        // within the limit, with what didn't fit counted.
+        for page in ["shop", "about"] {
+            let dir = ws.capture_dir().join("routes").join(page);
+            std::fs::create_dir_all(&dir).unwrap();
+            for f in ["screenshot-390.png", "screenshot-1280.png", "noise-1280.png"] {
+                std::fs::write(dir.join(f), png).unwrap();
+            }
+        }
+        let (picked, left_out) = for_first_message(&ws, 5);
+        let picked: Vec<String> = picked.iter().map(|p| p.display().to_string().replace('\\', "/")).collect();
+        assert_eq!(
+            picked,
+            [
+                "reference/picture-1.png",
+                "capture/screenshot-1280.png",
+                "capture/routes/about/screenshot-1280.png",
+                "capture/routes/shop/screenshot-1280.png",
+                "capture/screenshot-390.png",
+            ]
+        );
+        assert_eq!(left_out, 2);
+        std::fs::remove_dir_all(ws.capture_dir().join("routes")).unwrap();
 
         // Each is read and named by its path; one that can't be shown is said, not dropped silently.
         std::fs::write(ws.capture_dir().join("screenshot-390.png"), b"not a picture").unwrap();
-        let mut asked: Vec<PathBuf> = for_first_message(&ws);
+        let mut asked: Vec<PathBuf> = for_first_message(&ws, 6).0;
         asked.push(PathBuf::from("capture/gone.png"));
         let (shown, skipped) = load(&ws.root, &asked);
         let names: Vec<&str> = shown.iter().filter_map(|b| if let Block::Image { name, .. } = b { Some(name.as_str()) } else { None }).collect();
