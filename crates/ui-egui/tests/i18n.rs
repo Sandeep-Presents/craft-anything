@@ -149,6 +149,28 @@ fn chinese_startup_language_menu_and_saved_selection() {
         assert_eq!(h.ctx.global_style().right_to_left, rtl);
         let x = h.get_by_label(new_project).rect().center().x;
         assert_eq!(x > 640.0, rtl, "{code}: New project at x = {x}");
+        // A found AI's card: Add at the end, the reason wrapped beside it where reading starts.
+        let reason = "Found the claude command on this computer, in a folder that another account's settings also point at.";
+        let suggestion = craft_anything_ai::BackendConfig {
+            name: "Claude Code".into(),
+            kind: craft_anything_ai::BackendKind::AgentCli,
+            model: "claude-code".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        };
+        let app = h.state_mut();
+        app.backends.clear();
+        app.detected = Some(vec![craft_anything_ai::Detected { suggestion, reason: reason.into(), needs_key: false }]);
+        app.detecting = true;
+        app.state.settings_open = true;
+        app.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        h.run_steps(4);
+        let text = h.get_by_label(reason).rect();
+        let add = h.query_all_by_label(&i18n::tr("Add")).map(|n| n.rect()).find(|r| r.top() < text.bottom() && r.bottom() > text.top() - 30.0);
+        let add = add.expect("the card has an Add button beside its text");
+        let beside = if rtl { add.right() <= text.left() } else { text.right() <= add.left() };
+        assert!(beside, "{code}: the reason ({text:?}) is beside the Add button ({add:?}) where reading starts");
     }
     // Evidence cards and the agent's tool chips name a tool by its translated title.
     i18n::set_language("ar");
