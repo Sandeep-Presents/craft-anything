@@ -107,7 +107,8 @@ fn take_in_turn(pages: &[Vec<Vec<PathBuf>>], max: usize, picked: &mut Vec<PathBu
 const MAX_SOURCE_BYTES: u64 = 64_000_000;
 
 /// Read pictures (project-relative paths) as image blocks named by their path. One larger than
-/// [`MAX_IMAGE_BYTES`] is shrunk to fit, and its name says at what scale it's shown, so sizes
+/// [`MAX_IMAGE_BYTES`], or longer than [`MAX_SIDE`] on a side, is shrunk to fit, and its name
+/// says at what scale it's shown, so sizes
 /// read off it can be scaled back. Those that can't be shown (missing, not a picture, too large
 /// to read) come back with why, to be said.
 pub(super) fn load(root: &Path, paths: &[PathBuf]) -> (Vec<Block>, Vec<String>) {
@@ -162,20 +163,26 @@ impl Shrunk {
     }
 }
 
-/// `bytes` as they are when they fit in `max`; otherwise the picture decoded and scaled down,
-/// keeping its shape, until it fits as a PNG. Each try scales by the square root of how far the
-/// last was over, a little smaller, so a few tries do it.
+/// The longest side a picture is shown with: Anthropic refuses a picture over 8000 px on either
+/// side, however few bytes it is (a full-page screenshot can be that tall).
+pub(super) const MAX_SIDE: u32 = 8000;
+
+/// `bytes` as they are when they fit in `max` and no side is over [`MAX_SIDE`]; otherwise the
+/// picture decoded and scaled down, keeping its shape, until it fits as a PNG. Each try scales by
+/// the square root of how far the last was over, a little smaller, so a few tries do it.
 pub(super) fn fit(bytes: Vec<u8>, max: usize) -> Result<Fitted, String> {
-    use craft_anything_engine::tools::web_common::{decode_picture, encode_png_within, resize};
-    if bytes.len() <= max {
+    use craft_anything_engine::tools::web_common::{decode_picture, encode_png_within, picture_dimensions, resize};
+    let too_long = picture_dimensions(&bytes).is_ok_and(|(w, h)| w.max(h) > MAX_SIDE);
+    if bytes.len() <= max && !too_long {
         return Ok(Fitted { bytes, shrunk: None });
     }
     let img = decode_picture(&bytes).map_err(|e| e.message)?;
     let (from_width, from_height) = (img.width.max(1), img.height.max(1));
-    let mut scale = (max as f64 / bytes.len() as f64).sqrt() * 0.9;
+    let by_bytes = if bytes.len() > max { (max as f64 / bytes.len() as f64).sqrt() * 0.9 } else { 1.0 };
+    let mut scale = by_bytes.min(f64::from(MAX_SIDE) / f64::from(from_width.max(from_height)));
     for _ in 0..8 {
-        let width = ((f64::from(from_width) * scale) as u32).max(1);
-        let height = ((f64::from(from_height) * scale) as u32).max(1);
+        let width = ((f64::from(from_width) * scale) as u32).clamp(1, MAX_SIDE);
+        let height = ((f64::from(from_height) * scale) as u32).clamp(1, MAX_SIDE);
         let small = resize(&img, width, height);
         if let Some(png) = encode_png_within(&small, max).map_err(|e| e.message)? {
             return Ok(Fitted { bytes: png, shrunk: Some(Shrunk { width, height, from_width, from_height }) });
@@ -373,6 +380,24 @@ mod tests {
         assert!(same.shrunk.is_none() && same.bytes == big);
         // Something over the limit that isn't a picture can't be shrunk, and says so.
         assert!(fit(vec![7; 100], 10).is_err());
+    }
+
+    #[test]
+    fn a_picture_longer_than_the_limit_on_a_side_is_shrunk_though_its_bytes_fit() {
+        use craft_anything_engine::tools::web_common::{Image, encode_png, png_dimensions};
+        let tall = |h: u32| encode_png(&Image { width: 100, height: h, rgba: vec![200; 100 * h as usize * 4] }).unwrap();
+        // A full-page screenshot: few bytes (one colour), but taller than a model is shown.
+        let long = tall(MAX_SIDE + 1000);
+        assert!(long.len() < MAX_IMAGE_BYTES);
+        let f = fit(long, MAX_IMAGE_BYTES).unwrap();
+        let s = f.shrunk.unwrap();
+        assert_eq!((s.from_width, s.from_height), (100, MAX_SIDE + 1000));
+        assert_eq!(png_dimensions(&f.bytes).unwrap(), (s.width, s.height));
+        assert_eq!((s.width, s.height), (88, MAX_SIDE), "its shape kept, its long side at the limit");
+        // One at the limit is left exactly as it is.
+        let edge = tall(MAX_SIDE);
+        let same = fit(edge.clone(), MAX_IMAGE_BYTES).unwrap();
+        assert!(same.shrunk.is_none() && same.bytes == edge);
     }
 
     #[test]
