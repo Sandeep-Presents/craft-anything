@@ -10,12 +10,16 @@ workspace clippy, layers, fmt and the secret scan of all history were clean. Chi
 
 macOS Dock launches can find an executable Codex CLI bundled with ChatGPT.app or
 Codex.app after checking PATH; a selected program remains first. Settings → AI
-offers a worker-backed Check action through the same headless API as `ai test`.
-Known signed-out and unknown states are distinct, with guidance for reconnecting.
+offers a worker-backed Check action for every local agent CLI through the same
+headless API as `ai test`. Sign-in comes from the selected backend's adapter and
+configuration folder, not a model-id check. Known signed-out states include guidance;
+unknown states leave the version reply unchanged, without claiming sign-in.
 The check reads no credential files, sends no prompt and does not claim model or
 quota access. Fixture tests cover bundle layouts, permissions, root order, status
-parsing, the selected CLI and rendered results. See [Codex setup and limits](codex.md).
-Local Apple Silicon verification: 771 AI/GUI unit, integration and smoke tests
+parsing, the selected CLI and rendered results. Regression coverage also includes
+a second adapter's true/false/unknown results, its configuration folder, and
+unrelated login-shell errors. See [Codex setup and limits](codex.md).
+Local Apple Silicon verification: 775 AI/GUI unit, integration and smoke tests
 passed with four existing ignored (four test threads), including headless parity.
 All-target clippy with warnings denied, formatting, layers, locks, translation
 coverage and secrets passed. The companion CLI was built with locked dependencies.

@@ -995,8 +995,8 @@ impl AiHub {
         }
     }
 
-    /// Send a tiny request and time it; a coding agent only runs `--version`, so its report says
-    /// `version_only`. Blocking (bounded); run it off the UI thread.
+    /// Send a tiny request and time it; a coding agent checks its version and, when its local
+    /// adapter can tell, sign-in, without a prompt (`version_only`). Blocking; run off the UI thread.
     pub fn test_backend(&self, name: &str) -> Result<TestReport, ToolError> {
         let e = self.entry(name)?;
         let start = Instant::now();
@@ -1008,15 +1008,15 @@ impl AiHub {
             };
             let out = p.timeout(Duration::from_secs(15)).run_checked()?;
             let mut reply = out.stdout_text().lines().next().unwrap_or_default().trim().to_string();
-            if e.config.ssh_host.as_deref().is_none_or(|host| host.trim().is_empty()) && e.config.model == "codex" {
-                let adapter = cli_agents::adapter_for(&e.config.model);
+            if e.config.ssh_host.as_deref().is_none_or(|host| host.trim().is_empty()) {
+                let adapter = cli_agents::AgentAdapters::built_in().for_backend(&e.config.model, &e.options);
                 match adapter.signed_in(&program) {
                     Some(true) => reply.push_str(" · signed in (model access is checked when you send a message)"),
                     Some(false) => {
-                        return Err(ToolError::new(ErrorCode::BadSettings, "Codex is installed but is not signed in.")
+                        return Err(ToolError::new(ErrorCode::BadSettings, format!("{} is installed but is not signed in.", e.config.name))
                             .with_remediation(adapter.sign_in_fix().unwrap_or_default()));
                     }
-                    None => reply.push_str(" · sign-in status could not be verified; try Codex login status in a terminal"),
+                    None => {}
                 }
             }
             return Ok(TestReport {

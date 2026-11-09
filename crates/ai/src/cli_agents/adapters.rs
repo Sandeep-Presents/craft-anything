@@ -181,13 +181,13 @@ pub trait AgentAdapter: Send + Sync {
     fn process(&self, program: &str) -> Process {
         Process::new(program)
     }
-    /// Whether it's signed in, checked before a build starts. `None`: can't tell (the run itself
-    /// reports any sign-in problem).
     /// Whether it still names an account it was signed in to, so a sign-in that doesn't work any
     /// more has expired (or was signed out) rather than never happened.
     fn signed_in_before(&self) -> bool {
         false
     }
+    /// Whether it's signed in, checked before a local build or connection test. `None`: can't
+    /// tell; leave version-only results unchanged and let the run report any sign-in problem.
     fn signed_in(&self, _program: &str) -> Option<bool> {
         None
     }
@@ -783,8 +783,8 @@ impl AgentAdapter for Codex {
         &["codex"]
     }
 
+    /// Ask the selected CLI, not its auth file or keychain; discard raw status output.
     fn signed_in(&self, program: &str) -> Option<bool> {
-        // Ask the selected CLI, not its auth file or keychain: no credentials enter this app.
         let out = Process::new(program).args(["login", "status"]).timeout(Duration::from_secs(10)).stdout_cap(16 * 1024).run().ok()?;
         codex_login_status(out.success, &out.stdout_text(), &out.stderr_text())
     }
@@ -855,6 +855,7 @@ impl AgentAdapter for Codex {
         false
     }
 
+    /// Translate Codex JSON events; only explicit authentication failures get sign-in guidance.
     fn parse(&self, p: &mut StreamParser, v: &Value) -> Vec<AgentEvent> {
         let mut out = Vec::new();
         let t = v.get("type").and_then(Value::as_str).unwrap_or_default();
@@ -896,7 +897,18 @@ impl AgentAdapter for Codex {
             }
             ("turn.failed", _) | ("error", _) => {
                 let m = v.pointer("/error/message").or_else(|| v.get("message")).and_then(Value::as_str).unwrap_or("unknown error");
-                let auth = ["unauthorized", "not logged", "authentication", "login", "token expired"].iter().any(|word| m.to_ascii_lowercase().contains(word));
+                let lower = m.to_ascii_lowercase();
+                let auth = [
+                    "unauthorized",
+                    "not logged in",
+                    "authentication expired",
+                    "authentication failed",
+                    "authentication required",
+                    "login required",
+                    "token expired",
+                ]
+                .iter()
+                .any(|phrase| lower.contains(phrase));
                 out.push(AgentEvent::Error { message: format!("Codex: {m}"), remediation: if auth { self.sign_in_fix() } else { None }, log: None });
             }
             _ => {}

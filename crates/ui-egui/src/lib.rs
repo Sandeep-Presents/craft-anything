@@ -157,7 +157,7 @@ pub enum Done {
     },
     /// What a scan found, and why an expected coding agent may be missing.
     Detected(Vec<Detected>, Vec<craft_anything_ai::detect::DetectHint>),
-    CodexConnection(String, Result<String, String>),
+    AgentConnection(String, Result<String, String>),
     /// The configured backends, the ones chosen to build with and to extract with, and each one's
     /// options.
     Backends(Vec<BackendConfig>, Option<String>, Option<String>, std::collections::BTreeMap<String, craft_anything_ai::BackendOptions>),
@@ -454,8 +454,8 @@ pub struct CraftApp {
     /// Why an expected coding agent may be missing, from the last scan.
     pub detect_hints: Vec<craft_anything_ai::detect::DetectHint>,
     pub detecting: bool,
-    /// Local Codex checks: None while the worker runs, then a credential-free status or error.
-    pub codex_connections: std::collections::BTreeMap<String, Option<Result<String, String>>>,
+    /// Local agent checks: None while the worker runs, then a credential-free status or error.
+    pub agent_connections: std::collections::BTreeMap<String, Option<Result<String, String>>>,
     /// Counts AI choices, so an add that finishes later doesn't undo one made meanwhile.
     pub backend_choices: u64,
     pub log: Vec<LogLine>,
@@ -576,7 +576,7 @@ impl CraftApp {
             detected: None,
             detect_hints: Vec::new(),
             detecting: false,
-            codex_connections: Default::default(),
+            agent_connections: Default::default(),
             backend_choices: 0,
             log: Vec::new(),
             key_inputs: Default::default(),
@@ -1216,15 +1216,16 @@ impl CraftApp {
         self.jobs.spawn("Look for AI on this computer", true, move |_| Ok(Done::Detected(hub.detect(), hub.detect_hints())));
     }
 
-    pub fn check_codex_connection(&mut self, name: String) {
-        if self.codex_connections.get(&name) == Some(&None) {
+    /// Check a selected local agent through the headless API without blocking the UI.
+    pub fn check_agent_connection(&mut self, name: String) {
+        if self.agent_connections.get(&name) == Some(&None) {
             return;
         }
-        self.codex_connections.insert(name.clone(), None);
+        self.agent_connections.insert(name.clone(), None);
         let hub = self.hub.clone();
         self.jobs.spawn("Check", true, move |_| {
             let status = hub.test_backend(&name).map(|report| report.reply).map_err(|error| error.for_people());
-            Ok(Done::CodexConnection(name, status))
+            Ok(Done::AgentConnection(name, status))
         });
     }
 
@@ -1492,8 +1493,8 @@ impl CraftApp {
                 self.log(false, format!("Found {} AI option(s) on this computer", d.len()));
                 self.detected = Some(d);
             }
-            Done::CodexConnection(name, result) => {
-                self.codex_connections.insert(name, Some(result));
+            Done::AgentConnection(name, result) => {
+                self.agent_connections.insert(name, Some(result));
             }
             Done::Backends(b, builder, extractor, options) => {
                 if self.state.backend.as_ref().is_some_and(|n| !b.iter().any(|c| &c.name == n)) {

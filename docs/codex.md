@@ -17,14 +17,18 @@ In Settings → AI, add Codex under Found on this computer → Harnesses, then u
 and `login status` on a worker. `craft-anything-cli ai test <name>` uses the same
 headless API. It sends no prompt, and its `version_only` flag remains true:
 installation and sign-in do not prove model entitlement or remaining usage.
-Unknown or failed status output is reported as unverified, not signed in.
+Unknown or failed status output leaves the version reply unchanged, without a
+signed-in claim. Every configured local agent CLI has the same Check action;
+its adapter determines whether sign-in can be verified, using that backend's
+selected configuration folder where supported.
 
 Codex owns authentication. Run the selected Codex program with `login` in a
 terminal and choose Sign in with ChatGPT, or use Codex's supported API-key login.
 Craft Anything does not read, copy or store Codex's credential files or tokens.
 This is not native ChatGPT OAuth inside Craft Anything and does not change
 Codex's sandbox, approval policy or model selection. A known signed-out state
-and recognized authentication failures include sign-in guidance. SSH connection
+and recognized authentication failures include sign-in guidance. Unrelated
+errors such as a failed login shell do not get authentication advice. SSH connection
 tests retain their existing behavior; the Settings action is local-only.
 
 The bundle layouts, executable permissions, root order, login-status parsing,

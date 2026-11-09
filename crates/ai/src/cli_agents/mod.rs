@@ -78,6 +78,7 @@ pub fn replaced_program(options: &BackendOptions, program: &str) -> Option<Strin
     Path::new(saved).parent().is_some_and(|p| !p.as_os_str().is_empty()).then(|| saved.to_string())
 }
 
+/// Resolve saved commands locally through the shared lookup, but leave SSH commands untouched.
 fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<std::ffi::OsString>) -> Result<String, ToolError> {
     let usual = program_for(&config.model);
     let local = config.ssh_host.as_deref().is_none_or(|h| h.trim().is_empty());
@@ -91,10 +92,6 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
     }
     let path = Path::new(chosen);
     let bare = path.parent().is_none_or(|p| p.as_os_str().is_empty());
-    // A saved bare `codex` needs the same bundle fallback as detection after a Dock launch.
-    if local && usual == "codex" && chosen == "codex" {
-        return Ok(usual_program(&usual, search)?.unwrap_or(usual));
-    }
     // A saved `claude`, by name or as the desktop app's own file, is looked up as the usual one is,
     // so it never starts the desktop app.
     let named_claude = bare && path.file_stem().is_some_and(|s| s.eq_ignore_ascii_case(&usual));
@@ -112,7 +109,11 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
             None => Err(desktop_app_error(path)),
         };
     }
-    if !local || bare || path.exists() {
+    // Saved bare names share detection's desktop-CLI fallback, whichever agent owns it.
+    if local && bare {
+        return Ok(usual_program(chosen, search)?.unwrap_or_else(|| chosen.to_string()));
+    }
+    if !local || path.exists() {
         return Ok(chosen.to_string());
     }
     // Gone, and nothing beside it: the usual program if it's really here, else the saved path, so
@@ -147,6 +148,7 @@ pub fn find_program(program: &str) -> Option<PathBuf> {
     find_program_in(program, craft_anything_platform::which::search_path()).or_else(|| local_desktop_cli(program))
 }
 
+/// Off-PATH desktop CLI locations stay here, not in backend tests or command selection.
 fn local_desktop_cli(program: &str) -> Option<PathBuf> {
     let windows = desktop_cli(program, local_app_data().as_deref());
     #[cfg(target_os = "macos")]
@@ -1651,6 +1653,7 @@ mod tests {
         assert_eq!(macos_codex_in([user, system]), Some(user_cli));
     }
 
+    /// Every supported bundle accepts its CLI, never its GUI or a directory at the CLI path.
     #[cfg(unix)]
     #[test]
     fn every_supported_macos_codex_bundle_layout_is_found_without_the_gui() {
@@ -1676,6 +1679,24 @@ mod tests {
             std::fs::write(&cli, b"stand-in CLI, never run").unwrap();
             std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
             assert_eq!(macos_codex_in([d.path().into()]), Some(cli));
+        }
+    }
+
+    /// Saved usual names share desktop lookup for every agent, while SSH names remain remote.
+    #[test]
+    fn saved_bare_agent_names_share_the_usual_lookup() {
+        let empty = std::env::join_paths(std::iter::empty::<&Path>()).ok();
+        for (model, program, _) in KNOWN {
+            let mut config =
+                BackendConfig { name: "Agent test".into(), kind: BackendKind::AgentCli, model: (*model).into(), base_url: None, ssh_host: None, enabled: true };
+            let options = BackendOptions { command: Some((*program).into()), ..Default::default() };
+            assert_eq!(
+                program_in(&config, &options, empty.clone()).unwrap(),
+                program_in(&config, &BackendOptions::default(), empty.clone()).unwrap(),
+                "{model}"
+            );
+            config.ssh_host = Some("test-host".into());
+            assert_eq!(program_in(&config, &options, empty.clone()).unwrap(), *program, "SSH never resolves a local desktop CLI");
         }
     }
 
@@ -2313,6 +2334,7 @@ mod tests {
         assert!(adapter_for("claude-code").handoff(&saved, 10_000).is_some() && adapter_for("codex").handoff(&saved, 10_000).is_none());
     }
 
+    /// Native stream events preserve text, tool results and usage for both adapters.
     #[test]
     fn parses_codex_and_gemini_streams() {
         let mut p = StreamParser::new(adapter_for("codex"));
@@ -2343,6 +2365,34 @@ mod tests {
         .collect();
         assert!(matches!(&ev[1], AgentEvent::ToolStarted { tool, .. } if tool == "core_targets_list"));
         assert!(matches!(&ev[2], AgentEvent::ToolFinished { ok: false, .. }));
+    }
+
+    /// Login-shell, tool and network failures are not evidence that the account needs sign-in.
+    #[test]
+    fn codex_sign_in_guidance_only_matches_authentication_failures() {
+        for kind in ["turn.failed", "error"] {
+            for (message, needs_login) in [
+                ("login required", true),
+                ("Authentication expired", true),
+                ("authentication failed", true),
+                ("authentication required", true),
+                ("Unauthorized", true),
+                ("not logged in", true),
+                ("token expired", true),
+                ("login shell failed", false),
+                ("authentication service unavailable", false),
+                ("tool execution failed", false),
+                ("network timeout", false),
+            ] {
+                let mut parser = StreamParser::new(adapter_for("codex"));
+                let events = parser.line(&json!({"type":kind,"error":{"message":message}}).to_string());
+                assert!(
+                    matches!(events.as_slice(), [AgentEvent::Error { remediation, message: shown, .. }]
+                    if remediation.is_some() == needs_login && shown == &format!("Codex: {message}")),
+                    "{kind}: {message}: {events:?}"
+                );
+            }
+        }
     }
 
     #[cfg(unix)]
