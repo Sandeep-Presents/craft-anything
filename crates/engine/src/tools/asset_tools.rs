@@ -163,6 +163,12 @@ fn job(ctx: &Ctx<'_>) -> Result<Job, ToolError> {
             comfy.workflow.as_deref().map(str::trim).filter(|w| !w.is_empty()).map(PathBuf::from),
         )));
     }
+    // No way to make anything (no saved key, no ComfyUI server): say so before the permission check (#923).
+    // ComfyUI chosen as the picture model says what it's missing itself, so it passes here.
+    let comfy_chosen = ctx.session.settings.assets.image_model.as_deref() == Some(comfyui::ID);
+    if !comfy_chosen && !providers.ids().into_iter().any(|id| keys.get(id).is_some() || providers.get(id).is_some_and(|p| !p.needs_key())) {
+        return Err(no_key("fal.ai"));
+    }
     if !ws.manifest.generate_assets {
         return Err(ToolError::new(ErrorCode::NoPermission, "The person hasn't turned on generated assets for this project.").with_remediation(
             "Make these assets with simple shapes and colours instead, and tell the person they can turn on generated assets for this game in the app.",
