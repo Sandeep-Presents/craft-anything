@@ -42,6 +42,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// How long adding a server by its address waits to reach it.
+pub const SERVER_CONNECT_WAIT: Duration = Duration::from_secs(15);
+/// How long adding a server by its address waits for its models once it's reached: one still
+/// starting, or loading a model before it answers, took longer than the 10 seconds it had (#1429).
+pub const SERVER_ANSWER_WAIT: Duration = Duration::from_secs(60);
+
 /// Kinds of backend. See `plan/05-ai-backends.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -498,6 +504,11 @@ impl AiHub {
     /// model, the first one it lists that can chat is used. Returns the model. Anthropic's own
     /// address is added as an Anthropic backend, as its API isn't OpenAI's.
     pub fn add_server(&self, name: &str, address: &str, model: Option<&str>, key: Option<String>) -> Result<String, ToolError> {
+        self.add_server_within(name, address, model, key, SERVER_ANSWER_WAIT)
+    }
+
+    /// [`AiHub::add_server`], waiting `wait` for the server to list its models once reached.
+    fn add_server_within(&self, name: &str, address: &str, model: Option<&str>, key: Option<String>, wait: Duration) -> Result<String, ToolError> {
         let name = name.trim();
         let address = address.trim().trim_end_matches('/');
         if name.is_empty() {
@@ -514,13 +525,21 @@ impl AiHub {
         } else {
             // OpenCode Go lists its models at /v1, not under the chat path a person would paste.
             let probe = if openai::is_opencode_go(address) { opencode_go_models_base(address) } else { address.to_string() };
-            openai::OpenAi::compatible(name, &probe, key.clone(), "").list_models(Duration::from_secs(10))
+            openai::OpenAi::compatible(name, &probe, key.clone(), "").list_models_within(SERVER_CONNECT_WAIT, wait)
         };
         let models = listed.map_err(|e| {
-            let why = e.message.clone();
-            e.with_remediation(format!(
-                "Check the address (it usually ends in /v1), that the server is running and can be reached from this computer, and its key if it needs one. ({why})"
-            ))
+            // A server that took the request has the right address: it may still be starting, or
+            // loading a model before it answers (#1429).
+            if http::was_reached(&e) {
+                let secs = wait.as_secs();
+                return e.with_remediation(format!(
+                    "The server was reached but didn't list its models within {secs} seconds. It may still be starting or loading a model: \
+                     wait until it's ready, then add it again."
+                ));
+            }
+            e.with_remediation(
+                "Check the address (it usually ends in /v1), that the server is running and can be reached from this computer, and its key if it needs one.",
+            )
         })?;
         let model = match model.map(str::trim).filter(|m| !m.is_empty()) {
             Some(m) => m.to_string(),

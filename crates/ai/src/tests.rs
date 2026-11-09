@@ -842,6 +842,32 @@ fn a_server_is_added_by_its_address() {
     assert_eq!(h.backends().len(), 2, "only the ones that answered");
 }
 
+/// #1429: a server that takes the request and doesn't list its models in time (still starting, or
+/// loading a model) is told to wait, not to check its address, and the message isn't repeated.
+#[test]
+fn a_server_that_was_reached_but_slow_is_told_to_wait() {
+    let (h, _d) = hub();
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", l.local_addr().unwrap());
+    // Accepts and holds the connection without answering, for longer than the test waits.
+    std::thread::spawn(move || {
+        let held: Vec<_> = l.incoming().take(1).flatten().collect();
+        std::thread::sleep(Duration::from_secs(10));
+        drop(held);
+    });
+    let e = h.add_server_within("Slow box", &url, None, None, Duration::from_secs(2)).unwrap_err();
+    assert_eq!(e.code, ErrorCode::TimedOut, "{e:?}");
+    let advice = e.remediation.clone().unwrap_or_default();
+    assert!(advice.contains("was reached") && advice.contains("2 seconds") && advice.contains("loading a model"), "{advice}");
+    assert!(!advice.contains("Check the address") && !advice.contains(&e.message), "{advice}");
+    assert!(h.backends().is_empty(), "nothing added");
+    // Nothing listening (port zero refuses): still told to check the address, without the message
+    // again in brackets.
+    let e = h.add_server("Nobody", "http://127.0.0.1:0/v1", None, None).unwrap_err();
+    let advice = e.remediation.clone().unwrap_or_default();
+    assert!(advice.contains("Check the address") && !advice.contains(&e.message), "{advice}");
+}
+
 #[test]
 fn a_backend_context_budget_reaches_the_model() {
     let (hub, dir) = hub();

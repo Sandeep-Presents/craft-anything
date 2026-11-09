@@ -33,6 +33,12 @@ pub fn stream_agent(limit: Option<Duration>) -> ureq::Agent {
     agent(Duration::from_secs(15), limit.unwrap_or(STREAM_FIRST_BYTE), limit.unwrap_or(STREAM_BODY))
 }
 
+/// Whether a request's error says the server took it and didn't answer in time: its address is
+/// right, and it may still be starting or loading a model.
+pub fn was_reached(e: &ToolError) -> bool {
+    e.details.as_ref().and_then(|d| d.get("reached")).and_then(Value::as_bool).unwrap_or(false)
+}
+
 /// The agent for quick calls (model lists, probes).
 pub fn quick_agent(total: Duration) -> ureq::Agent {
     agent(total, total, total)
@@ -50,8 +56,10 @@ fn net_error(what: &str, url: &str, e: ureq::Error) -> ToolError {
         } else {
             "A server busy with another tool's work may need longer."
         };
+        // `reached`: the server took the request, so its address is right (#1429).
         return ToolError::new(ErrorCode::TimedOut, format!("{what} took the request but didn't start answering in time."))
-            .with_remediation(format!("{why} {LONGER}"));
+            .with_remediation(format!("{why} {LONGER}"))
+            .with_details(serde_json::json!({ "reached": true }));
     }
     let code = if matches!(e, ureq::Error::Timeout(_)) { ErrorCode::TimedOut } else { ErrorCode::EngineMissing };
     let remediation = if local {

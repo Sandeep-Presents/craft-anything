@@ -190,7 +190,14 @@ impl OpenAi {
 
     /// Model ids from `GET /models`.
     pub fn list_models(&self, timeout: std::time::Duration) -> Result<Vec<String>, ToolError> {
-        let agent = http::quick_agent(timeout);
+        self.list_models_within(timeout, timeout)
+    }
+
+    /// Like [`OpenAi::list_models`], with its own limit for reaching the server (`connect`) and for
+    /// its answer (`wait`): a server still starting or loading a model is reached at once but may
+    /// take a while to answer, and an address nothing listens at shouldn't hold the person as long.
+    pub fn list_models_within(&self, connect: std::time::Duration, wait: std::time::Duration) -> Result<Vec<String>, ToolError> {
+        let agent = http::agent(connect, wait, wait);
         let v = http::get_json(&agent, &self.label, &self.url("models"), &self.headers())?;
         let arr = v.get("data").or_else(|| v.get("models")).and_then(Value::as_array).cloned().unwrap_or_default();
         // A catalogue may list a model only for another API (Responses, Messages): such an entry

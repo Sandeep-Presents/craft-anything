@@ -791,7 +791,8 @@ pub(crate) fn server_form(app: &mut CraftApp, ui: &mut Ui) {
         let w = ui.available_width() - FRAME;
         field(ui, &mut form.address, "address, e.g. http://192.168.1.20:11434/v1", w, "Server address", false);
     });
-    let ready = !form.name.trim().is_empty() && !form.address.trim().is_empty();
+    // One server at a time: pressing Add again while it's asked would only start a second wait.
+    let ready = !form.name.trim().is_empty() && !form.address.trim().is_empty() && form.connecting.is_none();
     let mut add = false;
     ui.horizontal(|ui| {
         field(ui, &mut form.model, "model (optional)", 150.0, "Model", false);
@@ -800,6 +801,19 @@ pub(crate) fn server_form(app: &mut CraftApp, ui: &mut Ui) {
         field(ui, &mut form.key, "API key, if it needs one", w, "API key", true);
         add = widgets::primary_icon(ui, Some("plus"), "Add", ready).clicked() && ready;
     });
+    // A server still starting or loading a model may take up to a minute to answer: say it's being
+    // asked and for how long, so the form doesn't look like nothing happened (#1429).
+    if let Some((_, name, started)) = &form.connecting {
+        let seconds = started.elapsed().as_secs().to_string();
+        ui.horizontal(|ui| {
+            ui.add(widgets::Spinner::new().size(theme::CAPTION).color(t.accent));
+            ui.label(
+                RichText::new(trf("Connecting to {name}… {seconds} s", &[("name", name), ("seconds", &seconds)])).color(t.text_faint).size(theme::CAPTION),
+            );
+        });
+        // The seconds count on even when the spinner is out of view.
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    }
     if add {
         app.add_server();
     }
@@ -1296,6 +1310,47 @@ mod model_options_tests {
             })
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// #1429: while a server is asked for its models the form says so, with the seconds waited, and
+    /// Add waits; the line goes when the job ends, whether the server was added or not.
+    #[test]
+    fn a_server_being_added_shows_that_it_is_connecting() {
+        let draw = |app: &mut CraftApp| {
+            let context = egui::Context::default();
+            crate::theme::install_fonts(&context);
+            let mut output = context.run_ui(egui::RawInput::default(), |ui| server_form(app, ui));
+            output.textures_delta.clear();
+            output
+                .shapes
+                .iter()
+                .filter_map(|shape| match &shape.shape {
+                    egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let mut app = app_with_backend();
+        assert!(!draw(&mut app).contains("Connecting to"), "nothing to say before Add");
+        // Port zero refuses at once: the job never reaches a network.
+        app.server_form.name = "Home box".into();
+        app.server_form.address = "http://127.0.0.1:0/v1".into();
+        app.add_server();
+        let job = app.server_form.connecting.as_ref().map(|(job, ..)| *job).expect("connecting");
+        let text = draw(&mut app);
+        assert!(text.contains("Connecting to Home box… 0 s"), "{text}");
+        // A different job finishing leaves it alone; this one's failure clears it.
+        app.handle_done(crate::jobs::Finished { job: job.wrapping_add(1000), result: Err("other".into()) });
+        assert!(app.server_form.connecting.is_some());
+        let refused = craft_anything_engine::evidence::ToolError::invalid("refused");
+        app.handle_done(crate::jobs::Finished {
+            job,
+            result: Ok(crate::Done::BackendAdded { name: "Home box".into(), result: Err(refused), choices: app.backend_choices }),
+        });
+        assert!(app.server_form.connecting.is_none());
+        assert!(!draw(&mut app).contains("Connecting to"));
+        assert_eq!(app.server_form.address, "http://127.0.0.1:0/v1", "what was typed is kept to fix it");
     }
 
     #[test]
