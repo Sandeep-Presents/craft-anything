@@ -899,6 +899,13 @@ fn nothing_done(backend: &str) -> AgentEvent {
     AgentEvent::TurnDone { backend: backend.to_string(), input_tokens: 0, output_tokens: 0, cost_usd: None, cost_is_estimate: false }
 }
 
+/// How long a turn's process may keep running after its stream already said the turn was done
+/// (Claude Code's final `result` line, or another adapter's equivalent) before we stop waiting on
+/// it. The turn is over once the stream says so; a shutdown hook or cleanup step that hangs after
+/// that must not leave the build "Pausing" for as long as the idle timeout allows (hours, for a
+/// builder turn, since a hung hook alone never touches stdout again to reset it).
+const RESULT_GRACE: Duration = Duration::from_secs(5);
+
 /// One message as one run of the agent's program (here or over SSH), its events sent on `tx`
 /// as they come. Returns the `TurnDone` that ends the turn, whatever happened, for the caller to
 /// send once the conversation can take the next message. The session it reports is kept for the
@@ -1034,6 +1041,10 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
     let failed_tools = Arc::new(AtomicBool::new(false));
     let (failed_tools2, failed_tools3) = (failed_tools.clone(), failed_tools.clone());
     let stop2 = stop.clone();
+    // Set once the stream's own terminal event is parsed, so the process is stopped `RESULT_GRACE`
+    // after rather than whenever it happens to exit (its own shutdown hooks aren't ours to wait on).
+    let result_seen: Arc<Mutex<Option<std::time::Instant>>> = Arc::new(Mutex::new(None));
+    let (result_seen2, result_seen3) = (result_seen.clone(), result_seen.clone());
     let mut proc = (if remote.is_none() { adapter.process(&prog) } else { Process::new(&prog) })
         .args(&argv)
         .timeout(Duration::from_secs(spec.options.timeout_secs.unwrap_or(turn)))
@@ -1043,7 +1054,10 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
     }
     let mut proc = proc
         .stdout_cap(4 * 1024 * 1024)
-        .cancel_when(move || stop2.is_stopped() || failed_tools2.load(Ordering::SeqCst))
+        .cancel_when(move || {
+            let seen: Option<std::time::Instant> = *result_seen3.lock().unwrap_or_else(PoisonError::into_inner);
+            stop2.is_stopped() || failed_tools2.load(Ordering::SeqCst) || seen.is_some_and(|at| at.elapsed() >= RESULT_GRACE)
+        })
         .on_stdout_line(move |l| {
             if failed_tools3.load(Ordering::SeqCst) {
                 return;
@@ -1064,6 +1078,12 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
                 *failure2.lock().unwrap_or_else(PoisonError::into_inner) = Some(failed);
                 if failed.kind == FailureKind::ToolsUnavailable {
                     failed_tools3.store(true, Ordering::SeqCst);
+                }
+            }
+            if p.saw_result {
+                let mut seen = result_seen2.lock().unwrap_or_else(PoisonError::into_inner);
+                if seen.is_none() {
+                    *seen = Some(std::time::Instant::now());
                 }
             }
             for e in events {
@@ -1126,6 +1146,10 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
             }
         }
         Ok(_) => {}
+        // The stream already said the turn was done; it's that result, not this cancellation,
+        // that ends the turn. Whatever kept the process itself running past that (a shutdown
+        // hook, logging, cleanup) isn't ours to wait on or report as a stop.
+        Err(e) if e.code == craft_anything_evidence::ErrorCode::Cancelled && p.saw_result => {}
         Err(e) if e.code == craft_anything_evidence::ErrorCode::Cancelled => {
             let _ = tx.send(AgentEvent::Status { text: "Stopped.".into() });
         }
@@ -2725,6 +2749,60 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
             }
             assert!(!events.iter().any(|e| matches!(e, AgentEvent::Error { .. })), "round {round}: {events:?}");
         }
+    }
+
+    /// A fake `claude` that prints the turn's `result` line, then hangs well past it (standing in
+    /// for a shutdown hook or cleanup step that got stuck after Claude Code's own turn was done).
+    #[cfg(unix)]
+    fn hangs_after_its_result(dir: &std::path::Path) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let program = dir.join("claude");
+        let reply = r#"{"type":"result","subtype":"success","is_error":false,"num_turns":1,"session_id":"s1"}"#;
+        std::fs::write(&program, format!("#!/bin/sh\necho '{reply}'\nsleep 20\n")).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        program
+    }
+
+    #[cfg(windows)]
+    fn hangs_after_its_result(dir: &std::path::Path) -> PathBuf {
+        let program = dir.join("claude.cmd");
+        let reply = r#"{"type":"result","subtype":"success","is_error":false,"num_turns":1,"session_id":"s1"}"#;
+        std::fs::write(&program, format!("@echo off\r\necho {reply}\r\nping -n 21 127.0.0.1 >nul\r\n")).unwrap();
+        program
+    }
+
+    /// A turn whose stream already said it was done (the `result` line) must not stay "Building"
+    /// for as long as the process takes to actually exit: a shutdown hook or cleanup step that
+    /// hangs after that line isn't ours to wait on. Without `RESULT_GRACE`, this test would see no
+    /// `TurnDone` until the fake CLI's 20 s sleep ends; with it, `TurnDone` arrives within seconds.
+    #[test]
+    fn a_turn_already_said_done_ends_without_waiting_for_the_process_to_exit() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = hangs_after_its_result(dir.path());
+        let config =
+            BackendConfig { name: "Claude".into(), kind: BackendKind::AgentCli, model: "claude-code".into(), base_url: None, ssh_host: None, enabled: true };
+        let options = BackendOptions { command: Some(program.display().to_string()), ..Default::default() };
+        let mut spec = CliSpec::new(config, options, false, None);
+        // A short, single-line preamble: on Windows, a `.cmd` stand-in can't take the real
+        // multi-line default (a batch file's arguments can't carry a newline), which is beside
+        // the point of this test either way.
+        spec.preamble = Some("P:".into());
+        let mut c = CliConversation::new(spec);
+        c.send("go");
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut events = Vec::new();
+        loop {
+            let got = c.poll();
+            let done = got.iter().any(|e| matches!(e, AgentEvent::TurnDone { .. }));
+            events.extend(got);
+            if done {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "no TurnDone within {RESULT_GRACE:?} of the result line: {events:?}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let bad = |e: &AgentEvent| matches!(e, AgentEvent::Error { .. }) || matches!(e, AgentEvent::Status { text } if text == "Stopped.");
+        assert!(!events.iter().any(bad), "{events:?}");
     }
 
     /// #91: a Mac app with no CLI beside it reached Claude Code, which stopped with a stack trace.
