@@ -1509,3 +1509,4 @@ Check a ComfyUI server	ComfyUI 서버 확인
 Looking for checkpoints…	체크포인트를 찾는 중…
 {n} checkpoints found	체크포인트 {n}개를 찾았습니다
 1 checkpoint found	체크포인트 1개를 찾았습니다
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	설정 → 빌드에 ComfyUI 주소와 체크포인트가 필요합니다. 그전까지는 게임을 이것 없이 만듭니다.

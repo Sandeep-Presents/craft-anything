@@ -209,9 +209,12 @@ impl AssetSettings {
     /// Pictures come from the person's own ComfyUI server: it's the picture model, with the same
     /// two fields the asset tools need before they send anything (an address and a checkpoint).
     pub fn comfyui_ready(&self) -> bool {
+        self.comfyui_chosen() && !self.comfyui.address.trim().is_empty() && !self.comfyui.checkpoint.trim().is_empty()
+    }
+
+    /// ComfyUI is the picture model, set up or not.
+    pub fn comfyui_chosen(&self) -> bool {
         self.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID)
-            && !self.comfyui.address.trim().is_empty()
-            && !self.comfyui.checkpoint.trim().is_empty()
     }
 }
 

@@ -1509,3 +1509,4 @@ Workflow	Flujo de trabajo
 e.g. http://192.168.1.20:8188	p. ej. http://192.168.1.20:8188
 on your server	en tu servidor
 {n} checkpoints found	{n} checkpoints encontrados
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Necesita una dirección de ComfyUI y un checkpoint en Configuración → Construcciones. Mientras tanto, el juego se construye sin ellos.

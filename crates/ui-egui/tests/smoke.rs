@@ -204,16 +204,25 @@ fn turning_on_generated_assets_without_a_fal_key_asks_for_one() {
     h.get_by_label("Generate custom pictures and models").click();
     h.run_steps(3);
     assert!(h.state().state.make.generate_assets && h.state().state.modal.is_none());
-    // No key, but a ComfyUI server makes the pictures: nothing is asked, and the note says so.
+    // ComfyUI chosen but with no checkpoint: Settings → Builds opens, not the fal.ai key.
     h.get_by_label("Generate custom pictures and models").click();
     h.run_steps(2);
     {
         let a = &mut h.state_mut().settings.assets;
         a.image_model = Some(craft_anything_engines::assets::comfyui::ID.into());
         a.comfyui.address = "http://127.0.0.1:9".into();
-        a.comfyui.checkpoint = "a.safetensors".into();
     }
     h.state_mut().asset_keys = Some(fal_key(false));
+    h.get_by_label("Generate custom pictures and models").click();
+    h.run_steps(3);
+    assert!(h.state().state.modal.is_none(), "a fal.ai key wouldn't fill in ComfyUI");
+    assert!(h.state().state.settings_open && h.state().state.settings_tab == craft_anything_ui_egui::state::SettingsTab::Builds);
+    h.get_by_label("Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.");
+    h.state_mut().state.settings_open = false;
+    // No key, but a ComfyUI server makes the pictures: nothing is asked, and the note says so.
+    h.get_by_label("Generate custom pictures and models").click();
+    h.run_steps(2);
+    h.state_mut().settings.assets.comfyui.checkpoint = "a.safetensors".into();
     h.get_by_label("Generate custom pictures and models").click();
     h.run_steps(3);
     assert!(h.state().state.make.generate_assets && h.state().state.modal.is_none(), "a ComfyUI server needs no key");

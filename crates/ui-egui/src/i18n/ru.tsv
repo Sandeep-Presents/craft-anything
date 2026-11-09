@@ -1509,3 +1509,4 @@ Check a ComfyUI server	Проверить сервер ComfyUI
 Looking for checkpoints…	Поиск чекпойнтов…
 {n} checkpoints found	Найдено чекпойнтов: {n}
 1 checkpoint found	Найден 1 чекпойнт
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Нужны адрес ComfyUI и чекпойнт в разделе Настройки → Сборки. До этого игра собирается без них.

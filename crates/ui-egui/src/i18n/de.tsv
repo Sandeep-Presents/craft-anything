@@ -1509,3 +1509,4 @@ Check a ComfyUI server	ComfyUI-Server prüfen
 Looking for checkpoints…	Suche Checkpoints…
 {n} checkpoints found	{n} Checkpoints gefunden
 1 checkpoint found	1 Checkpoint gefunden
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Braucht eine ComfyUI-Adresse und einen Checkpoint unter Einstellungen → Builds. Bis dahin wird das Spiel ohne sie gebaut.

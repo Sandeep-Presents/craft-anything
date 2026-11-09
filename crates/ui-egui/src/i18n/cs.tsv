@@ -1509,3 +1509,4 @@ Check a ComfyUI server	Zkontrolovat server ComfyUI
 Looking for checkpoints…	Hledám checkpointy…
 {n} checkpoints found	Nalezeno checkpointů: {n}
 1 checkpoint found	Nalezen 1 checkpoint
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Vyžaduje adresu ComfyUI a checkpoint v Nastavení → Sestavení. Do té doby se hra sestavuje bez nich.

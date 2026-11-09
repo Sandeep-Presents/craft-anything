@@ -1509,3 +1509,4 @@ Check a ComfyUI server	检查 ComfyUI 服务器
 Looking for checkpoints…	正在查找检查点…
 {n} checkpoints found	找到 {n} 个检查点
 1 checkpoint found	找到 1 个检查点
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	需要在 设置 → 构建 中填写 ComfyUI 地址和检查点。填写之前，构建游戏时不会生成这些素材。
