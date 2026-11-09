@@ -477,6 +477,15 @@ been run live.
 - [x] Do not select an embedding, ranking or transcription model as a chat backend when a local server has no chat models — claimed: Afloat16, branch bugfix/r5.4-nonchat-model-detection-20261103
 - [x] Recognize specialised model file paths and numeric task-name versions during local chat setup
       — claimed: Afloat16, branch bugfix/r5.4-model-task-identifiers-20261103
+- [ ] Adding a server by its address with no model took the first chat model its `/models` lists;
+      FastFlowLM lists every model it can download, so the saved model started a 5.5 GB download
+      and unloaded the one in use (#1434). Prefer a chat model the server says is loaded
+      (`/api/ps`, which Ollama and FastFlowLM answer) before the list
+      — claimed: jgt87, branch bugfix/r5.4-add-server-loaded-model
+- [ ] **decision** When nothing says which model is loaded and a server lists more than one chat
+      model, ask the person to pick one (the list in the address form's model field) instead of
+      taking the first (#1434): `/api/ps` helps only while a model is loaded, and LM Studio and
+      llama.cpp routers don't answer it
 - [x] The first run's AI step can add a model server on another computer by its address (llama.cpp,
       Ollama or LM Studio on a home server), the same form as Settings → AI
 - [ ] A chat sent while a llama.cpp router is still loading the model ended after 31 s with "The
