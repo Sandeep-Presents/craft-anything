@@ -326,6 +326,9 @@ pub struct ServerForm {
     /// The server being asked for its models (the job, its name, when it started); the form says
     /// it's connecting and for how long (#1429).
     pub connecting: Option<(u64, String, Instant)>,
+    /// The address the key was typed or tested with. The models are listed with the key only at
+    /// that address, so editing the address never sends the key to a half-typed or other host.
+    pub key_address: String,
     /// The models the service lists, and the one picked or typed.
     pub choice: model_pick::ModelChoice,
     /// The last test of what the form holds.

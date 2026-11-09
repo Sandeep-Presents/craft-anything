@@ -1038,6 +1038,12 @@ fn a_kinds_environment_key_never_goes_to_another_address() {
     let env = |v: &str| (v == "ANTHROPIC_API_KEY").then(|| "sk-ant-env".to_string());
     assert_eq!(kind_env_key_with(BackendKind::Anthropic, Some("https://api.anthropic.com"), env).as_deref(), Some("sk-ant-env"));
     assert_eq!(kind_env_key_with(BackendKind::Anthropic, Some("https://other-host/v1"), env), None);
+    // A request goes to the host before any `?`, `#` or `\`: an `@` after them names no host.
+    for tricked in ["https://other-host?@api.anthropic.com/v1", "https://other-host#@api.anthropic.com", "https://other-host\\@api.anthropic.com"] {
+        assert_eq!(kind_env_key_with(BackendKind::Anthropic, Some(tricked), env), None, "{tricked}");
+        assert!(!openai::is_opencode_go(&tricked.replace("api.anthropic.com", "opencode.ai/inference/go")), "{tricked}");
+    }
+    assert!(openai::is_opencode_go("https://opencode.ai/inference/go?x=1"), "a query after the path is still the service");
 }
 
 #[test]

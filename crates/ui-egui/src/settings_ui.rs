@@ -932,12 +932,18 @@ pub(crate) fn form_signature(form: &ServerForm) -> u64 {
     h.finish()
 }
 
+fn form_address(address: &str) -> &str {
+    address.trim().trim_end_matches('/')
+}
+
 /// What the form asks the service for its models with, once there is enough to ask.
 fn form_ask(form: &ServerForm, service: &craft_anything_ai::providers::Service) -> Option<Ask> {
     let key = form.key.trim().to_string();
     if service.needs_address {
-        let address = form.address.trim().trim_end_matches('/');
+        let address = form_address(&form.address);
         let web = address.split_once("://").is_some_and(|(scheme, rest)| matches!(scheme, "http" | "https") && !rest.is_empty());
+        // The key goes only to the address it was typed or tested with.
+        let key = if form_address(&form.key_address) == address { key } else { String::new() };
         return web.then(|| Ask { kind: service.kind, base_url: Some(address.to_string()), key });
     }
     // A hosted service is asked only once the key looks whole, as on the key cards: a pause while
@@ -1016,7 +1022,11 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
     if service.needs_address {
         form_row(ui, label_w, "Address", |ui, w| field(ui, w, &mut form.address, "e.g. http://192.168.1.20:8080/v1", "Server address", false));
     }
+    let key_before = form.key.clone();
     form_row(ui, label_w, "API key", |ui, w| field(ui, w, &mut form.key, "if it needs one", "API key", true));
+    if form.key != key_before {
+        form.key_address = form.address.clone();
+    }
     let ask = form_ask(form, service);
     // Test needs only what the listing needs; Add also needs a name.
     let can_test = ask.is_some();
@@ -1072,6 +1082,8 @@ fn server_form_body(app: &mut CraftApp, ui: &mut Ui) {
         app.add_server();
     }
     if test {
+        // Testing sends the key to this address, so the listing may use it there too.
+        app.server_form.key_address = app.server_form.address.clone();
         app.test_endpoint();
     }
 }
@@ -1325,6 +1337,24 @@ mod tests {
         let ask = |key: &str| form_ask(&ServerForm { key: key.into(), ..Default::default() }, hosted);
         assert!(ask("").is_none() && ask("sk-or").is_none(), "part of a key");
         assert_eq!(ask(" sk-test-0000 ").map(|a| a.key), Some("sk-test-0000".to_string()));
+    }
+
+    /// On a server of the person's own, the key is listed with only at the address it was typed
+    /// or tested with: editing the address afterwards never sends it to the new host.
+    #[test]
+    fn an_own_servers_key_stays_with_its_address() {
+        let services = craft_anything_ai::providers::services();
+        let own = services.iter().find(|s| s.needs_address).expect("your own server");
+        let form = |address: &str, key_address: &str| ServerForm {
+            address: address.into(),
+            key: "sk-test-0000".into(),
+            key_address: key_address.into(),
+            ..Default::default()
+        };
+        let key = |f: ServerForm| form_ask(&f, own).map(|a| a.key);
+        assert_eq!(key(form("http://10.0.0.20:8080/v1", "http://10.0.0.20:8080/v1/")).as_deref(), Some("sk-test-0000"));
+        assert_eq!(key(form("http://10.0.0.2", "http://10.0.0.20:8080/v1")).as_deref(), Some(""), "a half-typed host");
+        assert_eq!(key(form("http://other-host/v1", "")).as_deref(), Some(""), "typed before any address");
     }
 
     #[test]

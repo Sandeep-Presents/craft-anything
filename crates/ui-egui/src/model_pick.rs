@@ -98,6 +98,15 @@ impl ModelChoice {
         };
         if self.typed.as_ref().map(|(a, _)| a) != Some(&ask) {
             self.typed = Some((ask.clone(), now));
+            // The list (or the answer on its way) is for other inputs: drop it, so it can't be
+            // added with another server's model. A model typed by hand stays.
+            if self.asked.as_ref().is_some_and(|a| *a != ask) {
+                self.asked = None;
+                self.awaiting = None;
+                self.models.clear();
+                self.error = None;
+                self.picked.clear();
+            }
         }
         if self.asked.as_ref() == Some(&ask) {
             return Poll::Idle;
@@ -369,6 +378,26 @@ mod tests {
         assert_eq!(c.step(1.2, Some(ask("ab"))), Poll::Fire(ask("ab")));
         assert_eq!(c.step(1.3, Some(ask("ab"))), Poll::Idle, "asked once");
         assert!(matches!(c.step(1.4, Some(ask("abc"))), Poll::Wait(_)), "a new key asks again");
+    }
+
+    /// New inputs drop the old list and the answer still on its way; a typed model stays.
+    #[test]
+    fn new_inputs_drop_the_old_list_and_its_late_answer() {
+        let mut c = ModelChoice::default();
+        c.step(0.0, Some(ask("a")));
+        assert_eq!(c.step(1.0, Some(ask("a"))), Poll::Fire(ask("a")));
+        c.awaiting = Some(1);
+        c.apply(models(&["old-model"]));
+        c.step(2.0, Some(ask("a")));
+        assert_eq!(c.step(3.0, Some(ask("a"))), Poll::Idle);
+        // Asked again for the same inputs, then they change while the answer is on its way.
+        c.typed_model = "my-alias".into();
+        c.custom = true;
+        c.awaiting = Some(2);
+        assert!(matches!(c.step(4.0, Some(ask("b"))), Poll::Wait(_)));
+        assert!(c.models.is_empty() && !c.loading() && c.picked.is_empty(), "{c:?}");
+        assert_eq!(c.chosen(), "my-alias", "a typed model stays");
+        assert_eq!(c.step(5.0, Some(ask("b"))), Poll::Fire(ask("b")), "the new inputs are asked about");
     }
 
     /// Inputs that stop naming something to ask about empty the list.
