@@ -269,6 +269,7 @@ fn rail_list(app: &mut CraftApp, ui: &mut Ui, kind: RailKind, fill: &Fill) {
     }
 }
 
+/// Render a selectable analysis-result row with its address, name and accessible selection.
 fn list_row(ui: &mut Ui, r: &Value, selected: bool, h: f32) -> bool {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), h), egui::Sense::click());

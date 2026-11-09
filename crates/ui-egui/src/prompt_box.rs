@@ -131,6 +131,7 @@ pub struct PromptOut {
     pub restore: Option<Vec<PathBuf>>,
 }
 
+/// Render an editable prompt and attachment controls, returning requested actions to its caller.
 pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBox) -> PromptOut {
     let t = Tokens::get(ui.ctx());
     let mut out = PromptOut::default();
@@ -436,6 +437,7 @@ mod tests {
     }
 
     #[test]
+    /// Attachment thumbnails stay on one row and can be targeted independently.
     fn picture_tiles_sit_side_by_side_in_one_row() {
         use egui_kittest::kittest::Queryable as _;
         let files: Vec<PathBuf> = ["a.png", "b.png", "c.png"].map(PathBuf::from).to_vec();

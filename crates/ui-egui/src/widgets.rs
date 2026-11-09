@@ -436,6 +436,7 @@ impl Spinner {
 }
 
 impl egui::Widget for Spinner {
+    /// Paint an animated spinner and expose it as a progress indicator to accessibility clients.
     fn ui(self, ui: &mut Ui) -> Response {
         let size = self.size.unwrap_or_else(|| ui.style().spacing.interact_size.y);
         let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());

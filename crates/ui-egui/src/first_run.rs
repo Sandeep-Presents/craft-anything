@@ -9,6 +9,7 @@ use craft_anything_ai::{BackendKind, Detected};
 use craft_anything_engine::Mode;
 use egui::{Align2, RichText, Ui, Vec2};
 
+/// Render onboarding with a scrollable body and reachable navigation controls.
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let full = ui.max_rect();
@@ -243,6 +244,7 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
     });
 }
 
+/// Draw a selectable onboarding choice with its accessible label and selection state.
 fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();

@@ -737,6 +737,7 @@ fn the_builders_questions_can_come_to_the_person_for_one_project() {
 }
 
 #[test]
+/// Approval choices in the prompt and menu update the selected project's permission settings.
 fn approvals_are_chosen_from_the_prompt_box_and_its_menu() {
     use craft_anything_engine::workspace::{ActionKind, Approval, TargetRef, Workspace};
     let d = tempfile::tempdir().unwrap();
@@ -907,6 +908,7 @@ fn website_choice_stays_picked_while_the_address_is_empty() {
 }
 
 #[test]
+/// Mode and Deep controls update state while preserving the consent interaction.
 fn mode_switch_and_deep_toggle() {
     let store = tempfile::tempdir().unwrap();
     let empty = store.path().to_path_buf();
@@ -1097,6 +1099,7 @@ fn opening_a_missing_file_is_a_calm_error() {
 }
 
 #[test]
+/// A Clean room request requiring Deep mode presents consent before opening the target.
 fn clean_room_asks_for_deep_mode_instead_of_opening_a_file() {
     use craft_anything_ui_egui::state::Modal;
     let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, true)));

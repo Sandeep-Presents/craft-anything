@@ -6,6 +6,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use std::path::Path;
 
+/// Create an isolated locale harness without real settings persistence or optional-font requirements.
 fn harness(mut settings: Settings, dir: &Path) -> Harness<'static, CraftApp> {
     let dir = dir.to_path_buf();
     // Keep every engine path under the test directory, including after a saved-settings reload.
@@ -35,6 +36,7 @@ fn harness(mut settings: Settings, dir: &Path) -> Harness<'static, CraftApp> {
 }
 
 #[test]
+/// Both Chinese locales survive startup, accessible language selection and a saved-settings roundtrip.
 fn chinese_startup_language_menu_and_saved_selection() {
     let temp = tempfile::tempdir().unwrap();
     for (initial, native, other, other_native, translated_language, translated_open) in [

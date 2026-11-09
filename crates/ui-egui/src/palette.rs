@@ -62,6 +62,7 @@ pub fn score(hay: &str, query: &str) -> Option<i32> {
     Some(score - (hay.len() as i32 / 16))
 }
 
+/// Render searchable app commands and registered tools, or the selected tool's parameter form.
 pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
     if !app.state.palette.open {
         return;
@@ -244,6 +245,7 @@ pub(crate) fn run_app_command(app: &mut CraftApp, c: AppCommand) {
     }
 }
 
+/// Build a tool form from its registered schema and dispatch after the person chooses Run.
 fn form(app: &mut CraftApp, ctx: &egui::Context, tool: &str) {
     let t = Tokens::get(ctx);
     let Some(spec) = app.engine.registry().get(tool).copied() else {

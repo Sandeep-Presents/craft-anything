@@ -22,11 +22,13 @@ fn check_lock(lock: &str) -> Result<(), String> {
 }
 
 #[test]
+/// The real lockfile must retain the published macOS observer-preservation fix.
 fn locked_macos_adapter_contains_the_kvo_fix() {
     assert_eq!(check_lock(include_str!("../../../Cargo.lock")), Ok(()));
 }
 
 #[test]
+/// Old, prerelease and malformed resolutions cannot establish that teardown is fixed.
 fn guard_rejects_the_crashing_resolution_and_uncertain_inputs() {
     for version in ["0.26.3", "0.27.1", "0.27.2-alpha.1", "0.28.0-beta.1", "invalid"] {
         let lock = format!("[[package]]\nname = 'accesskit_macos'\nversion = '{version}'\n");
@@ -38,6 +40,7 @@ fn guard_rejects_the_crashing_resolution_and_uncertain_inputs() {
 }
 
 #[test]
+/// A fixed package cannot hide a second vulnerable adapter in the same lockfile.
 fn guard_accepts_fixed_releases_but_checks_every_resolution() {
     for version in ["0.27.2", "0.27.10", "0.28.0", "1.0.0"] {
         let lock = format!("[[package]]\nname = 'accesskit_macos'\nversion = '{version}'\n");

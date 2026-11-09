@@ -133,6 +133,7 @@ fn row(ui: &mut Ui, title: &str, sub: &str, add: impl FnOnce(&mut Ui)) {
     ui.add_space(10.0);
 }
 
+/// Render general preferences and route confirmed edits through the app's persistence path.
 fn general(app: &mut CraftApp, ui: &mut Ui) {
     row(ui, "Mode", "Simple: say what you want and it's handled for you. Advanced: every tool, the evidence and the logs.", |ui| {
         let sel = usize::from(app.settings.mode == Mode::Experienced);
@@ -202,6 +203,7 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
     });
 }
 
+/// Choose the UI language using its native name and persist the selected locale.
 fn language(app: &mut CraftApp, ui: &mut Ui) {
     row(ui, "Language", "", |ui| {
         let selected = (!app.settings.language.trim().is_empty()).then(|| crate::i18n::language_from_tag(&app.settings.language).unwrap_or("en"));
@@ -828,6 +830,7 @@ fn number<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, range: std::ops::
     ui.add(egui::DragValue::new(value).range(range).prefix(prefix).suffix(suffix)).changed()
 }
 
+/// Edit build goals and asset-generation settings, persisting changes after rendering.
 fn builds(app: &mut CraftApp, ui: &mut Ui) {
     let mut changed = false;
     let b = &mut app.settings.build;
@@ -1126,6 +1129,7 @@ mod tests {
     }
 
     #[test]
+    /// The shared picker deduplicates model labels without losing the selected model's identity.
     fn identical_model_names_are_shown_once_in_the_shared_picker() {
         use craft_anything_ai::{AgentModel, BackendEntry, ModelContext};
         use egui_kittest::{Harness, kittest::Queryable};
@@ -1164,6 +1168,7 @@ mod tests {
     }
 
     #[test]
+    /// Missing-model warnings identify the configured backend rather than another agent.
     fn shared_picker_warnings_name_the_configured_agent() {
         use craft_anything_ai::{BackendEntry, ModelContext};
         use egui_kittest::{Harness, kittest::Queryable};

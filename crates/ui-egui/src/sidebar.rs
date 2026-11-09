@@ -27,6 +27,7 @@ const ROW_H: f32 = 34.0;
 /// Room above the first row and below Settings.
 const EDGE: f32 = 14.0;
 
+/// Render project navigation in folded or full form while keeping Settings reachable.
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let fold = folded(app, ui.ctx());
