@@ -482,11 +482,13 @@ been run live.
       and unloaded the one in use (#1434). Prefer a chat model the server says is loaded
       (`/api/ps`, which Ollama and FastFlowLM answer) before the list
       — claimed: jgt87, branch bugfix/r5.4-add-server-loaded-model — PR #1435
-- [ ] **decision** When nothing says which model is loaded and a server lists more than one chat
+- [x] **decision** When nothing says which model is loaded and a server lists more than one chat
       model, ask the person to pick one (the list in the address form's model field) instead of
       taking the first (#1434): `/api/ps` helps only while a model is loaded, and LM Studio and
       llama.cpp routers don't answer it
-      — claimed: jgt87, branch feature/r5.4-pick-server-model (a draft for the maintainers to decide on)
+      — claimed: jgt87, branch feature/r5.4-pick-server-model (a draft for the maintainers to decide on) — PR #1436
+- [ ] "Look for AI" (`detect::probe_local`) still saves the first chat model a local server lists;
+      LM Studio lists every model downloaded, so it may load one the person isn't using (#1434)
 - [x] The first run's AI step can add a model server on another computer by its address (llama.cpp,
       Ollama or LM Studio on a home server), the same form as Settings → AI
 - [ ] A chat sent while a llama.cpp router is still loading the model ended after 31 s with "The

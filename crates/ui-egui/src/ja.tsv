@@ -947,3 +947,5 @@ yesterday	昨日
 … {n} more	… ほか {n} 件
 … {n} older	… 古いもの {n} 件
 Connecting to {name}… {seconds} s	{name} に接続中… {seconds} 秒
+This server lists several chat models. Choose one:	このサーバーには複数のチャットモデルがあります。1 つ選んでください:
+Choose a model	モデルを選ぶ
