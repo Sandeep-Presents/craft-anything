@@ -189,6 +189,26 @@ impl OpenAi {
     }
 
     /// Model ids from `GET /models`.
+    /// The models the server says are loaded now, from Ollama's `/api/ps` at the root of a `…/v1`
+    /// address (Ollama and FastFlowLM answer it). Empty when the address doesn't end in `/v1`, or
+    /// the server doesn't answer it: `/models` may list every model a server can download, and
+    /// asking for one it hasn't got starts that download (#1434).
+    pub fn loaded_models(&self, timeout: std::time::Duration) -> Vec<String> {
+        let Some(root) = self.base_url.strip_suffix("/v1") else { return Vec::new() };
+        let Ok(v) = http::get_json(&http::quick_agent(timeout), &self.label, &format!("{root}/api/ps"), &self.headers()) else { return Vec::new() };
+        let entries = v.get("models").and_then(Value::as_array).cloned().unwrap_or_default();
+        let mut out: Vec<String> = Vec::new();
+        for m in entries {
+            let id = m.get("model").or_else(|| m.get("name")).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+            if let Some(id) = id
+                && !out.iter().any(|seen| seen == id)
+            {
+                out.push(id.to_string());
+            }
+        }
+        out
+    }
+
     pub fn list_models(&self, timeout: std::time::Duration) -> Result<Vec<String>, ToolError> {
         let agent = http::quick_agent(timeout);
         let v = http::get_json(&agent, &self.label, &self.url("models"), &self.headers())?;

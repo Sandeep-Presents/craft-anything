@@ -821,6 +821,47 @@ input.on('line', line => {
     }
 }
 
+/// A stand-in server that answers `GET <path>` from `routes` and 404 otherwise; its `/v1` address.
+fn serve_routes(routes: &'static [(&'static str, &'static str)]) -> String {
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}/v1", l.local_addr().unwrap());
+    std::thread::spawn(move || {
+        for mut s in l.incoming().flatten() {
+            let (mut got, mut buf) = (Vec::new(), [0u8; 4096]);
+            while !got.windows(4).any(|w| w == b"\r\n\r\n") {
+                match s.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => got.extend_from_slice(&buf[..n]),
+                }
+            }
+            let head = String::from_utf8_lossy(&got);
+            let path = head.split_whitespace().nth(1).unwrap_or_default().to_string();
+            let (status, body) = routes.iter().find(|(p, _)| *p == path).map_or(("404 Not Found", "not here"), |(_, b)| ("200 OK", *b));
+            let _ = write!(s, "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
+        }
+    });
+    base
+}
+
+/// #1434: FastFlowLM's `/models` lists every model it can download; taking the first started a
+/// 5.5 GB download and unloaded the model in use. A chat model the server says is loaded comes
+/// first; without `/api/ps`, or with nothing loaded, the first chat model listed is still used.
+#[test]
+fn a_server_added_without_a_model_gets_the_one_it_has_loaded() {
+    let (h, _d) = hub();
+    const CATALOGUE: &str = r#"{"object":"list","data":[{"id":"deepseek-r1:8b"},{"id":"gemma3:1b"},{"id":"qwen3.8-mtp-uncensored:27b"}]}"#;
+    let flm = serve_routes(&[
+        ("/v1/models", CATALOGUE),
+        ("/api/ps", r#"{"models":[{"name":"embed","model":"nomic-embed-text"},{"name":"qwen3.8-mtp-uncensored:27b","model":"qwen3.8-mtp-uncensored:27b"}]}"#),
+    ]);
+    assert_eq!(h.add_server("Npu", &flm, None, None).unwrap(), "qwen3.8-mtp-uncensored:27b", "the loaded chat model, not an embedding one");
+    assert_eq!(h.add_server("Named", &flm, Some("gemma3:1b"), None).unwrap(), "gemma3:1b", "a named model still wins");
+    let idle = serve_routes(&[("/v1/models", CATALOGUE), ("/api/ps", r#"{"models":[]}"#)]);
+    assert_eq!(h.add_server("Idle", &idle, None, None).unwrap(), "deepseek-r1:8b", "nothing loaded: the list's first");
+    let no_ps = serve_routes(&[("/v1/models", CATALOGUE)]);
+    assert_eq!(h.add_server("Studio", &no_ps, None, None).unwrap(), "deepseek-r1:8b", "no /api/ps: the list's first");
+}
+
 /// #54, #98: a server on another computer is added by its address, with a model that can chat
 /// when none is named; one that doesn't answer with its models isn't added.
 #[test]
