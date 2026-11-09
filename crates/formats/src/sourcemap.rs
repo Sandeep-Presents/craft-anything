@@ -83,7 +83,10 @@ impl SourceMap {
     pub fn source_path(&self, index: u32) -> Option<String> {
         let s = self.sources.get(index as usize)?.as_ref()?;
         Some(match self.source_root.as_deref().filter(|r| !r.is_empty()) {
-            Some(root) if !s.contains("://") && !s.starts_with('/') => format!("{}/{}", root.trim_end_matches('/'), s),
+            Some(root) if !s.contains("://") && !s.starts_with('/') => {
+                let join = if root.ends_with('/') { "" } else { "/" };
+                format!("{root}{join}{s}")
+            }
             _ => s.clone(),
         })
     }
@@ -358,6 +361,21 @@ mod tests {
         let matches = map.original_positions(0, 3);
         assert_eq!(matches.iter().map(|p| p.source_index).collect::<Vec<_>>(), [0, 1]);
         assert!(map.original_positions(0, 4).is_empty());
+    }
+
+    #[test]
+    fn relative_sources_keep_the_url_root_delimiter() {
+        for (root, expected) in [
+            ("webpack:///", "webpack:///src/main.js"),
+            ("file:///", "file:///src/main.js"),
+            ("https://host/scripts/", "https://host/scripts/src/main.js"),
+            ("src", "src/src/main.js"),
+        ] {
+            let json = serde_json::json!({"version":3,"sourceRoot":root,"sources":["src/main.js"],"mappings":"AAAA"});
+            let map = parse(json.to_string().as_bytes(), Limits::default()).unwrap();
+            assert_eq!(map.all_sources(), [expected]);
+            assert_eq!(map.original_positions(0, 0)[0].source.as_deref(), Some(expected));
+        }
     }
 
     #[test]
