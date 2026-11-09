@@ -1507,3 +1507,11 @@ Which tools a builder on this AI is offered. Lean: only the tools for building, 
 (the lean list)	(lühike loend)
 (the lean list until its server says it holds more)	(lühike loend, kuni selle server ütleb, et mahutab rohkem)
 Set which tools an AI is offered	Määra, milliseid tööriistu AI-le pakutakse
+Sees pictures	Näeb pilte
+Yes	Jah
+No	Ei
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	Kas selle AI ehitajale näidatakse pilte: originaali ekraanipildid, sinu pildid sellest ja kontrolli pildid ehitusest. Automaatne: mida selle server ütleb; mudelile, mille kohta see midagi ei ütle, pilte ei näidata.
+(its server says it sees)	(selle server ütleb, et näeb)
+(its server says it doesn't)	(selle server ütleb, et ei näe)
+(its server doesn't say: not shown pictures)	(selle server ei ütle: pilte ei näidata)
+Set whether an AI sees pictures	Määra, kas AI näeb pilte
