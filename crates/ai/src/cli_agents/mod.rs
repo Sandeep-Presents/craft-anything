@@ -78,6 +78,7 @@ pub fn replaced_program(options: &BackendOptions, program: &str) -> Option<Strin
     Path::new(saved).parent().is_some_and(|p| !p.as_os_str().is_empty()).then(|| saved.to_string())
 }
 
+/// Resolve saved commands locally through the shared lookup, but leave SSH commands untouched.
 fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<std::ffi::OsString>) -> Result<String, ToolError> {
     let usual = program_for(&config.model);
     let local = config.ssh_host.as_deref().is_none_or(|h| h.trim().is_empty());
@@ -108,7 +109,11 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
             None => Err(desktop_app_error(path)),
         };
     }
-    if !local || bare || path.exists() {
+    // Saved bare names share detection's desktop-CLI fallback, whichever agent owns it.
+    if local && bare {
+        return Ok(usual_program(chosen, search)?.unwrap_or_else(|| chosen.to_string()));
+    }
+    if !local || path.exists() {
         return Ok(chosen.to_string());
     }
     // Gone, and nothing beside it: the usual program if it's really here, else the saved path, so
@@ -122,7 +127,7 @@ fn program_in(config: &BackendConfig, options: &BackendOptions, search: Option<s
 fn usual_program(usual: &str, search: Option<std::ffi::OsString>) -> Result<Option<String>, ToolError> {
     let first = craft_anything_platform::which::which_in(usual, search.clone()).into_iter().next();
     match (first, find_program_in(usual, search)) {
-        (None, _) => Ok(desktop_cli(usual, local_app_data().as_deref()).map(|cli| cli.display().to_string())),
+        (None, _) => Ok(local_desktop_cli(usual).map(|cli| cli.display().to_string())),
         (Some(first), Some(real)) => Ok(Some(if first == real { usual.to_string() } else { real.display().to_string() })),
         (Some(app), None) => Err(desktop_app_error(&app)),
     }
@@ -140,7 +145,41 @@ fn desktop_app_error(app: &Path) -> ToolError {
 /// really it. Detection, the desktop app hint and starting a run all look through this, so what's
 /// offered is what runs.
 pub fn find_program(program: &str) -> Option<PathBuf> {
-    find_program_in(program, craft_anything_platform::which::search_path()).or_else(|| desktop_cli(program, local_app_data().as_deref()))
+    find_program_in(program, craft_anything_platform::which::search_path()).or_else(|| local_desktop_cli(program))
+}
+
+/// Off-PATH desktop CLI locations stay here, not in backend tests or command selection.
+fn local_desktop_cli(program: &str) -> Option<PathBuf> {
+    let windows = desktop_cli(program, local_app_data().as_deref());
+    #[cfg(target_os = "macos")]
+    if windows.is_none() && program == "codex" {
+        let roots = dirs::home_dir().map(|home| home.join("Applications")).into_iter().chain([PathBuf::from("/Applications")]);
+        return macos_codex_in(roots);
+    }
+    windows
+}
+
+/// Dock launches do not inherit a terminal's PATH. Look only in known app-bundle locations,
+/// never run an app's GUI executable as a CLI, and leave an explicit/PATH installation first.
+#[cfg(any(target_os = "macos", all(test, unix)))]
+fn macos_codex_in(roots: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    const INSIDE: &[&str] = &[
+        "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "ChatGPT.app/Contents/Resources/codex",
+        "Codex.app/Contents/Resources/codex",
+        "Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+    ];
+    roots.into_iter().flat_map(|root| INSIDE.iter().map(move |inside| root.join(inside))).find(|path| {
+        let Ok(meta) = std::fs::metadata(path) else { return false };
+        if !meta.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            meta.permissions().mode() & 0o111 != 0
+        }
+    })
 }
 
 /// Agents whose Windows desktop app keeps the command-line program in its own folder, under
@@ -1590,6 +1629,77 @@ mod tests {
         assert!(adapter.mcp_env(&mcp).unwrap().is_some());
     }
 
+    /// Reject non-executable candidates and prefer the user's application installation.
+    #[cfg(unix)]
+    #[test]
+    fn macos_bundled_codex_needs_an_executable_and_respects_application_root_order() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let user = d.path().join("User Applications");
+        let system = d.path().join("Applications");
+        let relative = "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex";
+        let user_cli = user.join(relative);
+        let system_cli = system.join("Codex.app/Contents/Resources/codex");
+        assert!(macos_codex_in([user.clone(), system.clone()]).is_none());
+        std::fs::create_dir_all(user_cli.parent().unwrap()).unwrap();
+        std::fs::write(&user_cli, b"not executable").unwrap();
+        std::fs::set_permissions(&user_cli, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(macos_codex_in([user.clone()]).is_none());
+        std::fs::create_dir_all(system_cli.parent().unwrap()).unwrap();
+        std::fs::write(&system_cli, b"stand-in").unwrap();
+        std::fs::set_permissions(&system_cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(macos_codex_in([user.clone(), system.clone()]), Some(system_cli));
+        std::fs::set_permissions(&user_cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(macos_codex_in([user, system]), Some(user_cli));
+    }
+
+    /// Every supported bundle accepts its CLI, never its GUI or a directory at the CLI path.
+    #[cfg(unix)]
+    #[test]
+    fn every_supported_macos_codex_bundle_layout_is_found_without_the_gui() {
+        use std::os::unix::fs::PermissionsExt;
+        for relative in [
+            "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "ChatGPT.app/Contents/Resources/codex",
+            "Codex.app/Contents/Resources/codex",
+            "Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        ] {
+            let d = tempfile::tempdir().unwrap();
+            let cli = d.path().join(relative);
+            std::fs::create_dir_all(cli.parent().unwrap()).unwrap();
+            // A directory and an app GUI executable are never CLI candidates.
+            std::fs::create_dir_all(&cli).unwrap();
+            assert!(macos_codex_in([d.path().into()]).is_none());
+            std::fs::remove_dir(&cli).unwrap();
+            let gui = d.path().join("ChatGPT.app/Contents/MacOS/ChatGPT");
+            std::fs::create_dir_all(gui.parent().unwrap()).unwrap();
+            std::fs::write(&gui, b"stand-in GUI, never run").unwrap();
+            std::fs::set_permissions(&gui, std::fs::Permissions::from_mode(0o700)).unwrap();
+            assert!(macos_codex_in([d.path().into()]).is_none());
+            std::fs::write(&cli, b"stand-in CLI, never run").unwrap();
+            std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(macos_codex_in([d.path().into()]), Some(cli));
+        }
+    }
+
+    /// Saved usual names share desktop lookup for every agent, while SSH names remain remote.
+    #[test]
+    fn saved_bare_agent_names_share_the_usual_lookup() {
+        let empty = std::env::join_paths(std::iter::empty::<&Path>()).ok();
+        for (model, program, _) in KNOWN {
+            let mut config =
+                BackendConfig { name: "Agent test".into(), kind: BackendKind::AgentCli, model: (*model).into(), base_url: None, ssh_host: None, enabled: true };
+            let options = BackendOptions { command: Some((*program).into()), ..Default::default() };
+            assert_eq!(
+                program_in(&config, &options, empty.clone()).unwrap(),
+                program_in(&config, &BackendOptions::default(), empty.clone()).unwrap(),
+                "{model}"
+            );
+            config.ssh_host = Some("test-host".into());
+            assert_eq!(program_in(&config, &options, empty.clone()).unwrap(), *program, "SSH never resolves a local desktop CLI");
+        }
+    }
+
     /// #1060: OpenCode's desktop app keeps its CLI in its own folder, as `opencode-cli.exe`.
     #[test]
     fn a_cli_inside_its_desktop_app_is_found() {
@@ -2224,6 +2334,7 @@ mod tests {
         assert!(adapter_for("claude-code").handoff(&saved, 10_000).is_some() && adapter_for("codex").handoff(&saved, 10_000).is_none());
     }
 
+    /// Native stream events preserve text, tool results and usage for both adapters.
     #[test]
     fn parses_codex_and_gemini_streams() {
         let mut p = StreamParser::new(adapter_for("codex"));
@@ -2241,6 +2352,8 @@ mod tests {
         assert!(matches!(&ev[1], AgentEvent::ToolFinished { ok: true, .. }));
         assert!(matches!(&ev[2], AgentEvent::TextDelta { text } if text.starts_with("It lists")));
         assert!(p.saw_result && p.output_tokens == 4);
+        let auth = p.line(&json!({"type":"turn.failed","error":{"message":"authentication expired"}}).to_string());
+        assert!(auth.iter().any(|event| matches!(event, AgentEvent::Error { remediation: Some(fix), .. } if fix.contains("Sign in with ChatGPT"))));
         let mut g = StreamParser::new(adapter_for("gemini-cli"));
         let ev: Vec<_> = [
             json!({"type":"message","role":"assistant","content":"Hi","delta":true}),
@@ -2252,6 +2365,34 @@ mod tests {
         .collect();
         assert!(matches!(&ev[1], AgentEvent::ToolStarted { tool, .. } if tool == "core_targets_list"));
         assert!(matches!(&ev[2], AgentEvent::ToolFinished { ok: false, .. }));
+    }
+
+    /// Login-shell, tool and network failures are not evidence that the account needs sign-in.
+    #[test]
+    fn codex_sign_in_guidance_only_matches_authentication_failures() {
+        for kind in ["turn.failed", "error"] {
+            for (message, needs_login) in [
+                ("login required", true),
+                ("Authentication expired", true),
+                ("authentication failed", true),
+                ("authentication required", true),
+                ("Unauthorized", true),
+                ("not logged in", true),
+                ("token expired", true),
+                ("login shell failed", false),
+                ("authentication service unavailable", false),
+                ("tool execution failed", false),
+                ("network timeout", false),
+            ] {
+                let mut parser = StreamParser::new(adapter_for("codex"));
+                let events = parser.line(&json!({"type":kind,"error":{"message":message}}).to_string());
+                assert!(
+                    matches!(events.as_slice(), [AgentEvent::Error { remediation, message: shown, .. }]
+                    if remediation.is_some() == needs_login && shown == &format!("Codex: {message}")),
+                    "{kind}: {message}: {events:?}"
+                );
+            }
+        }
     }
 
     #[cfg(unix)]

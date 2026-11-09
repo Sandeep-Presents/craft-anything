@@ -317,6 +317,7 @@ fn model_options_loading(ui: &mut Ui, backend: &str) {
 }
 
 /// Draw AI settings and model pickers, preserving drafts during contention and invalidating confirmed context changes.
+/// Connection checks are delegated to the shared worker API.
 fn ai(app: &mut CraftApp, ui: &mut Ui) {
     if app.agent_model_picker.as_ref().is_some_and(|p| app.hub.model_context(&p.context.backend.config.name).is_ok_and(|current| current != p.context)) {
         app.agent_model_picker = None;
@@ -331,6 +332,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     let (mut pick, mut builds, mut extracts, mut toggle, mut remove) = (None, None, None, None, None);
     let (mut choose_program, mut usual_program) = (None, None);
+    let mut check_agent = None;
     let mut save_folder = None;
     // Taken out while the rows borrow the app, and put back after them.
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
@@ -581,6 +583,14 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                         extracts = Some(Some(b.name.clone()));
                     }
                 }
+                if b.kind == BackendKind::AgentCli && b.ssh_host.as_deref().is_none_or(|host| host.trim().is_empty()) {
+                    let pending = app.agent_connections.get(&b.name) == Some(&None);
+                    ui.add_enabled_ui(!pending, |ui| {
+                        if widgets::secondary(ui, None, if pending { "Checking" } else { "Check" }).clicked() {
+                            check_agent = Some(b.name.clone());
+                        }
+                    });
+                }
                 // Off: kept with its key, but nothing uses it.
                 let (label, tip) = if b.enabled {
                     ("Turn off", "Nothing uses it until it's on again; it keeps its key.")
@@ -604,11 +614,21 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
             if !b.enabled {
                 ui.label(RichText::new(tr("Off")).color(t.text_faint).size(theme::CAPTION));
             }
+            if let Some(Some(result)) = app.agent_connections.get(&b.name) {
+                let (message, color) = match result {
+                    Ok(message) => (message, t.text_dim),
+                    Err(message) => (message, t.danger),
+                };
+                ui.label(RichText::new(message).color(color).size(theme::CAPTION));
+            }
         });
         ui.add_space(6.0);
     }
     if let Some((name, on)) = toggle {
         app.set_backend_enabled(&name, on);
+    }
+    if let Some(name) = check_agent {
+        app.check_agent_connection(name);
     }
     if let Some(name) = choose_program {
         app.picking_program_for = Some(name);
@@ -1058,6 +1078,66 @@ mod tests {
         // The early read lands last: it doesn't undo the save.
         app.handle_done(Finished { job: early, result: Ok(stale) });
         assert_eq!(app.builder.as_deref(), Some("Claude Code"), "an older read can't replace the saved builder");
+    }
+
+    #[test]
+    /// A non-Codex local agent gets the same Check action and result presentation.
+    fn agent_connection_check_and_its_result_are_visible_in_settings() {
+        let mut app = demo::app(demo::engine(craft_anything_engine::Mode::Experienced, true));
+        app.backends = vec![BackendConfig {
+            name: "Agent test".into(),
+            kind: BackendKind::AgentCli,
+            model: "plain-test-agent".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        }];
+        app.agent_connections.insert("Agent test".into(), Some(Err("Agent test is installed but is not signed in.".into())));
+        let context = egui::Context::default();
+        theme::install_fonts(&context);
+        let mut output = context.run_ui(Default::default(), |ui| ai(&mut app, ui));
+        output.textures_delta.clear();
+        let text = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Check"));
+        assert!(text.contains("Agent test is installed but is not signed in."));
+    }
+
+    /// A failed worker frees only its own Check button; unrelated pending/results remain intact.
+    #[test]
+    fn failed_agent_check_workers_can_be_retried_without_clearing_other_checks() {
+        let mut app = demo::app(demo::engine(craft_anything_engine::Mode::Experienced, true));
+        app.agent_connections.insert("Failed agent".into(), None);
+        app.agent_connections.insert("Running agent".into(), None);
+        app.agent_connections.insert("Finished agent".into(), Some(Ok("already checked".into())));
+        app.agent_connection_jobs.insert(41, "Failed agent".into());
+        app.agent_connection_jobs.insert(42, "Running agent".into());
+        // Jobs::spawn emits this same Err completion if the thread cannot start (or panics).
+        app.handle_done(Finished { job: 41, result: Err("Couldn't start a worker thread: test failure".into()) });
+        assert!(matches!(app.agent_connections.get("Failed agent"), Some(Some(Err(error))) if error.contains("Couldn't start a worker thread")));
+        assert!(!app.agent_connection_jobs.contains_key(&41));
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&None));
+        assert_eq!(app.agent_connection_jobs.get(&42).map(String::as_str), Some("Running agent"));
+        assert_eq!(app.agent_connections.get("Finished agent"), Some(&Some(Ok("already checked".into()))));
+        app.handle_done(Finished { job: 99, result: Err("unrelated job failed".into()) });
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&None));
+        app.handle_done(Finished { job: 42, result: Ok(Done::AgentConnection("Running agent".into(), Ok("checked".into()))) });
+        assert!(app.agent_connection_jobs.is_empty());
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&Some(Ok("checked".into()))));
+        // The backend is intentionally absent: no real agent or credential access is needed.
+        app.check_agent_connection("Failed agent".into());
+        assert_eq!(app.agent_connections.get("Failed agent"), Some(&None));
+        assert_eq!(app.agent_connection_jobs.len(), 1, "retry was scheduled");
+        let count = app.jobs.list.len();
+        app.check_agent_connection("Failed agent".into());
+        assert_eq!(app.jobs.list.len(), count, "a pending retry cannot start a duplicate");
     }
 
     #[test]

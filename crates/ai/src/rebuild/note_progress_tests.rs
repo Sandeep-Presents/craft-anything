@@ -136,7 +136,7 @@ fn consumed_note_progress_errors_preserve_the_completed_turn() {
             options: Default::default(),
         };
         let opts = RunOptions { message: Some("Apply the requested edits".into()), ..RunOptions::default() };
-        let error = worker.run(&mut ws, entry, Some(api), None, &opts).unwrap_err();
+        let error = worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory::default(), &opts).unwrap_err();
         let saved = Workspace::open(&ws.root).unwrap();
         assert!(saved.manifest.awaiting_check, "the finished turn must be recorded before a progress error: {error:?}");
         assert_eq!(saved.manifest.last_reply, "Finished the requested edit");
@@ -228,7 +228,7 @@ fn consumed_note_resets_survive_failed_and_cancelled_turns() {
                     options: Default::default(),
                 };
                 let opts = RunOptions { continuing: true, ..RunOptions::default() };
-                let error = worker.run(&mut ws, entry, Some(api), None, &opts).unwrap_err();
+                let error = worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory::default(), &opts).unwrap_err();
                 assert_eq!(calls.load(Ordering::SeqCst), 1, "an interrupted request must not be sent again");
                 if cancelled {
                     assert_eq!(error.code, ErrorCode::Cancelled, "retain cancellation even when the progress record is unreadable");

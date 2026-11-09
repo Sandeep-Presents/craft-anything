@@ -944,10 +944,10 @@ impl Workspace {
     pub fn inbox_dir(&self) -> PathBuf {
         self.root.join("inbox")
     }
-    /// A builder has worked on this project and its conversation was kept, so a later run carries
-    /// it on instead of starting over.
-    pub fn builder_started(&self) -> bool {
-        self.manifest.agent_session.is_some() || self.transcript_path().is_file()
+    /// A coding agent's session saved for this project in `deep` mode. A session saved before the
+    /// mode was kept counts as Deep, since it may have read inside the original.
+    pub fn builder_session_in(&self, deep: bool) -> bool {
+        self.manifest.agent_session.as_ref().is_some_and(|_| self.manifest.agent_session_deep.unwrap_or(true) == deep)
     }
 
     /// The API builder's conversation, kept so a follow-up continues it (`ai::context`).
@@ -1941,6 +1941,21 @@ mod tests {
         let text = serde_json::to_string(&m).unwrap();
         let back: Manifest = serde_json::from_str(&text).unwrap();
         assert_eq!((back.agent_session_by.as_deref(), back.agent_session_deep), (Some("claude-code"), None));
+    }
+
+    /// A saved session is history only in the mode it ran in; one from before the mode was kept
+    /// counts as Deep.
+    #[test]
+    fn a_saved_session_counts_as_history_only_in_its_mode() {
+        let d = tempfile::tempdir().unwrap();
+        let mut ws = Workspace::create(d.path(), "x", "A thing", TargetRef::None).unwrap();
+        assert!(!ws.builder_session_in(true) && !ws.builder_session_in(false), "nothing saved yet");
+        ws.manifest.agent_session = Some("s1".into());
+        assert!(ws.builder_session_in(true), "one saved before the mode was kept counts as Deep");
+        assert!(!ws.builder_session_in(false), "Deep may have read the original");
+        ws.manifest.agent_session_deep = Some(false);
+        assert!(!ws.builder_session_in(true));
+        assert!(ws.builder_session_in(false));
     }
 
     /// A rename survives a stale save, a copy takes the build but not the conversation (nor its

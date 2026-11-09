@@ -205,11 +205,28 @@ fn same_question(a: &AskedQuestion, b: &AskedQuestion) -> bool {
     a.at_ms == b.at_ms && a.question == b.question
 }
 
-/// Whether a run without a new request is carrying on work already under way in this mode. For an
-/// API loop, `api_resumed` says its kept transcript matched the run's mode: a transcript from the
-/// other mode isn't carried on, so the run still studies as a fresh one.
-fn is_carrying_on(opts: &RunOptions, ws: &Workspace, api_resumed: bool) -> bool {
-    (opts.continuing || (opts.message.is_none() && ws.builder_started())) && api_resumed
+/// A conversation the project kept: in this run's mode, in the other mode, or both.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct KeptHistory {
+    /// A conversation is kept for this run's mode.
+    in_mode: bool,
+    /// A conversation is kept for the other mode (a saved session or a transcript).
+    elsewhere: bool,
+}
+
+/// Whether a run without a new request is carrying on work already under way in this mode.
+/// `history_in_mode` says the project has a conversation kept for this mode (an API transcript or
+/// a coding agent's session); one from the other mode isn't carried on, so the run studies again.
+fn is_carrying_on(opts: &RunOptions, history_in_mode: bool) -> bool {
+    history_in_mode && (opts.continuing || opts.message.is_none())
+}
+
+/// Whether a run starts by studying: there is no capture to build from, or the project's kept
+/// conversation is for the other mode. A capture from the other mode must not be handed to this
+/// run's builder. A follow-up with no conversation at all keeps the old no-study path; only a
+/// conversation that was kept and then rejected for mode starts a new study.
+fn starts_with_study(opts: &RunOptions, kept: KeptHistory, has_capture: bool) -> bool {
+    !has_capture || (opts.message.is_none() && !kept.in_mode) || (!kept.in_mode && kept.elsewhere)
 }
 
 /// A running (or finished) rebuild.
@@ -244,6 +261,15 @@ impl RebuildRun {
             .map(|s| s.clean_room())
             .or(opts.clean_room)
             .unwrap_or_else(|| !craft_anything_engine::Settings::load_from(&hub.settings_path()).deep_mode);
+        let run_deep = !clean_room;
+        // A study is only carried on in the mode it was made in. A session kept in the other mode
+        // may have read inside the original, and its capture must not be handed to this run.
+        let saved_in_mode = ws.builder_session_in(run_deep);
+        let transcript_in_mode = crate::context::load(&ws.transcript_path(), run_deep).is_some();
+        let kept_without_api = KeptHistory {
+            in_mode: saved_in_mode || transcript_in_mode,
+            elsewhere: (ws.manifest.agent_session.is_some() && !saved_in_mode) || (ws.transcript_path().is_file() && !transcript_in_mode),
+        };
         // An API backend builds with our own agent loop and the Build tools; its conversation is
         // kept in the project and continued by follow-ups (a fresh build starts a new one).
         let api = match entry.config.kind {
@@ -251,12 +277,12 @@ impl RebuildRun {
             _ => {
                 // A run carrying on keeps its transcript, so `ApiConversation::resumed` can tell
                 // the run which conversation it continues. Only a genuinely fresh build (no
-                // continuation and no completed Study) starts a new one.
-                let continuing = opts.continuing || (opts.message.is_none() && ws.builder_started());
+                // continuation and no study kept in this mode) starts a new one.
+                let continuing = opts.continuing || (opts.message.is_none() && kept_without_api.in_mode);
                 if !continuing && !ws.capture_dir().exists() {
                     let _ = std::fs::remove_file(ws.transcript_path());
                 }
-                Some(hub.start_builder(&entry, opts.beginner, Some(ws.transcript_path()), !clean_room)?)
+                Some(hub.start_builder(&entry, opts.beginner, Some(ws.transcript_path()), run_deep)?)
             }
         };
         // A chosen extractor (an API backend, e.g. Kimi K3) takes a game's files out after a fresh
@@ -314,7 +340,7 @@ impl RebuildRun {
                 let _here = self_check::BuildingHere::new(&ws.root);
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     ctx.load_asset_keys(&key_store);
-                    ctx.run(&mut ws, entry, api, extractor, &opts)
+                    ctx.run(&mut ws, entry, api, extractor, kept_without_api, &opts)
                 }));
                 let (ok, message, paused) = run_outcome(result, &mut ws);
                 ctx.record_usage(None);
@@ -749,6 +775,7 @@ impl Worker {
         entry: crate::BackendEntry,
         api: Option<crate::agent::ApiConversation>,
         extractor: Option<(String, crate::agent::ApiConversation)>,
+        kept_without_api: KeptHistory,
         opts: &RunOptions,
     ) -> Result<String, ToolError> {
         let mut progress = BuildProgress::load(&ws.root)?;
@@ -798,9 +825,10 @@ impl Worker {
         self.self_check = Some((kind.clone(), opts.good_enough));
         let kind = kind.as_ref();
         self.editor = self.find_editor(&ws.manifest.stack)?;
-        let api_resumed = api.as_ref().is_none_or(crate::agent::ApiConversation::resumed);
-        let carrying_on = is_carrying_on(opts, ws, api_resumed);
-        let first = (opts.message.is_none() && !carrying_on) || !ws.capture_dir().exists();
+        let api_resumed = api.as_ref().is_some_and(crate::agent::ApiConversation::resumed);
+        let kept = KeptHistory { in_mode: kept_without_api.in_mode || api_resumed, elsewhere: kept_without_api.elsewhere };
+        let carrying_on = is_carrying_on(opts, kept.in_mode);
+        let first = starts_with_study(opts, kept, ws.capture_dir().exists());
         if first {
             self.study(ws, kind)?;
             if let Some((name, ex)) = extractor {

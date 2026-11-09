@@ -2083,7 +2083,7 @@ mod picking_up_a_build {
         };
         let mut opts = RunOptions::default();
         opts.kinds.register(Arc::new(FlakyKind));
-        let error = worker.run(&mut ws, entry, Some(api), None, &opts).unwrap_err();
+        let error = worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory { in_mode: true, elsewhere: false }, &opts).unwrap_err();
         assert!(error.message.contains("two builder turns"), "{error:?}");
         assert_eq!(seen.lock().unwrap().len(), 2);
     }
@@ -2194,7 +2194,7 @@ mod picking_up_a_build {
                 };
                 let mut opts = RunOptions::default();
                 opts.kinds.register(Arc::new(NoteKind { notes: worker.notes.clone(), add: mode == "queued-check", text }));
-                let error = worker.run(&mut ws, entry, Some(api), None, &opts).unwrap_err();
+                let error = worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory { in_mode: true, elsewhere: false }, &opts).unwrap_err();
                 assert!(error.message.contains("two builder turns"), "{error:?}");
                 let requests = seen.lock().unwrap();
                 let expected = if text.trim().is_empty() {
@@ -2280,6 +2280,7 @@ mod picking_up_a_build {
             let mut ws = worked_on(&b);
             ws.manifest.agent_session_deep = saved;
             ws.save().unwrap();
+            std::fs::write(ws.capture_dir().join("README.md"), "# What we found in the Deep run\n\ninside evidence").unwrap();
             b.hub.engine.session().settings.deep_mode = deep;
             let seen = Arc::new(craft_anything_platform::sync::Mutex::new(Vec::new()));
             let mut adapters = crate::cli_agents::AgentAdapters::built_in();
@@ -2289,6 +2290,11 @@ mod picking_up_a_build {
             let told = std::fs::read_to_string(&b.prompts).unwrap();
             assert_eq!(told.contains("Pick up where you left off"), continued, "saved={saved:?}, deep={deep}: {told}");
             assert_eq!(told.contains("Their request"), !continued, "a fresh start gets the brief: {told}");
+            let readme = std::fs::read_to_string(ws.capture_dir().join("README.md")).unwrap();
+            assert_eq!(readme.contains("What we found"), continued, "saved={saved:?}, deep={deep}: the Deep notes are replaced: {readme}");
+            if !continued {
+                assert!(readme.contains("# No target"), "saved={saved:?}, deep={deep}: the new study wrote its notes: {readme}");
+            }
             let expected = continued.then_some("session-1");
             let seen = seen.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             assert!(!seen.is_empty(), "saved={saved:?}, deep={deep}: the stand-in ran");
@@ -2400,23 +2406,41 @@ mod picking_up_a_build {
         drop(run);
     }
 
-    /// R2.9: an API transcript from the other mode isn't "carrying on", so a no-message run still
-    /// studies as a fresh one instead of skipping the Deep study.
+    /// R2.9: a transcript from the other mode isn't "carrying on", so a no-message run still
+    /// studies as a fresh one instead of skipping the Deep study. A follow-up message with a
+    /// rejected transcript studies too, even when a capture from the other mode exists.
     #[test]
     fn an_api_transcript_from_the_other_mode_is_not_carried_on() {
-        let d = tempfile::tempdir().unwrap();
-        let ws = Workspace::create(d.path(), "x", "A thing", TargetRef::None).unwrap();
         let mut opts = RunOptions::default();
-        assert!(!super::super::is_carrying_on(&opts, &ws, true), "nothing is under way yet");
-        std::fs::write(ws.transcript_path(), b"{}").unwrap();
-        assert!(super::super::is_carrying_on(&opts, &ws, true), "a transcript in this mode is carried on");
-        assert!(!super::super::is_carrying_on(&opts, &ws, false), "another mode's transcript is not");
+        assert!(!super::super::is_carrying_on(&opts, false), "nothing is under way yet");
+        assert!(super::super::is_carrying_on(&opts, true), "a transcript in this mode is carried on");
         opts.message = Some("change it".into());
-        assert!(!super::super::is_carrying_on(&opts, &ws, true), "a new request isn't carrying on");
+        assert!(!super::super::is_carrying_on(&opts, true), "a new request isn't carrying on");
         opts.message = None;
         opts.continuing = true;
-        assert!(super::super::is_carrying_on(&opts, &ws, true), "an explicit resume in this mode is");
-        assert!(!super::super::is_carrying_on(&opts, &ws, false), "one in another mode is not");
+        assert!(super::super::is_carrying_on(&opts, true), "an explicit resume in this mode is");
+        assert!(!super::super::is_carrying_on(&opts, false), "one in another mode is not");
+    }
+
+    /// R2.9: a follow-up with a conversation kept in the other mode studies even when a capture
+    /// exists; one that resumed a conversation in this mode builds from the capture without
+    /// studying again. A fresh follow-up with no conversation at all keeps the old no-study path.
+    #[test]
+    fn a_rejected_transcript_studies_even_with_a_capture() {
+        use super::super::{KeptHistory, starts_with_study};
+        let opts = RunOptions::default();
+        let none = KeptHistory::default();
+        assert!(starts_with_study(&opts, none, true), "no conversation for this mode studies");
+        let mut follow_up = RunOptions { message: Some("change it".into()), ..Default::default() };
+        assert!(!starts_with_study(&follow_up, none, true), "a fresh follow-up with a capture doesn't study");
+        assert!(starts_with_study(&follow_up, KeptHistory { elsewhere: true, ..Default::default() }, true), "a conversation rejected for mode studies");
+        assert!(!starts_with_study(&follow_up, KeptHistory { in_mode: true, ..Default::default() }, true), "a conversation in this mode carries on");
+        assert!(starts_with_study(&opts, KeptHistory { in_mode: true, ..Default::default() }, false), "no capture to build from: study");
+        follow_up.message = None;
+        assert!(
+            !starts_with_study(&follow_up, KeptHistory { in_mode: true, ..Default::default() }, true),
+            "a same-mode continuation studies only without a capture"
+        );
     }
 
     /// A saved session records the mode it ran in, and a lost one clears both.

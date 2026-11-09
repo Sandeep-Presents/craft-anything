@@ -157,6 +157,7 @@ pub enum Done {
     },
     /// What a scan found, and why an expected coding agent may be missing.
     Detected(Vec<Detected>, Vec<craft_anything_ai::detect::DetectHint>),
+    AgentConnection(String, Result<String, String>),
     /// The configured backends, the ones chosen to build with and to extract with, each one's
     /// options, and the ones that need a key and have none.
     Backends(
@@ -462,6 +463,10 @@ pub struct CraftApp {
     /// Why an expected coding agent may be missing, from the last scan.
     pub detect_hints: Vec<craft_anything_ai::detect::DetectHint>,
     pub detecting: bool,
+    /// Local agent checks: None while the worker runs, then a credential-free status or error.
+    pub agent_connections: std::collections::BTreeMap<String, Option<Result<String, String>>>,
+    /// Which agent owns each pending check, including failures before the worker body starts.
+    pub(crate) agent_connection_jobs: std::collections::BTreeMap<u64, String>,
     /// Counts AI choices, so an add that finishes later doesn't undo one made meanwhile.
     pub backend_choices: u64,
     pub log: Vec<LogLine>,
@@ -597,6 +602,8 @@ impl CraftApp {
             detected: None,
             detect_hints: Vec::new(),
             detecting: false,
+            agent_connections: Default::default(),
+            agent_connection_jobs: Default::default(),
             backend_choices: 0,
             log: Vec::new(),
             key_inputs: Default::default(),
@@ -1257,6 +1264,21 @@ impl CraftApp {
         self.jobs.spawn("Look for AI on this computer", true, move |_| Ok(Done::Detected(hub.detect(), hub.detect_hints())));
     }
 
+    /// Check a selected local agent through the headless API without blocking the UI.
+    pub fn check_agent_connection(&mut self, name: String) {
+        if self.agent_connections.get(&name) == Some(&None) {
+            return;
+        }
+        self.agent_connections.insert(name.clone(), None);
+        let hub = self.hub.clone();
+        let agent = name.clone();
+        let job = self.jobs.spawn("Check", true, move |_| {
+            let status = hub.test_backend(&agent).map(|report| report.reply).map_err(|error| error.for_people());
+            Ok(Done::AgentConnection(agent, status))
+        });
+        self.agent_connection_jobs.insert(job, name);
+    }
+
     pub fn add_backend(&mut self, config: BackendConfig, key: Option<String>) {
         let hub = self.hub.clone();
         let name = config.name.clone();
@@ -1437,6 +1459,7 @@ impl CraftApp {
     /// Apply a completed background job, reporting failures and accepting picker results only for matching requests.
     fn handle_done(&mut self, done: jobs::Finished<Done>) {
         let job = done.job;
+        let checked_agent = self.agent_connection_jobs.remove(&job);
         if self.saving == Some(job) {
             self.saving = None;
         }
@@ -1464,6 +1487,9 @@ impl CraftApp {
                     if !self.roles_saving() {
                         self.refresh_backends();
                     }
+                }
+                if let Some(agent) = checked_agent {
+                    self.agent_connections.insert(agent, Some(Err(e.clone())));
                 }
                 self.detecting = false;
                 self.facts_read(job, None);
@@ -1538,6 +1564,9 @@ impl CraftApp {
                 self.detecting = false;
                 self.log(false, format!("Found {} AI option(s) on this computer", d.len()));
                 self.detected = Some(d);
+            }
+            Done::AgentConnection(name, result) => {
+                self.agent_connections.insert(name, Some(result));
             }
             Done::Backends(b, builder, extractor, options, missing_key) => {
                 if self.state.backend.as_ref().is_some_and(|n| !b.iter().any(|c| &c.name == n)) {

@@ -661,6 +661,9 @@ Owner: maintainers · Status: in progress
 
 ### R2.2 More coding agents
 Owner: open · Status: in progress
+- [x] Find Codex bundled with ChatGPT.app/Codex.app after a macOS Dock launch, and
+      verify the selected CLI's sign-in through the headless connection check and Settings.
+      — claimed: dbzx6r, branch bugfix/r2.2-macos-codex-signin-upstream
 - [x] A saved agent program path that no longer exists (Codex desktop moves its CLI to a new
       build folder on every update) says so and names the path, instead of "isn't installed or
       isn't on your PATH" (#721); it stays a missing program, so a builder turn isn't retried
@@ -1141,9 +1144,17 @@ Gaps found while using the app for real projects.
       mode, or a version-1 one (counts as Deep), isn't resumed. A same-mode continuation keeps its
       transcript and carries on; a mismatch studies again from the brief. Claimed:
       AlexJoaquimPereira, branch bugfix/r2.9-api-transcript-mode
-- [ ] Study can still be skipped after a mode switch: a coding agent's `builder_started()` is
-      mode-unaware, and an API follow-up message with an existing capture leaves `first` false even
-      when the transcript was rejected. Gate both on the run's mode
+- [x] Study can still be skipped after a mode switch: a coding agent's `builder_started()` was
+      mode-unaware, and an API follow-up message with an existing capture left `first` false even
+      when the transcript was rejected. Gate both on the run's mode — `builder_session_in` matches
+      the saved session's mode, and a run studies again when its only kept conversation is in the
+      other mode; a follow-up with no kept conversation keeps its old path
+      — claimed: AlexJoaquimPereira, branch bugfix/r2.9-mode-switch-study
+- [ ] Exercise a mode-switched API follow-up end to end: an other-mode transcript, a capture and a
+      message must study again, not only the decision helper
+- [ ] Record which mode wrote `capture/`, so a failed run that leaves a capture from the other mode
+      isn't handed to a same-mode conversation; remove Deep-only capture files when a Clean room
+      study replaces them
 - [ ] A saved Claude `--resume`/`--continue` in the backend's extra arguments is refused in a
       Clean room build or question when it would reuse the project's Deep session, leaving
       unrelated arguments alone; unit and scripted CLI tests cover the build and question paths
