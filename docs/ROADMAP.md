@@ -489,6 +489,11 @@ been run live.
       that never started didn't say a large model may still be loading or reading a long prompt
       (#1239 gave it the `timeout_secs` advice)
       — claimed: jgt87, branch bugfix/r5.4-local-server-messages — PR #1242
+- [ ] Adding a server by its address showed nothing while it connected and gave up after 10 s with
+      "check the address" for a server that was reached but still starting or loading a model
+      (#1429): show "Connecting to <name>…" with a spinner and the seconds waited, wait a minute,
+      and give advice for a server that was reached
+      — claimed: jgt87, branch bugfix/r5.4-add-server-connecting
 
 ### R5.5 API-key builds fail in words people can use
 Owner: open · Status: todo
