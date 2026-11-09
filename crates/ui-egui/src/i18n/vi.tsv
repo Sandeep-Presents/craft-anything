@@ -741,7 +741,6 @@ Not now	Để sau
 Nothing allowed yet.	Chưa cho phép gì cả.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Chưa thể xây dựng gì: hãy cài Claude Code (và đăng nhập một lần), hoặc thêm một AI bằng khóa API bên dưới.
 Nothing found	Không tìm thấy gì
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Chưa tìm thấy gì. Chúng tôi tìm khóa API, máy chủ mô hình cục bộ (Ollama, LM Studio) và các ứng dụng tác tử bạn đã có. Nếu có một cái ở cổng khác hoặc máy tính khác, bạn có thể thêm bằng địa chỉ của nó bên dưới.
 Nothing inside it is read.	Chúng tôi không đọc bất cứ thứ gì bên trong.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Chúng tôi không đọc bất cứ thứ gì bên trong; Craft Anything chỉ làm việc dựa trên những gì bạn nhìn thấy. Phiên bản của bạn sẽ có hình ảnh riêng.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Chúng tôi không đọc bất cứ thứ gì bên trong bản gốc: không đọc mã, tệp hay mã nguồn trang. Craft Anything chỉ làm việc dựa trên những gì bạn nhìn thấy: hình ảnh, trang như khách truy cập thấy, và quan sát nó chạy.
@@ -1290,7 +1289,6 @@ Write the brief	Viết bản tóm tắt
 Write the handoff	Viết bản bàn giao
 Wrote {what} to {}	Đã ghi {what} vào {}
 You answered: {a}	Bạn đã trả lời: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Bạn có thể thêm khóa Claude, ChatGPT hoặc OpenRouter, một mô hình chạy trên máy (Ollama, LM Studio) hoặc một tác tử bạn đã dùng, sau này trong Cài đặt → AI.
 You chose:	Bạn đã chọn:
 You're all set	Mọi thứ đã sẵn sàng
 Your app is ready	Ứng dụng của bạn đã sẵn sàng
@@ -1467,3 +1465,33 @@ Connecting to {name}… {seconds} s	Đang kết nối với {name}… {seconds} 
 Stopped adding {name}.	Đã dừng thêm {name}.
 It isn't there any more, so {program} runs in its place.	Nó không còn ở đó nữa, nên {program} chạy thay thế.
 Use it	Dùng nó
+1 model found	Tìm thấy 1 mô hình
+Address	Địa chỉ
+Answered in {seconds} s	Đã trả lời sau {seconds} giây
+Answered in {seconds} s: {reply}	Đã trả lời sau {seconds} giây: {reply}
+Anthropic API	API Anthropic
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Bất kỳ công cụ nào dùng API của OpenAI, như llama.cpp, hoặc một dịch vụ được lưu trữ kèm khóa của nó.
+Coding agent	Tác tử lập trình
+Custom LLM endpoint	Điểm cuối LLM tùy chỉnh
+Custom endpoint	Điểm cuối tùy chỉnh
+Custom model	Mô hình tùy chỉnh
+Custom model or alias…	Mô hình tùy chỉnh hoặc bí danh…
+Gemini API	API Gemini
+Installed: {reply}	Đã cài: {reply}
+It lists no models yet.	Chưa liệt kê mô hình nào.
+Looking for models…	Đang tìm mô hình…
+Name	Tên
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Chưa tìm thấy gì. Chúng tôi tìm khóa API, máy chủ mô hình cục bộ (llama.cpp, LM Studio) và các ứng dụng tác tử bạn đã có. Nếu có một cái ở cổng khác hoặc máy tính khác, bạn có thể thêm nó ở thẻ Điểm cuối tùy chỉnh.
+OpenAI API	API OpenAI
+OpenRouter	OpenRouter
+Service	Dịch vụ
+Test	Kiểm tra
+Test an AI	Kiểm tra một AI
+Testing…	Đang kiểm tra…
+Testing… a model that isn't loaded yet can take a minute	Đang kiểm tra… một mô hình chưa được tải có thể mất một phút
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Bạn có thể thêm khóa Claude, ChatGPT hoặc OpenRouter, một mô hình chạy trên máy (llama.cpp, LM Studio) hoặc một tác tử bạn đã dùng, sau này trong Cài đặt → AI. Máy chủ thêm bằng địa chỉ nằm ở thẻ Điểm cuối tùy chỉnh.
+e.g. Home server	vd: Máy chủ ở nhà
+e.g. http://192.168.1.20:8080/v1	vd: http://192.168.1.20:8080/v1
+if it needs one	nếu cần
+model name	tên mô hình
+{n} models found	Tìm thấy {n} mô hình

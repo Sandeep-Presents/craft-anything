@@ -741,7 +741,6 @@ Not now	Agora não
 Nothing allowed yet.	Nenhuma permissão concedida ainda.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Ainda não é possível criar: instale o Claude Code (e entre na sua conta nele), ou adicione abaixo uma IA com chave de API.
 Nothing found	Nada encontrado
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Ainda não encontramos nada. Procuramos chaves de API, servidores de modelos locais (Ollama, LM Studio) e aplicativos de agentes já instalados. Você pode adicionar abaixo, pelo endereço, um servidor em outra porta ou outro computador.
 Nothing inside it is read.	Nada do conteúdo interno é lido.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Nada do conteúdo interno é lido; o Craft Anything trabalha com o que é visível. Sua versão terá sua própria arte.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Nada do interior do original é lido: nem o código, nem os arquivos, nem o código-fonte das páginas. O Craft Anything trabalha com o que é visível: imagens, a página como aparece ao visitante e a observação da execução.
@@ -1290,7 +1289,6 @@ Write the brief	Registrar o briefing da investigação
 Write the handoff	Registrar as informações para continuar o trabalho
 Wrote {what} to {}	Salvo: {what} em {}
 You answered: {a}	Você respondeu: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Você pode adicionar depois uma chave do Claude, ChatGPT ou OpenRouter, um modelo local (Ollama, LM Studio) ou um agente que já utiliza em Configurações → IA.
 You chose:	Você escolheu:
 You're all set	Tudo pronto
 Your app is ready	Seu aplicativo está pronto
@@ -1467,3 +1465,33 @@ Connecting to {name}… {seconds} s	Conectando a {name}… {seconds} s
 Stopped adding {name}.	A adição de {name} foi interrompida.
 It isn't there any more, so {program} runs in its place.	Ele não está mais lá, então {program} é usado no lugar.
 Use it	Usar este
+1 model found	1 modelo encontrado
+Address	Endereço
+Answered in {seconds} s	Respondeu em {seconds} s
+Answered in {seconds} s: {reply}	Respondeu em {seconds} s: {reply}
+Anthropic API	API da Anthropic
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Qualquer mecanismo que fale a API da OpenAI, como o llama.cpp, ou um serviço hospedado com a chave dele.
+Coding agent	Agente de código
+Custom LLM endpoint	Endpoint de LLM próprio
+Custom endpoint	Endpoint próprio
+Custom model	Outro modelo
+Custom model or alias…	Outro modelo ou alias…
+Gemini API	API do Gemini
+Installed: {reply}	Instalado: {reply}
+It lists no models yet.	Ainda não lista nenhum modelo.
+Looking for models…	Procurando modelos…
+Name	Nome
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Ainda não encontramos nada. Procuramos chaves de API, servidores de modelos locais (llama.cpp, LM Studio) e aplicativos de agentes já instalados. Um servidor em outra porta ou outro computador pode ser adicionado na aba Endpoint próprio.
+OpenAI API	API da OpenAI
+OpenRouter	OpenRouter
+Service	Serviço
+Test	Testar
+Test an AI	Testar uma IA
+Testing…	Testando…
+Testing… a model that isn't loaded yet can take a minute	Testando… um modelo que ainda não foi carregado pode levar um minuto
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Você pode adicionar depois uma chave do Claude, ChatGPT ou OpenRouter, um modelo local (llama.cpp, LM Studio) ou um agente que já utiliza em Configurações → IA. Um servidor pelo endereço vai na aba Endpoint próprio.
+e.g. Home server	ex.: Servidor de casa
+e.g. http://192.168.1.20:8080/v1	ex.: http://192.168.1.20:8080/v1
+if it needs one	se precisar
+model name	nome do modelo
+{n} models found	{n} modelos encontrados
