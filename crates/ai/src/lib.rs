@@ -167,7 +167,9 @@ fn kind_env_key(kind: BackendKind, base: Option<&str>) -> Option<String> {
 
 /// [`kind_env_key`] with the environment passed in, so tests need no process state.
 fn kind_env_key_with(kind: BackendKind, base: Option<&str>, get: impl Fn(&str) -> Option<String>) -> Option<String> {
-    if base.is_some_and(|b| !b.trim().is_empty()) {
+    // The hosted OpenAI-style services get theirs by address (`providers::env_key`); this kind isn't one.
+    let own = |b: &str| kind == BackendKind::Anthropic && anthropic::is_anthropic_api(b);
+    if base.is_some_and(|b| !b.trim().is_empty() && !own(b)) {
         return None;
     }
     keys::env_var(kind).and_then(get).filter(|k| !k.trim().is_empty())

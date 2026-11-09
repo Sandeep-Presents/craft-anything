@@ -1034,6 +1034,10 @@ fn a_kinds_environment_key_never_goes_to_another_address() {
     assert_eq!(kind_env_key_with(BackendKind::Openai, Some(" "), env).as_deref(), Some("sk-env"), "a blank address is the default");
     assert_eq!(kind_env_key_with(BackendKind::Openai, Some("http://other-host/v1"), env), None);
     assert_eq!(kind_env_key_with(BackendKind::Openrouter, None, env), None, "another kind's variable");
+    // A service's own address, typed in full, is still its own.
+    let env = |v: &str| (v == "ANTHROPIC_API_KEY").then(|| "sk-ant-env".to_string());
+    assert_eq!(kind_env_key_with(BackendKind::Anthropic, Some("https://api.anthropic.com"), env).as_deref(), Some("sk-ant-env"));
+    assert_eq!(kind_env_key_with(BackendKind::Anthropic, Some("https://other-host/v1"), env), None);
 }
 
 #[test]
