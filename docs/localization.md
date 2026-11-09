@@ -88,7 +88,7 @@ Thai glyphs come from Noto Sans Thai in craft-fonts, which the script test in `t
 **العربية** (`ar`) is Modern Standard Arabic and reads right to left. `ar`, `ar-IQ`, `ar-SA` and any other
 `ar-*` select it, as does the system language when it is Arabic. `crates/ui-egui/src/i18n/ar.tsv` has the
 same keys as the Chinese catalogs, written from the English source strings. It was drafted with an AI and
-not yet reviewed by a native speaker; corrections are welcome. Product and technology names, tool ids and
+read by a native speaker; corrections are welcome. Product and technology names, tool ids and
 shortcuts keep their Latin spelling. The kind detection also knows لعبة, موقع ويب, موقع الويب and صفحة ويب.
 
 The window is mirrored: storytold's egui fork lays Arabic text out in its right order and mirrors egui's own
