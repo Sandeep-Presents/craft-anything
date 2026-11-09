@@ -355,7 +355,7 @@ Every round spends the person's money or quota. One that can't do anything shoul
       `RESULT_GRACE` after its terminal `result` line instead of waiting for the process itself to
       exit. A wall or idle deadline that fires during that grace period (the result was already
       parsed) counts as completion, not a failure; a deadline with no parsed result still stops the
-      turn as before — claimed: claude, branch bugfix/builder-stuck-after-turn-completes, PR #1426
+      turn as before — claimed: mytrade2909-design, branch bugfix/builder-stuck-after-turn-completes, PR #1426
 
 ### R5.4 Local models can build
 Owner: open · Status: todo
