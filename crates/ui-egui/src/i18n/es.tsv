@@ -1514,4 +1514,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it sees)	(su servidor dice que ve)
 (its server says it doesn't)	(su servidor dice que no)
 (its server doesn't say: not shown pictures)	(su servidor no lo dice: no se le muestran imágenes)
+(asked when a build starts: it's reached over SSH)	(se le pregunta al iniciar una construcción: se llega por SSH)
 Set whether an AI sees pictures	Indicar si una IA ve imágenes

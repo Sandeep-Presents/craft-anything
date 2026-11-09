@@ -1514,4 +1514,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it sees)	(เซิร์ฟเวอร์บอกว่าดูได้)
 (its server says it doesn't)	(เซิร์ฟเวอร์บอกว่าดูไม่ได้)
 (its server doesn't say: not shown pictures)	(เซิร์ฟเวอร์ไม่บอก: ไม่ให้ดูรูป)
+(asked when a build starts: it's reached over SSH)	(จะถามเมื่อเริ่มบิลด์: เชื่อมต่อผ่าน SSH)
 Set whether an AI sees pictures	ตั้งค่าว่า AI ดูรูปได้หรือไม่

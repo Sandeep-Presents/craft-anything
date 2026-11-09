@@ -672,6 +672,8 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     let works_out = match server.sight {
                                         Some(s) if s.sees => tr("(its server says it sees)"),
                                         Some(_) => tr("(its server says it doesn't)"),
+                                        // Not asked here; a build asks through its own tunnel.
+                                        None if b.over_ssh() => tr("(asked when a build starts: it's reached over SSH)"),
                                         None => tr("(its server doesn't say: not shown pictures)"),
                                     };
                                     ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));

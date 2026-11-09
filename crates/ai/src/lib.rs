@@ -45,6 +45,24 @@ pub struct ServerWindow {
     pub sight: Option<sight::Sight>,
 }
 
+/// A backend's vision setting and what its server says ([`AiHub::vision`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VisionRead {
+    pub setting: Vision,
+    /// What its server says; `None` when it doesn't say, or wasn't asked.
+    pub read: Option<sight::Sight>,
+    /// Reached over ssh, so not asked here: a build asks through its tunnel.
+    pub over_ssh: bool,
+}
+
+impl VisionRead {
+    /// Whether its model is shown pictures, or `None` when that's decided only when a build
+    /// starts (Auto over ssh).
+    pub fn sees(&self) -> Option<bool> {
+        (self.setting != Vision::Auto || !self.over_ssh).then(|| sight::sees(self.setting, self.read))
+    }
+}
+
 impl ServerWindow {
     /// Whether a builder on this backend gets the lean tool list with these settings (`tools`, and
     /// the context budget: `None` is Auto), decided exactly as the agent loop decides once it knows
@@ -160,6 +178,14 @@ pub struct BackendConfig {
     pub ssh_host: Option<String>,
     #[serde(default = "yes")]
     pub enabled: bool,
+}
+
+impl BackendConfig {
+    /// Reached through an ssh tunnel (`ssh_host`). Settings and the CLI don't open one just to
+    /// ask its server something; a build asks through its own.
+    pub fn over_ssh(&self) -> bool {
+        self.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty())
+    }
 }
 
 fn yes() -> bool {
@@ -851,20 +877,20 @@ impl AiHub {
     }
 
     /// A backend's vision setting and what its server says, for showing what Auto works out to
-    /// (`ai vision`): `sight::sees(setting, read)` is whether its model is shown pictures. As with
-    /// [`AiHub::server_window`], a backend over ssh or one that can't be built isn't asked.
-    /// Blocking (bounded); run it off the UI thread.
-    pub fn vision(&self, name: &str) -> Result<(Vision, Option<sight::Sight>), ToolError> {
+    /// (`ai vision`). As with [`AiHub::server_window`], a backend over ssh or one that can't be
+    /// built isn't asked; over ssh, a build still asks through its tunnel, so [`VisionRead::sees`]
+    /// can't say yet. Blocking (bounded); run it off the UI thread.
+    pub fn vision(&self, name: &str) -> Result<VisionRead, ToolError> {
         let e = self.entry(name)?;
         if e.config.kind == BackendKind::AgentCli {
             return Err(ToolError::invalid(format!("{name} is an agent app, which opens pictures with its own tools."))
                 .with_remediation("Whether a model sees pictures is set for API backends."));
         }
         let setting = e.options.vision.unwrap_or_default();
-        let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
+        let over_ssh = e.config.over_ssh();
         // A set answer needs no question to the server.
         let read = if setting != Vision::Auto || over_ssh { None } else { self.build_model(&e).ok().and_then(|s| s.model.sees_pictures()) };
-        Ok((setting, read))
+        Ok(VisionRead { setting, read, over_ssh })
     }
 
     /// What a backend's server says about its context window, for showing what its budget works
@@ -877,8 +903,7 @@ impl AiHub {
             return Err(ToolError::invalid(format!("{name} is an agent app, which keeps its own conversation."))
                 .with_remediation("A context budget is for API backends."));
         }
-        let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
-        let slot = if over_ssh { None } else { self.build_model(&e).ok() };
+        let slot = if e.config.over_ssh() { None } else { self.build_model(&e).ok() };
         let local = slot.as_ref().map_or(e.config.kind == BackendKind::OpenaiCompatible, |s| s.local);
         Ok(ServerWindow { window: slot.as_ref().and_then(|s| s.model.context_window()), local, sight: slot.as_ref().and_then(|s| s.model.sees_pictures()) })
     }

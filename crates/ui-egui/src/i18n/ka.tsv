@@ -1514,4 +1514,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it sees)	(სერვერი ამბობს, რომ ხედავს)
 (its server says it doesn't)	(სერვერი ამბობს, რომ არ ხედავს)
 (its server doesn't say: not shown pictures)	(სერვერი არ ამბობს: სურათები არ ეჩვენება)
+(asked when a build starts: it's reached over SSH)	(იკითხება აწყობის დაწყებისას: მას SSH-ით უკავშირდება)
 Set whether an AI sees pictures	დააყენე, ხედავს თუ არა AI სურათებს

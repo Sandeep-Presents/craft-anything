@@ -479,11 +479,12 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             }
         }
         AiCommand::Vision { name, sees: None } => match hub.vision(name) {
-            Ok((setting, read)) => {
+            Ok(v) => {
+                // Over ssh on Auto, `sees` is null: a build asks the server through its tunnel.
                 emit(
                     &json!({
-                        "name": name, "vision": setting.as_str(), "sees": craft_anything_ai::sight::sees(setting, read),
-                        "server_says": read.map(|r| r.sees), "source": read.map(|r| r.source),
+                        "name": name, "vision": v.setting.as_str(), "sees": v.sees(), "over_ssh": v.over_ssh,
+                        "server_says": v.read.map(|r| r.sees), "source": v.read.map(|r| r.source),
                     }),
                     f,
                 );

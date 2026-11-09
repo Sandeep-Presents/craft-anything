@@ -706,6 +706,29 @@ fn a_budget_is_worked_out_from_the_servers_window() {
     assert!(h.server_window("Nobody").is_err());
 }
 
+/// A server reached over ssh isn't asked here (no tunnel is opened just for it), and a build asks
+/// through its own, so Auto can't say yet whether its model is shown pictures; a set answer can.
+#[test]
+fn a_server_over_ssh_isnt_asked_whether_its_model_sees_until_a_build() {
+    let (h, _d) = hub();
+    let remote = BackendConfig {
+        name: "Remote".into(),
+        kind: BackendKind::OpenaiCompatible,
+        model: "qwen".into(),
+        base_url: Some("http://127.0.0.1:9/v1".into()),
+        ssh_host: Some("gpu-box".into()),
+        enabled: true,
+    };
+    assert!(remote.over_ssh());
+    assert!(!BackendConfig { ssh_host: Some("  ".into()), ..remote.clone() }.over_ssh(), "a blank host is no host");
+    h.add_backend(remote, None).unwrap();
+    let auto = h.vision("Remote").unwrap();
+    assert_eq!((auto.read, auto.over_ssh, auto.sees()), (None, true, None));
+    assert_eq!(h.server_window("Remote").unwrap().sight, None);
+    assert!(h.set_vision("Remote", Some(crate::Vision::Yes)).unwrap());
+    assert_eq!(h.vision("Remote").unwrap().sees(), Some(true));
+}
+
 /// Every Claude effort level can be chosen for the Claude API and Claude Code, and only for them.
 #[test]
 fn a_claude_ais_effort_is_changed() {
