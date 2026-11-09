@@ -1495,3 +1495,17 @@ e.g. http://192.168.1.20:8080/v1	nt http://192.168.1.20:8080/v1
 if it needs one	kui vaja
 model name	mudeli nimi
 {n} models found	Leiti {n} mudelit
+1 checkpoint found	Leiti 1 checkpoint
+API-format workflow JSON, optional	API-vormingus töövoo JSON, valikuline
+Check a ComfyUI server	Kontrolli ComfyUI serverit
+Checkpoint	Checkpoint
+ComfyUI address	ComfyUI aadress
+ComfyUI workflow	ComfyUI töövoog
+List ComfyUI's checkpoints	Loetle ComfyUI checkpointid
+Looking for checkpoints…	Otsin checkpointe…
+No key needed; pictures are made on your server.	Võtit pole vaja; pildid tehakse sinu serveris.
+Test ComfyUI	Testi ComfyUI-d
+Workflow	Töövoog
+e.g. http://192.168.1.20:8188	nt http://192.168.1.20:8188
+on your server	sinu serveris
+{n} checkpoints found	Leiti {n} checkpointi

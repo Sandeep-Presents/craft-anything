@@ -1495,3 +1495,17 @@ e.g. http://192.168.1.20:8080/v1	მაგ. http://192.168.1.20:8080/v1
 if it needs one	თუ სჭირდება
 model name	მოდელის სახელი
 {n} models found	ნაპოვნია {n} მოდელი
+1 checkpoint found	ნაპოვნია 1 checkpoint
+API-format workflow JSON, optional	API ფორმატის workflow JSON, არასავალდებულო
+Check a ComfyUI server	ComfyUI სერვერის შემოწმება
+Checkpoint	Checkpoint
+ComfyUI address	ComfyUI-ის მისამართი
+ComfyUI workflow	ComfyUI workflow
+List ComfyUI's checkpoints	ComfyUI-ის checkpoint-ების ჩამოთვლა
+Looking for checkpoints…	ვეძებთ checkpoint-ებს…
+No key needed; pictures are made on your server.	გასაღები არ არის საჭირო; სურათები თქვენს სერვერზე იქმნება.
+Test ComfyUI	ComfyUI-ის შემოწმება
+Workflow	Workflow
+e.g. http://192.168.1.20:8188	მაგ. http://192.168.1.20:8188
+on your server	თქვენს სერვერზე
+{n} checkpoints found	ნაპოვნია {n} checkpoint

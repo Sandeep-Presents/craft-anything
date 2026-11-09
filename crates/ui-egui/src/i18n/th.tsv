@@ -1495,3 +1495,17 @@ e.g. http://192.168.1.20:8080/v1	เช่น http://192.168.1.20:8080/v1
 if it needs one	ถ้าจำเป็น
 model name	ชื่อโมเดล
 {n} models found	พบ {n} โมเดล
+1 checkpoint found	พบ 1 เช็กพอยต์
+API-format workflow JSON, optional	JSON เวิร์กโฟลว์รูปแบบ API (ไม่บังคับ)
+Check a ComfyUI server	ตรวจสอบเซิร์ฟเวอร์ ComfyUI
+Checkpoint	เช็กพอยต์
+ComfyUI address	ที่อยู่ ComfyUI
+ComfyUI workflow	เวิร์กโฟลว์ ComfyUI
+List ComfyUI's checkpoints	แสดงรายการเช็กพอยต์ของ ComfyUI
+Looking for checkpoints…	กำลังหาเช็กพอยต์…
+No key needed; pictures are made on your server.	ไม่ต้องใช้คีย์ ภาพสร้างบนเซิร์ฟเวอร์ของคุณ
+Test ComfyUI	ทดสอบ ComfyUI
+Workflow	เวิร์กโฟลว์
+e.g. http://192.168.1.20:8188	เช่น http://192.168.1.20:8188
+on your server	บนเซิร์ฟเวอร์ของคุณ
+{n} checkpoints found	พบ {n} เช็กพอยต์

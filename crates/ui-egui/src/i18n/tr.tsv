@@ -1495,3 +1495,17 @@ e.g. http://192.168.1.20:8080/v1	örn. http://192.168.1.20:8080/v1
 if it needs one	gerekiyorsa
 model name	model adı
 {n} models found	{n} model bulundu
+1 checkpoint found	1 checkpoint bulundu
+API-format workflow JSON, optional	API biçiminde iş akışı JSON'u, isteğe bağlı
+Check a ComfyUI server	Bir ComfyUI sunucusunu denetle
+Checkpoint	Checkpoint
+ComfyUI address	ComfyUI adresi
+ComfyUI workflow	ComfyUI iş akışı
+List ComfyUI's checkpoints	ComfyUI'nin checkpoint'lerini listele
+Looking for checkpoints…	Checkpoint'ler aranıyor…
+No key needed; pictures are made on your server.	Anahtar gerekmez; resimler sizin sunucunuzda yapılır.
+Test ComfyUI	ComfyUI'yi test et
+Workflow	İş akışı
+e.g. http://192.168.1.20:8188	örn. http://192.168.1.20:8188
+on your server	sunucunuzda
+{n} checkpoints found	{n} checkpoint bulundu

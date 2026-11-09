@@ -1495,3 +1495,17 @@ e.g. http://192.168.1.20:8080/v1	ex.: http://192.168.1.20:8080/v1
 if it needs one	se precisar
 model name	nome do modelo
 {n} models found	{n} modelos encontrados
+1 checkpoint found	1 checkpoint encontrado
+API-format workflow JSON, optional	JSON de fluxo de trabalho no formato da API, opcional
+Check a ComfyUI server	Verificar um servidor ComfyUI
+Checkpoint	Checkpoint
+ComfyUI address	Endereço do ComfyUI
+ComfyUI workflow	Fluxo de trabalho do ComfyUI
+List ComfyUI's checkpoints	Listar os checkpoints do ComfyUI
+Looking for checkpoints…	Procurando checkpoints…
+No key needed; pictures are made on your server.	Nenhuma chave necessária; as imagens são feitas no seu servidor.
+Test ComfyUI	Testar ComfyUI
+Workflow	Fluxo de trabalho
+e.g. http://192.168.1.20:8188	ex.: http://192.168.1.20:8188
+on your server	no seu servidor
+{n} checkpoints found	{n} checkpoints encontrados
