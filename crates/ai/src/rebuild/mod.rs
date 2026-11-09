@@ -471,6 +471,13 @@ pub fn preview(ws: &Workspace) -> Result<StaticServer, ToolError> {
     serve_dir(&site).map_err(|e| ToolError::io(site.display(), e))
 }
 
+/// Deep mode on a program requires decompiling, so a build turn that ends without the builder
+/// ever having decompiled in this project gets [`DECOMPILE_FIRST`] (once per run). A decompile in
+/// an earlier run counts: each request from the person starts a new run.
+fn needs_decompile_reminder(deep: bool, manifest: &craft_anything_engine::workspace::Manifest) -> bool {
+    deep && matches!(manifest.target, TargetRef::Local { .. }) && !manifest.decompiled
+}
+
 struct Worker {
     /// Told after each event.
     wake: Wake,
@@ -881,8 +888,6 @@ impl Worker {
             return Err(not_working(ws));
         }
         let mut refinements = 0;
-        // Deep mode on a program: decompiling is required, so a build turn without any gets one reminder.
-        let must_decompile = deep && matches!(ws.manifest.target, TargetRef::Local { .. });
         let mut reminded = false;
         // The builder finished and only the check didn't: the build is there to check.
         let mut only_check = carrying_on && !first && opts.message.is_none() && ws.manifest.awaiting_check;
@@ -965,8 +970,7 @@ impl Worker {
                     prompt = p;
                     continue;
                 }
-                // Decompiling in an earlier run counts: each request from the person is a new run.
-                if must_decompile && !ws.manifest.decompiled && !reminded {
+                if !reminded && needs_decompile_reminder(deep, &ws.manifest) {
                     reminded = true;
                     prompt = DECOMPILE_FIRST.to_string();
                     continue;
