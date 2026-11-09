@@ -1343,6 +1343,9 @@ Gaps found while using the app for real projects.
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
 
+- [ ] Offer to restart a running project app so its updated build can be opened
+      — claimed: Codex, branch bugfix/restart-updated-project-app
+
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress
 Keep a build that works at hand: pin it, and open it from the sidebar whatever the builder does
