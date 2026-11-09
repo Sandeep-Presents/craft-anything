@@ -753,7 +753,6 @@ Nothing open yet	Chưa mở gì
 Nothing selected	Chưa chọn gì
 Nothing to show	Không có gì để hiển thị
 Nothing uses it until it's on again; it keeps its key.	Sẽ không có gì dùng nó cho đến khi bật lại; khóa của nó vẫn được giữ.
-Nothing — start fresh	Không gì cả — bắt đầu mới
 Now	Bây giờ
 Now: {what} ({time})	Bây giờ: {what} ({time})
 Objective-C classes	Lớp Objective-C
@@ -1031,7 +1030,6 @@ Show the folder	Hiện thư mục
 Show the ones that are met	Hiện những mục đã đạt
 Show the sidebar	Hiện thanh bên
 Show the welcome again	Hiện lại màn hình chào mừng
-Showing	Đang hiện
 Sign in and add the Unity Editor	Đăng nhập và thêm Unity Editor
 Sign in and install Unreal Engine	Đăng nhập và cài Unreal Engine
 Simple	Đơn giản
@@ -1405,7 +1403,6 @@ your files there are the app, edited in place	các tệp của bạn ở đó ch
 {}: {state}	{}: {state}
 {}h {:02}m	{}h {:02}m
 {}m {:02}s	{}m {:02}s
-— use the filter to find the rest.	— dùng bộ lọc để tìm phần còn lại.
 … {n} more	… còn {n} mục
 … {n} older	… {n} mục cũ hơn
 … {} more	… còn {} mục
@@ -1510,3 +1507,5 @@ e.g. http://192.168.1.20:8188	vd: http://192.168.1.20:8188
 on your server	trên máy chủ của bạn
 {n} checkpoints found	Tìm thấy {n} checkpoint
 Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Cần địa chỉ ComfyUI và checkpoint trong Cài đặt → Các lượt xây dựng. Cho đến lúc đó, trò chơi được dựng mà không có chúng.
+Showing {n}. Use the filter to find the rest.	Đang hiện {n}. Dùng bộ lọc để tìm phần còn lại.
+Start fresh	Bắt đầu mới

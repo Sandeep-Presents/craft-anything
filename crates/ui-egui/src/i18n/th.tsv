@@ -753,7 +753,6 @@ Nothing open yet	ยังไม่มีอะไรเปิด
 Nothing selected	ไม่ได้เลือกอะไร
 Nothing to show	ไม่มีอะไรแสดง
 Nothing uses it until it's on again; it keeps its key.	ไม่มีอะไรใช้มันจนกว่าจะเปิดอีกครั้ง มันยังเก็บคีย์ไว้
-Nothing — start fresh	ไม่มี — เริ่มใหม่
 Now	ตอนนี้
 Now: {what} ({time})	ตอนนี้: {what} ({time})
 Objective-C classes	คลาส Objective-C
@@ -1031,7 +1030,6 @@ Show the folder	แสดงโฟลเดอร์
 Show the ones that are met	แสดงข้อที่ผ่านแล้ว
 Show the sidebar	แสดงแถบข้าง
 Show the welcome again	แสดงหน้าต้อนรับอีกครั้ง
-Showing	กำลังแสดง
 Sign in and add the Unity Editor	ล็อกอินและเพิ่ม Unity Editor
 Sign in and install Unreal Engine	ล็อกอินและติดตั้ง Unreal Engine
 Simple	ง่าย
@@ -1405,7 +1403,6 @@ your files there are the app, edited in place	ไฟล์ของคุณท�
 {}: {state}	{}: {state}
 {}h {:02}m	{} ชม. {:02} น.
 {}m {:02}s	{} น. {:02} ว.
-— use the filter to find the rest.	— ใช้ตัวกรองเพื่อหาที่เหลือ
 … {n} more	… อีก {n} รายการ
 … {n} older	… เก่ากว่า {n} รายการ
 … {} more	… อีก {}
@@ -1510,3 +1507,5 @@ e.g. http://192.168.1.20:8188	เช่น http://192.168.1.20:8188
 on your server	บนเซิร์ฟเวอร์ของคุณ
 {n} checkpoints found	พบ {n} เช็กพอยต์
 Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	ต้องมีที่อยู่ ComfyUI และเช็กพอยต์ใน การตั้งค่า → บิลด์ ก่อนหน้านั้นเกมจะสร้างโดยไม่มีสิ่งเหล่านี้
+Showing {n}. Use the filter to find the rest.	กำลังแสดง {n} รายการ ใช้ตัวกรองเพื่อหาที่เหลือ
+Start fresh	เริ่มใหม่

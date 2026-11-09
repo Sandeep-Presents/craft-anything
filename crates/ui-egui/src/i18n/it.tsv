@@ -754,7 +754,6 @@ Nothing open yet	Ancora niente aperto
 Nothing selected	Niente selezionato
 Nothing to show	Niente da mostrare
 Nothing uses it until it's on again; it keeps its key.	Niente lo usa finché non è di nuovo acceso; la chiave resta.
-Nothing — start fresh	Niente: ricomincia da zero
 Now	Ora
 Now: {what} ({time})	Ora: {what} ({time})
 Objective-C classes	Classi Objective-C
@@ -1033,7 +1032,6 @@ Show the folder	Mostra la cartella
 Show the ones that are met	Mostra quelli soddisfatti
 Show the sidebar	Mostra la barra laterale
 Show the welcome again	Mostra di nuovo il benvenuto
-Showing	In mostra
 Sign in and add the Unity Editor	Accedi e aggiungi Unity Editor
 Sign in and install Unreal Engine	Accedi e installa Unreal Engine
 Simple	Semplice
@@ -1407,7 +1405,6 @@ your files there are the app, edited in place	i tuoi file lì sono l'app, modifi
 {}: {state}	{}: {state}
 {}h {:02}m	{}h {:02}m
 {}m {:02}s	{}m {:02}s
-— use the filter to find the rest.	— usa il filtro per trovare il resto.
 … {n} more	… altri {n}
 … {n} older	… {n} più vecchi
 … {} more	… altri {}
@@ -1512,3 +1509,5 @@ e.g. http://192.168.1.20:8188	es. http://192.168.1.20:8188
 on your server	sul tuo server
 {n} checkpoints found	{n} checkpoint trovati
 Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Servono un indirizzo ComfyUI e un checkpoint in Impostazioni → Costruzioni. Fino ad allora il gioco si costruisce senza.
+Showing {n}. Use the filter to find the rest.	In mostra {n}. Usa il filtro per trovare il resto.
+Start fresh	Ricomincia da zero

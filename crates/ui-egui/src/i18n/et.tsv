@@ -753,7 +753,6 @@ Nothing open yet	Veel pole midagi avatud
 Nothing selected	Midagi pole valitud
 Nothing to show	Pole midagi näidata
 Nothing uses it until it's on again; it keeps its key.	Miski ei kasuta seda enne, kui see uuesti sisse lülitatakse; võti jääb alles.
-Nothing — start fresh	Mitte midagi — alusta nullist
 Now	Praegu
 Now: {what} ({time})	Praegu: {what} ({time})
 Objective-C classes	Objective-C klassid
@@ -1031,7 +1030,6 @@ Show the folder	Näita kausta
 Show the ones that are met	Näita täidetuid
 Show the sidebar	Näita külgriba
 Show the welcome again	Näita tervitust uuesti
-Showing	Näitan
 Sign in and add the Unity Editor	Logi sisse ja lisa Unity Editor
 Sign in and install Unreal Engine	Logi sisse ja paigalda Unreal Engine
 Simple	Lihtne
@@ -1405,7 +1403,6 @@ your files there are the app, edited in place	sinu failid seal on rakendus, mida
 {}: {state}	{}: {state}
 {}h {:02}m	{}h {:02}m
 {}m {:02}s	{}m {:02}s
-— use the filter to find the rest.	— ülejäänu leidmiseks kasuta filtrit.
 … {n} more	… veel {n}
 … {n} older	… veel {n} vanemat
 … {} more	… veel {}
@@ -1510,3 +1507,5 @@ e.g. http://192.168.1.20:8188	nt http://192.168.1.20:8188
 on your server	sinu serveris
 {n} checkpoints found	Leiti {n} checkpointi
 Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Vajab ComfyUI aadressi ja checkpointi (Seaded → Ehitused). Seni ehitatakse mäng ilma nendeta.
+Showing {n}. Use the filter to find the rest.	Näitan {n}. Ülejäänu leidmiseks kasuta filtrit.
+Start fresh	Alusta nullist
