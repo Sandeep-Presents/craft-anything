@@ -188,27 +188,47 @@ impl OpenAi {
         body
     }
 
-    /// Model ids from `GET /models`.
-    /// The models the server says are loaded now, from Ollama's `/api/ps` at the root of a `…/v1`
-    /// address (Ollama and FastFlowLM answer it). Empty when the address doesn't end in `/v1`, or
-    /// the server doesn't answer it: `/models` may list every model a server can download, and
-    /// asking for one it hasn't got starts that download (#1434).
+    /// The models the server says are loaded now, read at the root of a `…/v1` address: Ollama's
+    /// `/api/ps` (Ollama and FastFlowLM answer it), else LM Studio's `/api/v0/models`, whose
+    /// entries say `state: "loaded"` (embedding models left out). Empty when the address doesn't
+    /// end in `/v1`, or the server answers neither: `/models` may list every model a server has
+    /// downloaded or can download, and asking for another loads or downloads it (#1434).
     pub fn loaded_models(&self, timeout: std::time::Duration) -> Vec<String> {
         let Some(root) = self.base_url.strip_suffix("/v1") else { return Vec::new() };
-        let Ok(v) = http::get_json(&http::quick_agent(timeout), &self.label, &format!("{root}/api/ps"), &self.headers()) else { return Vec::new() };
-        let entries = v.get("models").and_then(Value::as_array).cloned().unwrap_or_default();
-        let mut out: Vec<String> = Vec::new();
-        for m in entries {
-            let id = m.get("model").or_else(|| m.get("name")).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
-            if let Some(id) = id
-                && !out.iter().any(|seen| seen == id)
-            {
-                out.push(id.to_string());
+        let agent = http::quick_agent(timeout);
+        let get = |path: &str| http::get_json(&agent, &self.label, &format!("{root}{path}"), &self.headers()).ok();
+        let ids = |entries: Vec<&Value>, keys: &[&str]| {
+            let mut out: Vec<String> = Vec::new();
+            for m in entries {
+                let id = keys.iter().find_map(|k| m.get(*k)).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+                if let Some(id) = id
+                    && !out.iter().any(|seen| seen == id)
+                {
+                    out.push(id.to_string());
+                }
             }
+            out
+        };
+        let running =
+            get("/api/ps").map(|v| ids(v.get("models").and_then(Value::as_array).map(|a| a.iter().collect()).unwrap_or_default(), &["model", "name"]));
+        if let Some(found) = running.filter(|r| !r.is_empty()) {
+            return found;
         }
-        out
+        let Some(v) = get("/api/v0/models") else { return Vec::new() };
+        let loaded = v
+            .get("data")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter(|m| m.get("state").and_then(Value::as_str) == Some("loaded"))
+                    .filter(|m| m.get("type").and_then(Value::as_str) != Some("embeddings"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        ids(loaded, &["id"])
     }
 
+    /// Model ids from `GET /models`.
     pub fn list_models(&self, timeout: std::time::Duration) -> Result<Vec<String>, ToolError> {
         self.list_models_within(timeout, timeout)
     }

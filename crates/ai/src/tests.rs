@@ -822,7 +822,7 @@ input.on('line', line => {
 }
 
 /// A stand-in server that answers `GET <path>` from `routes` and 404 otherwise; its `/v1` address.
-fn serve_routes(routes: &'static [(&'static str, &'static str)]) -> String {
+pub(crate) fn serve_routes(routes: &'static [(&'static str, &'static str)]) -> String {
     let l = TcpListener::bind("127.0.0.1:0").unwrap();
     let base = format!("http://{}/v1", l.local_addr().unwrap());
     std::thread::spawn(move || {

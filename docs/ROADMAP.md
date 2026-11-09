@@ -473,11 +473,11 @@ been run live.
       read (#83)
 - [ ] Check live that LM Studio on `--port 1235` is offered, and where its settings file is on
       Windows, macOS and Linux (`LM_STUDIO_SETTINGS` is from memory of its folders, not verified)
-- [ ] "Look for AI" (`detect::probe_local`) saved the first chat model a local server lists; LM
+- [x] "Look for AI" (`detect::probe_local`) saved the first chat model a local server lists; LM
       Studio lists every model downloaded and FastFlowLM every model it can download, so it could
       load or download one the person isn't using (#1434). Prefer the loaded model: `/api/ps`
       (Ollama, FastFlowLM) or LM Studio's `/api/v0/models` (`state: "loaded"`)
-      — claimed: jgt87, branch bugfix/r5.4-detect-loaded-model
+      — claimed: jgt87, branch bugfix/r5.4-detect-loaded-model — PR #1437
 - [ ] See why Bionic or LM Studio can't be picked (#140)
 - [x] Do not select an embedding, ranking or transcription model as a chat backend when a local server has no chat models — claimed: Afloat16, branch bugfix/r5.4-nonchat-model-detection-20261103
 - [x] Recognize specialised model file paths and numeric task-name versions during local chat setup
