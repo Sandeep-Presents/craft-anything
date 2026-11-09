@@ -3318,3 +3318,28 @@ fn a_start_waiting_for_an_ai_choice_that_fails_to_save_does_not_build() {
     assert!(h.state().creating.is_none() && runs.started().is_empty(), "no build after a failed save");
     assert!(h.state().state.toasts.iter().any(|(_, error)| *error), "the failure is shown");
 }
+
+/// A batch of role choices that saves one and then fails on the next shows what was saved
+/// (#1290's review): the builder chosen in it is shown, not the one from before.
+#[test]
+fn a_role_save_that_fails_part_way_shows_what_was_saved() {
+    use craft_anything_ai::Role;
+    use craft_anything_ai::rebuild::StandIns;
+    let d = tempfile::tempdir().unwrap();
+    let runs = StandIns::new();
+    let (dir, r) = (d.path().to_path_buf(), runs.clone());
+    let mut h = harness(move || stand_in_app(dir, &r));
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Claude Code")));
+    assert_eq!(h.state().builder, None);
+    {
+        let a = h.state_mut();
+        // The first choice is being saved; the next two wait for it and go out together.
+        a.set_role(Role::Extractor, None);
+        a.set_role(Role::Builder, Some("Claude Code".into()));
+        a.set_role(Role::Extractor, Some("No such AI".into()));
+    }
+    assert!(wait(&mut h, |a| !a.roles_saving()), "the saves ended");
+    assert_eq!(h.state().hub.chosen(Role::Builder).as_deref(), Some("Claude Code"), "saved before the failure");
+    assert!(wait(&mut h, |a| a.builder.as_deref() == Some("Claude Code")), "and shown");
+}

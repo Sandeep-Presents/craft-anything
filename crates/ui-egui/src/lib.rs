@@ -1452,6 +1452,12 @@ impl CraftApp {
                 if roles_saved {
                     self.start_after_roles = None;
                     self.save_roles();
+                    // Part of the batch may have been saved before it failed: show what's saved
+                    // now. A save started just above brings its own list instead, and a read
+                    // that arrives while another save is pending can't replace the choice shown.
+                    if !self.roles_saving() {
+                        self.refresh_backends();
+                    }
                 }
                 self.detecting = false;
                 self.facts_read(job, None);
