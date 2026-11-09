@@ -90,15 +90,16 @@ fn end_with_owner(owner: u32, group: u32, leftover: Option<&std::path::Path>, ev
         return None;
     }
     // The group is checked each time too, so the watcher never outlives it long enough for its id
-    // to name another group. Only a folder named craft-* is ever deleted.
+    // to name another group. Only a folder named craft-* is ever deleted. No `--` after the
+    // signal: dash (Debian's and Ubuntu's sh) reads it as a process id and fails.
     const SCRIPT: &str = r#"o=$1 g=$2 d=$3 t=$4
 while kill -0 "$o" 2>/dev/null; do
-  kill -0 -- "-$g" 2>/dev/null || exit 0
+  kill -0 "-$g" 2>/dev/null || exit 0
   sleep "$t"
 done
-kill -TERM -- "-$g" 2>/dev/null
+kill -TERM "-$g" 2>/dev/null
 sleep 2
-kill -KILL -- "-$g" 2>/dev/null
+kill -KILL "-$g" 2>/dev/null
 case "${d##*/}" in craft-*) rm -rf -- "$d" ;; esac"#;
     let leftover = leftover.map(|p| p.display().to_string()).unwrap_or_default();
     Process::new("/bin/sh")
