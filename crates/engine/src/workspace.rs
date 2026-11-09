@@ -21,10 +21,12 @@ use crate::inbox::{next_counter, now_ms};
 use crate::project::write_atomic;
 use crate::versioned::{self, upgrade};
 use craft_anything_evidence::{ErrorCode, ToolError};
+use craft_anything_platform::sync::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::sync::PoisonError;
 
 pub mod progress;
 
@@ -451,6 +453,12 @@ pub struct Manifest {
     /// Kept in the project so "Try again" can't restart the count.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub not_working_checks: u32,
+    /// The builder has read the original's code (a decompiled function) in this project, in any run.
+    /// Deep mode reminds a builder that hasn't; kept here because every request starts a new run, so
+    /// a run-only flag repeated the reminder after each request. An older build drops it when it
+    /// saves, which costs at most one more reminder, so the format version stays.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub decompiled: bool,
 }
 
 fn is_zero(n: &u32) -> bool {
@@ -491,6 +499,7 @@ impl Manifest {
             approvals: Default::default(),
             awaiting_check: false,
             not_working_checks: 0,
+            decompiled: false,
         }
     }
 
@@ -541,8 +550,8 @@ pub struct AssetRecord {
 /// The list of generated assets, in the workspace folder.
 const ASSETS: &str = "assets.json";
 
-/// What a project's builds have taken and used, every run together (`usage.json`). The rebuild
-/// run is its only writer; everything else reads it.
+/// What a project's builds and questions have taken and used, every run together (`usage.json`).
+/// A rebuild turn and a question can add to it; everything else reads it.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProjectUsage {
@@ -570,6 +579,9 @@ pub const ACTIVITY_LOG_OLD: &str = "build-activity.old.log";
 /// Where [`ProjectUsage`] is kept in the project folder.
 pub const USAGE_FILE: &str = "usage.json";
 pub const USAGE_VERSION: u32 = 1;
+/// A build's turn and a question can record their cost at the same time. The save is
+/// read-modify-write, so both go through one lock or one would overwrite the other.
+static USAGE_UPDATE: Mutex<()> = Mutex::new(());
 
 impl ProjectUsage {
     /// The saved usage of the project at `root`; nothing yet (or unreadable) is all zeros.
@@ -579,6 +591,7 @@ impl ProjectUsage {
 
     /// Change the saved usage (the run's job). A file from a newer Craft Anything is left alone.
     pub fn update(root: &Path, f: impl FnOnce(&mut ProjectUsage)) -> Result<(), ToolError> {
+        let _updating = USAGE_UPDATE.lock().unwrap_or_else(PoisonError::into_inner);
         let mut u = ProjectUsage::load(root);
         if u.version > USAGE_VERSION {
             return Err(ToolError::unsupported(format!("{USAGE_FILE} was written by a newer Craft Anything, so it isn't changed.")));
@@ -1493,6 +1506,28 @@ mod tests {
         std::fs::write(dir.path().join(USAGE_FILE), r#"{"version": 99, "work_ms": 5}"#).unwrap();
         assert!(ProjectUsage::update(dir.path(), |u| u.work_ms = 0).is_err());
         assert_eq!(ProjectUsage::load(dir.path()).work_ms, 5, "read as far as it's known, never written over");
+    }
+
+    /// A build turn and a question can save their cost together: neither may overwrite the other.
+    #[test]
+    fn concurrent_usage_updates_all_count() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let start = std::sync::Barrier::new(8);
+        std::thread::scope(|s| {
+            for _ in 0..8 {
+                let start = &start;
+                s.spawn(move || {
+                    start.wait();
+                    for _ in 0..25 {
+                        ProjectUsage::update(root, |u| u.add_turn(0, 0, Some(0.01), true)).unwrap();
+                    }
+                });
+            }
+        });
+        let u = ProjectUsage::load(root);
+        assert!((u.cost_usd - 2.0).abs() < 1e-6, "{u:?}");
+        assert!(u.priced);
     }
 
     #[test]

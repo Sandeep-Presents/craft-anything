@@ -390,17 +390,30 @@ fn hash_at(data: &[u8], off: usize) -> Option<String> {
     if h.iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b)) { Some(String::from_utf8_lossy(h).into_owned()) } else { None }
 }
 
+/// Bytes available in this record. Dart stores its length without the four magic bytes.
+fn snapshot_bytes(data: &[u8], off: usize) -> Option<&[u8]> {
+    let tail = data.get(off..)?;
+    let length = Reader::new(tail).u64_le(4)?;
+    let end = usize::try_from(length).unwrap_or(usize::MAX).saturating_add(4);
+    tail.get(..end.min(tail.len()))
+}
+
 /// Read a snapshot header at `off` (needs the magic there).
 pub fn snapshot_header(data: &[u8], off: usize) -> Option<SnapshotHeader> {
-    let r = Reader::new(data);
-    if r.slice(off, 4)? != SNAPSHOT_MAGIC {
+    let bytes = snapshot_bytes(data, off)?;
+    let r = Reader::new(bytes);
+    if r.slice(0, 4)? != SNAPSHOT_MAGIC {
         return None;
     }
-    let length = r.u64_le(off.checked_add(4)?)?;
-    let kind = r.u64_le(off.checked_add(12)?)?;
-    let hash = hash_at(data, off.checked_add(20)?);
-    let features =
-        off.checked_add(52).and_then(|f| r.cstr(f, 1024)).filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_graphic() || c == ' ') && hash.is_some());
+    let length = r.u64_le(4)?;
+    let kind = r.u64_le(12)?;
+    let hash = hash_at(bytes, 20);
+    let features = hash.as_ref().and_then(|_| {
+        let tail = bytes.get(52..)?;
+        let end = tail.iter().take(1024).position(|&b| b == 0)?;
+        let text = std::str::from_utf8(tail.get(..end)?).ok()?;
+        (!text.is_empty() && text.bytes().all(|b| b.is_ascii_graphic() || b == b' ')).then(|| text.to_owned())
+    });
     Some(SnapshotHeader { offset: off as u64, length, kind, kind_name: kind_name(kind), hash, features })
 }
 
@@ -459,7 +472,7 @@ pub fn scan_library(data: &[u8], max_candidates: usize) -> LibraryScan {
     let mut out = LibraryScan::default();
     for off in magic_offsets(data, 100_000) {
         out.snapshot_occurrences += 1;
-        if let Some(h) = off.checked_add(20).and_then(|o| hash_at(data, o))
+        if let Some(h) = snapshot_bytes(data, off).and_then(|bytes| hash_at(bytes, 20))
             && !out.snapshot_hashes.contains(&h)
         {
             if out.snapshot_hashes.len() >= max_candidates {
@@ -622,6 +635,23 @@ pub fn abi_rank(abi: &str) -> usize {
 mod tests {
     use super::*;
     use craft_anything_testkit::flutter as fx;
+
+    #[test]
+    fn snapshot_metadata_does_not_cross_its_declared_length() {
+        let mut data = fx::snapshot(3, &[]);
+        let full = snapshot_header(&data, 0).unwrap();
+        assert_eq!(full.features.as_deref(), Some(fx::FEATURES));
+        // The serialized length excludes the four magic bytes.
+        data[4..12].copy_from_slice(&48u64.to_le_bytes());
+        let header = snapshot_header(&data, 0).unwrap();
+        assert!(header.hash.is_some());
+        assert_eq!(header.features, None, "features start in the next record");
+
+        data[4..12].copy_from_slice(&16u64.to_le_bytes());
+        let header = snapshot_header(&data, 0).unwrap();
+        assert_eq!(header.hash, None, "the hash starts in the next record");
+        assert!(scan_library(&data, 10).snapshot_hashes.is_empty());
+    }
 
     /// Keep the backing bytes intact while varying only the note's declared extent.
     #[test]

@@ -25,7 +25,7 @@ fn refine(k: &str, check: &CheckResult) -> String {
     kind(k).refine(check, true)
 }
 fn follow_up(message: &str, k: &str) -> String {
-    super::follow_up(message, kind(k).as_ref())
+    super::follow_up(message, kind(k).as_ref(), false)
 }
 fn locate(path: &Path, k: &str) -> (PathBuf, Option<PathBuf>) {
     super::locate(path, kind(k).studies_folder())
@@ -453,7 +453,6 @@ fn notes_added_while_it_works_reach_the_agent_at_its_next_step() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -1361,7 +1360,6 @@ fn an_api_backend_builds_with_the_build_tools() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -1480,7 +1478,6 @@ fn the_mechanics_sheet_is_required_and_held_against_the_code() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -2598,7 +2595,6 @@ fn check_worker(ws: &Workspace, deep: bool) -> Worker {
         notes: Arc::default(),
         feed: Arc::new(Mutex::new(feed::FeedLog::open(ws))),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3025,8 +3021,17 @@ fn a_resumed_game_builder_hears_the_asset_choice_as_it_is_now() {
 }
 
 #[test]
+fn a_resumed_api_builder_waits_for_the_runs_check() {
+    let app = kind("app");
+    for prompt in [super::follow_up("bigger title", app.as_ref(), true), continue_prompt(app.as_ref(), true)] {
+        assert!(prompt.contains("Craft Anything checks your build after your turn"), "{prompt}");
+        assert!(!prompt.contains("rebuild_check"), "{prompt}");
+    }
+}
+
+#[test]
 fn a_stopped_build_is_told_to_carry_on_not_start_over() {
-    let p = continue_prompt(kind("website").as_ref());
+    let p = continue_prompt(kind("website").as_ref(), false);
     assert!(p.contains("stopped before it finished") && p.contains("Pick up where you left off") && p.contains("app/"));
 }
 
@@ -3156,7 +3161,6 @@ fn preparing_the_builders_agent_does_not_lock_up() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3200,7 +3204,6 @@ fn the_run_answers_the_builders_own_check_during_its_turn() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: Some((Arc::new(SheetKind), 90.0)),
         reset_progress_after_notes: false,
@@ -3213,6 +3216,64 @@ fn the_run_answers_the_builders_own_check_during_its_turn() {
     let steps: Vec<String> = rx.try_iter().filter_map(|e| if let RunEvent::Step { text, .. } = e { Some(text) } else { None }).collect();
     assert!(steps.iter().any(|s| s.contains("checking its work")) && steps.iter().any(|s| s.contains("checked its work")), "the person sees it: {steps:?}");
     assert!(Inbox::new(self_check::asks_dir(&ws.root)).pending().is_empty(), "nothing left waiting");
+}
+
+/// A builder that reads one decompiled function (by its MCP name, as Claude Code calls it) and ends
+/// its turn.
+struct Decompiles {
+    events: Vec<AgentEvent>,
+}
+
+impl Conversation for Decompiles {
+    fn send(&mut self, _text: &str) {
+        let tool = format!("mcp__craft-anything__{}", craft_anything_engine::tools::native_function::PSEUDOCODE_TOOL);
+        self.events = vec![
+            AgentEvent::ToolStarted { call_id: "1".into(), tool, input: json!({"function": "entry"}) },
+            AgentEvent::TextDelta { text: "Read it.".into() },
+            AgentEvent::TurnDone { backend: "test".into(), input_tokens: 0, output_tokens: 0, cost_usd: None, cost_is_estimate: false },
+        ];
+    }
+    fn poll(&mut self) -> Vec<AgentEvent> {
+        std::mem::take(&mut self.events)
+    }
+    fn answer_consent(&mut self, _call_id: &str, _allow: bool) {}
+    fn stop(&mut self) {}
+    fn is_busy(&self) -> bool {
+        !self.events.is_empty()
+    }
+}
+
+/// Every request from the person is a new run: decompiling in an earlier one is kept with the
+/// project, so Deep mode doesn't tell the builder it hasn't decompiled after each request.
+#[test]
+fn decompiling_once_is_remembered_by_the_project() {
+    let d = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(d.path(), "Sim", "Recreate this game", TargetRef::None).unwrap();
+    assert!(!ws.manifest.decompiled);
+    let (tx, _rx) = std::sync::mpsc::channel();
+    let mut w = Worker {
+        wake: Default::default(),
+        engine: Arc::new(Engine::new(craft_anything_engine::testing::session())),
+        tx,
+        stop: CancelToken::default(),
+        preview: Arc::default(),
+        seen: HashSet::new(),
+        inbox: Inbox::new(ws.inbox_dir()),
+        editor: None,
+        notes: Arc::default(),
+        feed: Arc::new(Mutex::new(feed::FeedLog::open(&ws))),
+        keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
+        kept_checks: Mutex::default(),
+        assets: false,
+        usage: None,
+        self_check: None,
+        reset_progress_after_notes: false,
+    };
+    let mut builder = Decompiles { events: Vec::new() };
+    w.turn(&mut ws, &mut builder, "Build it.", true, None).unwrap();
+    assert!(ws.manifest.decompiled, "the decompile is seen by its MCP name");
+    ws.save().unwrap();
+    assert!(Workspace::open(&ws.root).unwrap().manifest.decompiled, "a later run reads it from craft.json");
 }
 
 #[test]
@@ -3234,8 +3295,8 @@ fn every_kind_leads_tests_its_own_build_and_keeps_its_unknowns() {
             assert!(deep.contains("(the rendered HTML).\n\nMatch it exactly"), "one clean paragraph break: {deep}");
         }
     }
-    assert!(follow_up("bigger title", "game").contains("check it with rebuild_check"));
-    assert!(continue_prompt(kind("app").as_ref()).contains("check it with rebuild_check"));
+    assert!(follow_up("bigger title", "game").contains("Check it with rebuild_check"));
+    assert!(continue_prompt(kind("app").as_ref(), false).contains("Check it with rebuild_check"));
 }
 
 #[test]
@@ -3399,7 +3460,6 @@ fn a_note_the_builder_took_at_a_step_joins_the_feed_and_isnt_sent_again() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3759,7 +3819,6 @@ fn a_session_left_on_another_computer_starts_a_new_one_from_the_project() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3816,7 +3875,6 @@ fn a_missing_session_with_nothing_to_start_from_is_said_plainly() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3884,7 +3942,6 @@ fn the_builders_conversation_travels_with_the_project() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,
@@ -3963,7 +4020,6 @@ fn a_build_says_when_it_waits_for_an_analysis_started_earlier() {
         keys: crate::KeyStore::file_only(ws.root.join("keys.toml")),
         kept_checks: Mutex::default(),
         assets: false,
-        decompiled: false,
         usage: None,
         self_check: None,
         reset_progress_after_notes: false,

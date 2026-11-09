@@ -75,6 +75,7 @@ impl CraftApp {
     pub(crate) fn pin_done(&mut self, tool: &str, result: Result<Value, ToolError>) {
         match (tool, result) {
             ("project_pins_list", Ok(v)) => {
+                self.pinned_copy_bytes = v["copied_bytes"].as_u64();
                 self.pins = v["pins"]
                     .as_array()
                     .into_iter()
