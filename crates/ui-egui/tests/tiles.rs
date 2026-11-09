@@ -43,12 +43,14 @@ fn sibling_tiles_match_in_every_language() {
         let pair = rects(&h, &["Clean room", "Deep"]);
         same_size(lang, "Clean room / Deep", &pair);
         assert!((pair[0].top() - pair[1].top()).abs() < 0.5, "{lang}: Clean room and Deep aren't side by side: {pair:?}");
-        // Narrow: two full rows of two, never three and one.
+        // Narrow: full rows (one of four, or two of two where the labels need the room), never three and one.
         let mut h = harness(lang, 900.0);
         h.run_steps(3);
         let r = rects(&h, &start);
         same_size(lang, "start", &r);
         let rows = [r[0].top(), r[1].top(), r[2].top(), r[3].top()];
-        assert!(rows[0] == rows[1] && rows[2] == rows[3] && rows[2] > rows[1], "{lang}: the starts at 900 aren't two rows of two: {r:?}");
+        let one_row = rows.iter().all(|y| *y == rows[0]);
+        let two_of_two = rows[0] == rows[1] && rows[2] == rows[3] && rows[2] > rows[1];
+        assert!(one_row || two_of_two, "{lang}: the starts at 900 aren't full rows: {r:?}");
     }
 }

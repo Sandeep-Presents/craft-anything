@@ -1508,4 +1508,4 @@ on your server	თქვენს სერვერზე
 {n} checkpoints found	ნაპოვნია {n} checkpoint
 Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	საჭიროა ComfyUI-ის მისამართი და checkpoint (პარამეტრები → აწყობები). მანამდე თამაში მათ გარეშე აიწყობა.
 Showing {n}. Use the filter to find the rest.	ნაჩვენებია {n}. დანარჩენის საპოვნელად გამოიყენეთ ფილტრი.
-Start fresh	თავიდან დაწყება
+Start fresh	ნულიდან
