@@ -712,6 +712,13 @@ Owner: open · Status: in progress
       discovery, MCP-only tool restrictions, model selection and fresh read-only questions;
       unit tests and CLI 1.0.105 with an isolated home and loopback model, all five access modes
       — claimed: qu-gg, branch `feature/r2.2-copilot-integration` (recorded during PR preparation)
+- [ ] Pi as a coding agent (`pi -p --mode json`, message on stdin): discovery, model and thinking
+      effort, session resume, and our MCP server per run as an extension with direct exposure —
+      the only way in, since pi has no `--mcp-config`. A builder keeps reading and our tools only:
+      no `edit`, `write`, `bash` or `codemode` of its own, so every change goes through the tools
+      whose effects and consent we record. pi's own approval prompt has no equivalent flag; a
+      permission bridge is still owed. See [Pi](pi.md). Two live builds on macOS reached Ready.
+      — claimed: jiahao, branch feature/r2.2-pi-agent
 - [x] Grok Build as a coding agent over ACP (`grok agent stdio`): discovery in `~/.grok/bin`,
       the person's own `grok login` (a missing `auth.json` is unknown, so an API key still
       starts), model and reasoning effort, and our MCP server on the session with `"type": "stdio"`
