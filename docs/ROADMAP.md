@@ -661,6 +661,9 @@ Owner: maintainers · Status: in progress
 
 ### R2.2 More coding agents
 Owner: open · Status: in progress
+- [ ] Find Codex bundled with ChatGPT.app/Codex.app after a macOS Dock launch, and
+      verify the selected CLI's sign-in through the headless connection check and Settings.
+      — claimed: dbzx6r, branch bugfix/r2.2-macos-codex-signin-upstream
 - [x] A saved agent program path that no longer exists (Codex desktop moves its CLI to a new
       build folder on every update) says so and names the path, instead of "isn't installed or
       isn't on your PATH" (#721); it stays a missing program, so a builder turn isn't retried
