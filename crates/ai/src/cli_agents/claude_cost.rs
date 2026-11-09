@@ -47,6 +47,29 @@ fn load(path: &Path) -> Stored {
     }
 }
 
+/// The running total kept for `session` after its last turn, if it is known.
+pub fn kept_total(path: &Path, session: &str) -> Option<f64> {
+    match load(path) {
+        Stored::Kept(kept) => kept.totals.get(session).copied(),
+        Stored::Empty | Stored::Unwritable => None,
+    }
+}
+
+/// The cost of a question answered from a fork of `builder_session`: the fork reports the whole
+/// session's running total, so its own cost is what the total added since the builder's last turn.
+/// No kept builder total means the question's cost is unknown, never the whole session's total.
+pub fn fork_cost(path: &Path, builder_session: &str, total: Option<f64>) -> Option<f64> {
+    fork_cost_from(kept_total(path, builder_session), total)
+}
+
+/// [`fork_cost`] from a builder total read before the question started, so a build that advances
+/// the same session meanwhile cannot hide the question's cost.
+pub fn fork_cost_from(before: Option<f64>, total: Option<f64>) -> Option<f64> {
+    let total = total.filter(|t| t.is_finite() && *t >= 0.0)?;
+    let before = before.filter(|t| t.is_finite() && *t >= 0.0)?;
+    Some((total - before).max(0.0))
+}
+
 /// The cost of a turn that ran in `session`, which resumed `resumed` (None: a new session), given
 /// the running total Claude Code reported. Keeps the new total for the next turn.
 pub fn turn_cost(path: Option<&Path>, resumed: Option<&str>, session: Option<&str>, total: Option<f64>) -> Option<f64> {
@@ -140,6 +163,30 @@ mod tests {
         turn_cost(Some(&path), None, Some("s1"), Some(1.0));
         assert_eq!(turn_cost(Some(&path), Some("s1"), Some("copy"), Some(1.2)), None);
         assert_eq!(kept_total(&path, "s1"), Some(1.0), "the builder's session keeps its own total");
+    }
+
+    /// A question's fork reports the builder's whole running total; what it added is its own cost.
+    #[test]
+    fn a_questions_fork_costs_what_it_added_since_the_builders_last_turn() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = path_in(dir.path());
+        turn_cost(Some(&path), None, Some("builder"), Some(1.0));
+        let cost = fork_cost(&path, "builder", Some(1.2)).unwrap();
+        assert!((cost - 0.2).abs() < 1e-9, "{cost}");
+        assert_eq!(kept_total(&path, "builder"), Some(1.0), "the question doesn't replace the builder's total");
+        assert_eq!(fork_cost(&path, "builder", Some(0.9)), Some(0.0), "a total that went down costs nothing, not less");
+        assert_eq!(fork_cost(&path, "missing", Some(1.2)), None, "no kept baseline means the cost is unknown");
+        for total in [None, Some(f64::NAN), Some(-1.0), Some(f64::INFINITY)] {
+            assert_eq!(fork_cost(&path, "builder", total), None, "{total:?}");
+        }
+        let cost = fork_cost_from(Some(1.0), Some(1.2)).unwrap();
+        assert!((cost - 0.2).abs() < 1e-9, "{cost}");
+        assert_eq!(fork_cost_from(None, Some(1.2)), None);
+        assert_eq!(fork_cost_from(Some(f64::NAN), Some(1.2)), None);
+        std::fs::write(&path, r#"{"version": 2, "totals": {"builder": 1.0}}"#).unwrap();
+        assert_eq!(fork_cost(&path, "builder", Some(1.2)), None, "a newer file isn't read");
+        std::fs::write(&path, b"not json").unwrap();
+        assert_eq!(fork_cost(&path, "builder", Some(1.2)), None, "a damaged file keeps nothing");
     }
 
     /// A total that went down (the session was restarted under the same id) costs nothing, not less.

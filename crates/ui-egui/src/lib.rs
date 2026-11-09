@@ -489,6 +489,7 @@ pub struct CraftApp {
     pub asked: std::collections::HashMap<PathBuf, Vec<just_ask::Asked>>,
     /// Every project's pinned builds, and whether they're running (read by `refresh_pins`).
     pub pins: Vec<pins::PinRow>,
+    pub pinned_copy_bytes: Option<u64>,
     pub pins_read_at: Option<Instant>,
     /// An address to open in the browser on the next frame (set from a worker's result).
     open_url: Option<String>,
@@ -589,6 +590,7 @@ impl CraftApp {
             projects: Vec::new(),
             preview: None,
             pins: Vec::new(),
+            pinned_copy_bytes: None,
             asked: Default::default(),
             pins_read_at: None,
             open_url: None,

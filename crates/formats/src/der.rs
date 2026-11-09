@@ -169,17 +169,37 @@ fn text(data: &[u8], t: &Tlv) -> String {
     }
 }
 
+/// Escape values without changing the display order of the certificate's name.
+fn escaped_name_value(value: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in value.char_indices() {
+        if c == '\0' {
+            out.push_str(r"\00");
+            continue;
+        }
+        if matches!(c, '"' | '+' | ',' | ';' | '<' | '>' | '\\') || (i == 0 && matches!(c, ' ' | '#')) || (c == ' ' && i + 1 == value.len()) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// A distinguished name as `CN=…, O=…`.
 pub fn name(data: &[u8], seq: &Tlv) -> String {
     let mut parts = Vec::new();
     for set in children(data, seq) {
+        let mut attributes = Vec::new();
         for atv in children(data, &set) {
             let kids = children(data, &atv);
             if let (Some(o), Some(v)) = (kids.first(), kids.get(1)) {
                 let id = oid(o.bytes(data).unwrap_or(&[]));
                 let key = oid_name(&id).map(str::to_string).unwrap_or(id);
-                parts.push(format!("{key}={}", text(data, v)));
+                attributes.push(format!("{key}={}", escaped_name_value(&text(data, v))));
             }
+        }
+        if !attributes.is_empty() {
+            parts.push(attributes.join("+"));
         }
     }
     parts.join(", ")
@@ -399,6 +419,18 @@ mod tests {
         // A NULL followed by an OID is not an AlgorithmIdentifier.
         let misplaced = [0x30, 5, 0x05, 0, 0x06, 1, 0x2a];
         assert!(seq_alg_oid(&misplaced, &read(&misplaced, 0).unwrap()).is_none());
+    }
+
+    #[test]
+    fn name_marks_attribute_boundaries_and_literal_separators() {
+        let cert = craft_anything_testkit::android::certificate_der("Alpha, O=Beta", "One+Two");
+        let info = certificate(&cert).unwrap();
+        assert_eq!(info.subject, r"CN=Alpha\, O=Beta, O=One\+Two");
+        assert_eq!(info.issuer, info.subject);
+
+        // One RDN containing a common name and an organization.
+        let data = b"\x30\x16\x31\x14\x30\x08\x06\x03\x55\x04\x03\x0c\x01a\x30\x08\x06\x03\x55\x04\x0a\x0c\x01b";
+        assert_eq!(name(data, &read(data, 0).unwrap()), "CN=a+O=b");
     }
 
     #[test]

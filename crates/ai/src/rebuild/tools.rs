@@ -7,6 +7,7 @@ use super::*;
 use craft_anything_engine::EngineRef;
 use craft_anything_engine::questions::{self, AskedQuestion};
 use craft_anything_engine::tool::{Ctx, Effects, Requires, ToolOutput, ToolSpec, Toolset, parse_params, schema_of};
+use craft_anything_engine::workspace::ProjectUsage;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -287,10 +288,19 @@ fn rebuild_question_ask(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
         deep: settings.deep_mode,
         ..AskedQuestion::new(question.to_string(), answered.answer.clone(), from_session, answered.backend.clone(), answered.cost_usd, after)
     };
+    record_question_usage(&ws, &answered);
     // The replacement notice is for this caller; the saved question keeps the AI that answered.
     // An answer that couldn't be kept is still the answer.
     let not_kept = questions::add(&ws, asked).err().map(|e| e.message);
     Ok(ToolOutput::Value(json!({"project": ws.root, "question": question, "answered": answered, "not_kept": not_kept})))
+}
+
+/// Add a question's reported cost to the project's usage, as a build turn's cost is added.
+fn record_question_usage(ws: &Workspace, answered: &super::question::Answered) {
+    let Some(cost) = answered.cost_usd.filter(|cost| cost.is_finite() && *cost > 0.0) else { return };
+    if let Err(e) = ProjectUsage::update(&ws.root, |u| u.add_turn(0, 0, Some(cost), answered.cost_is_estimate)) {
+        log::warn!("Couldn't record the question's cost in {}: {}", ws.root.display(), e.message);
+    }
 }
 
 fn rebuild_questions_list(_ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -486,6 +496,29 @@ fn rebuild_check(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErr
 mod tests {
     use super::*;
     use craft_anything_engine::{CallOptions, Caller, Consent, Engine};
+
+    #[test]
+    fn a_questions_cost_is_counted_in_the_projects_usage() {
+        let d = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(d.path(), "Notes", "A notes app", TargetRef::None).unwrap();
+        let answered = |cost, estimate| super::super::question::Answered {
+            answer: "It is a notes app.".into(),
+            from: super::super::question::AnsweredFrom::BuildersSession,
+            backend: "Claude".into(),
+            cost_usd: cost,
+            cost_is_estimate: estimate,
+            builder_notice: None,
+        };
+        record_question_usage(&ws, &answered(Some(0.02), true));
+        let u = ws.usage();
+        assert!((u.cost_usd - 0.02).abs() < 1e-9 && u.api_billed_usd == 0.0 && u.priced, "an agent's estimate: {u:?}");
+        record_question_usage(&ws, &answered(Some(0.03), false));
+        let u = ws.usage();
+        assert!((u.cost_usd - 0.05).abs() < 1e-9 && (u.api_billed_usd - 0.03).abs() < 1e-9, "a key's charge: {u:?}");
+        record_question_usage(&ws, &answered(None, true));
+        record_question_usage(&ws, &answered(Some(0.0), true));
+        assert!((ws.usage().cost_usd - 0.05).abs() < 1e-9, "no cost is no change");
+    }
 
     #[test]
     fn a_question_through_the_engine_comes_back_instead_of_waiting_for_the_session() {

@@ -816,6 +816,11 @@ fn builds(app: &mut CraftApp, ui: &mut Ui) {
         changed |= number(ui, &mut b.parallel, 1..=8, "", "");
     });
     ui.add_space(8.0);
+    if let Some(bytes) = app.pinned_copy_bytes {
+        row(ui, "Pinned builds", "Size", |ui| {
+            ui.label(craft_anything_engine::evidence::human_bytes(bytes));
+        });
+    }
     widgets::caption(ui, "Generated art (games)");
     let a = &mut app.settings.assets;
     row(
