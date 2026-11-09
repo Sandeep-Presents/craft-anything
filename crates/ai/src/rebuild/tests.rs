@@ -3216,6 +3216,8 @@ fn the_run_answers_the_builders_own_check_during_its_turn() {
     let steps: Vec<String> = rx.try_iter().filter_map(|e| if let RunEvent::Step { text, .. } = e { Some(text) } else { None }).collect();
     assert!(steps.iter().any(|s| s.contains("checking its work")) && steps.iter().any(|s| s.contains("checked its work")), "the person sees it: {steps:?}");
     assert!(Inbox::new(self_check::asks_dir(&ws.root)).pending().is_empty(), "nothing left waiting");
+    let left: Vec<_> = std::fs::read_dir(self_check::asks_dir(&ws.root)).unwrap().flatten().map(|e| e.file_name()).collect();
+    assert!(left.iter().all(|n| !n.to_string_lossy().ends_with(".taken")), "the run clears its mark once it answers: {left:?}");
 }
 
 /// A builder that reads one decompiled function (by its MCP name, as Claude Code calls it) and ends
@@ -3274,6 +3276,23 @@ fn decompiling_once_is_remembered_by_the_project() {
     assert!(ws.manifest.decompiled, "the decompile is seen by its MCP name");
     ws.save().unwrap();
     assert!(Workspace::open(&ws.root).unwrap().manifest.decompiled, "a later run reads it from craft.json");
+}
+
+/// A later request's run, reading the project from disk, reminds only a builder that never
+/// decompiled in it, and only in Deep mode on a program.
+#[test]
+fn a_later_request_is_reminded_only_when_nothing_was_decompiled() {
+    let d = tempfile::tempdir().unwrap();
+    let program = TargetRef::Local { path: d.path().join("game.exe") };
+    let mut ws = Workspace::create(d.path(), "Sim", "Recreate this game", program).unwrap();
+    let reopened = |ws: &Workspace| Workspace::open(&ws.root).unwrap().manifest;
+    assert!(needs_decompile_reminder(true, &reopened(&ws)), "nothing decompiled yet");
+    assert!(!needs_decompile_reminder(false, &reopened(&ws)), "Clean room never decompiles");
+    ws.manifest.decompiled = true;
+    ws.save().unwrap();
+    assert!(!needs_decompile_reminder(true, &reopened(&ws)), "decompiled in an earlier run");
+    let none = Workspace::create(d.path(), "Notes", "A notes app", TargetRef::None).unwrap();
+    assert!(!needs_decompile_reminder(true, &none.manifest), "no program to decompile");
 }
 
 #[test]

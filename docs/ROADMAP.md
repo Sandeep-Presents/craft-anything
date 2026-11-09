@@ -1285,6 +1285,16 @@ Gaps found while using the app for real projects.
       (`decompiled`), so a run reminds the builder only while it has never decompiled in this
       project. Unit test only; not run live
       — claimed: NeuTroNBZh, branch bugfix/r2.9-decompile-reminder-every-request
+- [x] `rebuild_check` said "no build is running" when the run had taken the check and one of its
+      steps hadn't finished: on a Windows Unity build, three checks in a row stopped at
+      "game-self-test" and the builder gave up after its default 20 minutes, below the run's own
+      30-minute limit on a check. The run now marks a request it takes, the tool tells "still
+      going" (`TimedOut`) from "no run took it", and its default wait (35 min) outlasts the run's
+      limit, so the run reports a stuck check itself. Unit tests only; the stuck self-test wasn't
+      reproduced (the same game's `--self-test` now exits in 16 s)
+      — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-wait
+- [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
+      past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
 - [x] Make offers "Extracted by" beside the game's other choices: in Deep mode an AI with an API key
       can take a game's own files out after the study, but it could only be chosen in Settings → AI,
       so on Make only the builder could be picked. It sets the app's one extractor and says so
