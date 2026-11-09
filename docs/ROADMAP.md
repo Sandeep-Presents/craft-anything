@@ -481,7 +481,7 @@ been run live.
       FastFlowLM lists every model it can download, so the saved model started a 5.5 GB download
       and unloaded the one in use (#1434). Prefer a chat model the server says is loaded
       (`/api/ps`, which Ollama and FastFlowLM answer) before the list
-      — claimed: jgt87, branch bugfix/r5.4-add-server-loaded-model
+      — claimed: jgt87, branch bugfix/r5.4-add-server-loaded-model — PR #1435
 - [ ] **decision** When nothing says which model is loaded and a server lists more than one chat
       model, ask the person to pick one (the list in the address form's model field) instead of
       taking the first (#1434): `/api/ps` helps only while a model is loaded, and LM Studio and
