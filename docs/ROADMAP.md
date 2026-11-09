@@ -1185,9 +1185,14 @@ Gaps found while using the app for real projects.
 - [ ] Find why a site capture lost its browser ("the WebSocket is closed", 419 ms into
       `web_site_capture` for a second page, seen once; the same capture passed 41 s earlier)
 - [x] Delete a private browser's temporary profile when it closes or fails to start (#810) — PR #822
-- [ ] Stop private browsers that outlive the app after an abrupt exit, and investigate the Brave
-      Helper crash (#810); both still need macOS reproduction
+- [x] Stop private browsers (and Electron apps we drive) that outlive the app after an abrupt
+      exit, and delete their profile (#810): a watcher stops the browser's process group once the
+      app is gone (`platform::end_with_this_process`, Unix). Unix unit tests added; its script was
+      run against real process groups, but not on a Mac with Brave
       — claimed: justinjohn0306, branch bugfix/r2.9-browser-ends-with-app (stopping private browsers)
+- [ ] Investigate the Brave Helper crash on launch (#810); needs macOS reproduction
+- [ ] Check whether a private browser outlives an abrupt exit on Windows (its Job Object may not
+      be killed when closed); add a watcher there if it does
 - [ ] Claude Code's Ultracode switch (a setting, not an effort level; the effort environment
       variable we use can't turn it on)
 - [x] A model the list doesn't offer (`opusplan`, `[1m]` variants, one another harness serves) can
