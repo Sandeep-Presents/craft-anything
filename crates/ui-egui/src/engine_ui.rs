@@ -488,7 +488,7 @@ pub fn assets_toggle(app: &mut CraftApp, ui: &mut Ui, mut on: bool) {
     };
     ui.horizontal_wrapped(|ui| {
         ui.label(RichText::new(note).color(if no_key || unready { t.warning } else { t.text_dim }).size(theme::SMALL));
-        if no_key && widgets::link(ui, "Add a fal.ai key").clicked() {
+        if no_key && widgets::link_sized(ui, "Add a fal.ai key", theme::SMALL).clicked() {
             app.state.modal = Some(Modal::Assets);
         }
     });
@@ -947,7 +947,7 @@ pub fn progress_bar(ui: &mut Ui, fraction: Option<f32>, message: &str) {
     ui.painter().rect_filled(egui::Rect::from_x_y_ranges(bar.left() + bar.width() * from..=bar.left() + bar.width() * to, bar.y_range()), 3.0, t.accent);
     ui.add_space(4.0);
     let pct = fraction.map(|f| format!("{:.0}%  ·  ", f * 100.0)).unwrap_or_default();
-    ui.label(RichText::new(format!("{pct}{message}")).font(theme::mono(12.5)).color(t.text_dim));
+    ui.label(RichText::new(format!("{pct}{message}")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
     widgets::animate(ui, Duration::from_millis(100));
 }
 

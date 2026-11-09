@@ -129,7 +129,7 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
     let chosen = ws.manifest.approvals.clone();
     let t = Tokens::get(ui.ctx());
     let names: Vec<&str> = CHOICES.iter().map(|(n, _)| *n).collect();
-    let button = widgets::link(ui, "Approvals").on_hover_text(tr("What the builder may do without asking you, in this project."));
+    let button = widgets::link_sized(ui, "Approvals", theme::SMALL).on_hover_text(tr("What the builder may do without asking you, in this project."));
     let mut picked = None;
     // A named id, so tests (and anything else) can tell whether it's open.
     let popup = egui::Popup::from_toggle_button_response(&button).id(egui::Id::new("project-approvals"));

@@ -38,7 +38,7 @@ pub fn make_line(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(22.0);
         if let Some(how) = how {
             ui.label(RichText::new(how).size(theme::SMALL).color(t.text_dim));
-            if widgets::link_sized(ui, "Change", theme::SMALL).clicked() {
+            if widgets::link_sized(ui, "Change…", theme::SMALL).clicked() {
                 app.state.modal = Some(Modal::ExistingFiles);
             }
             ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));

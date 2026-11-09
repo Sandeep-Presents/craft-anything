@@ -363,7 +363,7 @@ pub fn built_by(app: &mut CraftApp, ui: &mut Ui) {
     let Some(default) = app.default_builder() else {
         icons::show(ui, "triangle-alert", 16.0, t.warning);
         ui.label(RichText::new(tr("Building needs a coding agent such as Claude Code, or an AI with an API key.")).size(theme::BODY).color(t.text_dim));
-        if widgets::link(ui, "Set one up").clicked() {
+        if widgets::link_sized(ui, "Set one up", theme::BODY).clicked() {
             app.need_builder(false);
         }
         return;

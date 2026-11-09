@@ -3374,8 +3374,12 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
 }
 
 fn ai_settings() -> egui_kittest::Harness<'static, CraftApp> {
-    let mut h = harness(|| {
-        let mut a = demo::app(demo::engine(Mode::Experienced, true));
+    ai_settings_in(Mode::Experienced)
+}
+
+fn ai_settings_in(mode: Mode) -> egui_kittest::Harness<'static, CraftApp> {
+    let mut h = harness(move || {
+        let mut a = demo::app(demo::engine(mode, true));
         a.state.settings_open = true;
         a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
         a.state.backend = Some("Claude".into());
@@ -3385,14 +3389,28 @@ fn ai_settings() -> egui_kittest::Harness<'static, CraftApp> {
     h
 }
 
-/// The "In use" chip is as tall as the buttons beside it, and sits level with them.
+/// The "In use" chip is as tall as the buttons beside it, and sits level with them, and as tall
+/// as the "Use" button it replaces, so a row doesn't shrink when its AI is picked; in both modes.
 #[test]
 fn an_ais_status_chip_is_as_tall_as_its_buttons() {
-    let h = ai_settings();
-    let chip = h.get_by_label("In use").rect();
-    let test = h.get_all_by_label("Build with this").next().expect("a button in the chip's row").rect();
-    assert_eq!(chip.height(), test.height(), "chip {chip:?} vs button {test:?}");
-    assert_eq!(chip.top(), test.top(), "chip {chip:?} vs button {test:?}");
+    for mode in [Mode::Experienced, Mode::Beginner] {
+        let h = ai_settings_in(mode);
+        let chip = h.get_by_label("In use").rect();
+        let test = h.get_all_by_label("Build with this").next().expect("a button in the chip's row").rect();
+        assert_eq!(chip.height(), test.height(), "{mode:?}: chip {chip:?} vs button {test:?}");
+        assert_eq!(chip.top(), test.top(), "{mode:?}: chip {chip:?} vs button {test:?}");
+        // The same row before the AI is picked shows Use in the chip's place.
+        let mut before = harness(move || {
+            let mut a = demo::app(demo::engine(mode, true));
+            a.state.settings_open = true;
+            a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+            a.state.backend = None;
+            a
+        });
+        before.run_steps(3);
+        let used = before.get_by_label("Use").rect();
+        assert_eq!(chip.height(), used.height(), "{mode:?}: chip {chip:?} vs Use {used:?}");
+    }
 }
 
 /// A key field and the Save on its row: other key fields have a Save of their own.

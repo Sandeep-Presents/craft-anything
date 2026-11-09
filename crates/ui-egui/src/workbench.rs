@@ -851,7 +851,8 @@ fn ledger(app: &mut CraftApp, ui: &mut Ui) {
                 ui.add(egui::Label::new(&finding.statement).wrap());
                 ui.label(RichText::new(finding.confidence.plain_label()).color(t.text_dim).size(theme::CAPTION));
                 for id in &finding.evidence_ids {
-                    if widgets::link(ui, id).clicked() {
+                    // Ids like the finding's own above them: mono, the same size, never translated.
+                    if widgets::link_text(ui, RichText::new(id).font(theme::mono(12.0))).clicked() {
                         pick = Some(id.clone());
                     }
                 }

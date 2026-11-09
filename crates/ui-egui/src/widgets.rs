@@ -393,7 +393,8 @@ pub fn link_sized(ui: &mut Ui, label: &str, size: f32) -> Response {
     link_text(ui, RichText::new(tr(label)).size(size))
 }
 
-fn link_text(ui: &mut Ui, text: RichText) -> Response {
+/// [`link`] with its text styled by the caller (an id in the mono font), and not translated.
+pub fn link_text(ui: &mut Ui, text: RichText) -> Response {
     let t = Tokens::get(ui.ctx());
     let r = ui.add(egui::Label::new(text.color(t.accent_ink)).sense(Sense::click()));
     let r = r.on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -782,7 +783,7 @@ pub fn working_since(ui: &mut Ui, title: &str, detail: Option<&str>, began: Opti
     let secs = began.map_or((now - since) as u64, |b| b.elapsed().as_secs());
     let note = wait_note(secs, quiet);
     let sub = [detail.map(str::to_string), note].into_iter().flatten().collect::<Vec<_>>().join("  ·  ");
-    let clock = RichText::new(crate::usage::duration_words(std::time::Duration::from_secs(secs))).font(theme::mono(12.5)).color(t.text_faint);
+    let clock = RichText::new(crate::usage::duration_words(std::time::Duration::from_secs(secs))).font(theme::mono(theme::CAPTION)).color(t.text_faint);
     // The words wrap before the clock, never under it: a right-to-left layout doesn't make room
     // for what's already on the row.
     let clock_width =
@@ -892,7 +893,9 @@ mod tests {
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "rs") && path.file_name().is_some_and(|n| n != "widgets.rs") {
                 let text = std::fs::read_to_string(&path).unwrap();
-                if text.lines().any(|l| !l.trim_start().starts_with("//") && (l.contains("egui::Spinner") || l.contains("egui::ProgressBar"))) {
+                // `ui.spinner()` is egui's own spinner too, by another name.
+                let egui_own = |l: &str| l.contains("egui::Spinner") || l.contains(".spinner()") || l.contains("egui::ProgressBar");
+                if text.lines().any(|l| !l.trim_start().starts_with("//") && egui_own(l)) {
                     used.push(path.file_name().unwrap().to_string_lossy().into_owned());
                 }
             }

@@ -863,7 +863,7 @@ fn asset_line(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
     ui.add_space(6.0);
     let budget = ws.manifest.asset_budget_usd;
     let amount = trf("{n} · ${spent} of ${budget}", &[("n", &n.to_string()), ("spent", &format!("{spent:.2}")), ("budget", &format!("{budget:.2}"))]);
-    ui.label(RichText::new(amount).font(theme::mono(12.5)).color(if spent >= budget { t.warning } else { t.text_dim }));
+    ui.label(RichText::new(amount).font(theme::mono(theme::CAPTION)).color(if spent >= budget { t.warning } else { t.text_dim }));
     let step = craft_anything_engines::assets::usd(app.asset_budget_step());
     if widgets::link(ui, &trf("Raise the budget by {amount}", &[("amount", &step)])).clicked() {
         app.raise_asset_budget();
@@ -1214,7 +1214,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
 /// two would overlap: a right-to-left layout doesn't make room for what's already on the row.
 fn stat_row(ui: &mut Ui, label: &str, value: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let text = RichText::new(value).font(theme::mono(13.0)).color(t.text);
+    let text = RichText::new(value).font(theme::mono(theme::CAPTION)).color(t.text);
     let value_width =
         egui::WidgetText::from(text.clone()).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::FontSelection::Default).size().x;
     let caption_width = widgets::label_galley(ui, &tr(label), 12.0, t.text_faint).size().x;
@@ -1518,7 +1518,7 @@ fn work(ui: &mut Ui, tools: &[(String, Option<bool>)], notes: &[String], advance
                         Some(false) => ("triangle-alert", t.warning),
                     };
                     icons::show(ui, icon, 12.0, col);
-                    ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(12.5)).color(t.text_dim));
+                    ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                 });
             }
             for n in notes {
@@ -1617,7 +1617,7 @@ fn ask_card(app: &mut CraftApp, ui: &mut Ui, r: &Request, answered: Option<&str>
                     .id_salt(("detail", &r.id))
                     .icon(widgets::disclosure_icon)
                     .show(ui, |ui| {
-                        ui.label(RichText::new(&r.detail).font(theme::mono(12.5)).color(t.text_dim));
+                        ui.label(RichText::new(&r.detail).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                     });
             } else {
                 ui.add(egui::Label::new(RichText::new(&r.detail).color(t.text_dim)).wrap());
@@ -1748,7 +1748,7 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
             for (i, p) in c.pages.iter().enumerate() {
                 let text = format!("{}  {:.0}%", if p.dir.is_empty() { tr("start page") } else { p.name.clone() }, p.similarity);
                 let colour = if p.similarity >= app.settings.build.good_enough { t.text_dim } else { t.warning };
-                if ui.selectable_label(i == picked, RichText::new(text).font(theme::mono(12.5)).color(colour)).clicked() {
+                if ui.selectable_label(i == picked, RichText::new(text).font(theme::mono(theme::CAPTION)).color(colour)).clicked() {
                     picked = i;
                     ui.data_mut(|d| d.insert_temp(picked_id, i));
                 }
@@ -1955,7 +1955,7 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
     let (sending, asking) = (["Change it", "Just ask"], ["Ask me", "Decide yourself"]);
     let title = widgets::label_galley(ui, &tr(QUESTIONS_TITLE), theme::SMALL, t.text_dim).size().x;
     // The approvals menu's link, the space before it and one more item gap.
-    let approvals = widgets::label_galley(ui, &tr("Approvals"), theme::BODY, t.text).size().x + 8.0;
+    let approvals = widgets::label_galley(ui, &tr("Approvals"), theme::SMALL, t.text).size().x + 8.0;
     let gaps = ui.spacing().item_spacing.x * 4.0;
     let title = title + approvals;
     // Side by side when both switches fit, else one under the other (a longer language, a narrow window).

@@ -592,7 +592,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                             tune_models.push(b.name.clone());
                                         }
                                     } else {
-                                        ui.spinner();
+                                        ui.add(widgets::Spinner::new());
                                     }
                                 }
                             } else {
