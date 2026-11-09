@@ -1667,6 +1667,37 @@ fn title_bar_keeps_its_size_when_zoomed() {
     }
 }
 
+/// The title bar's controls span one height: Settings, the Simple · Advanced switch, the AI
+/// drop-down, Clean room and the session's cost, in both modes, at 100% and zoomed.
+#[test]
+fn the_title_bars_controls_are_one_height() {
+    for (mode, zoom) in [(Mode::Experienced, 1.0), (Mode::Experienced, 1.5), (Mode::Beginner, 1.0)] {
+        let mut h = harness_sized(egui::vec2(1360.0, 600.0), move || {
+            let mut a = demo::app(demo::engine(mode, true));
+            a.session_usage.add_turn(1_180_000, 42_000, Some(3.21), false);
+            a
+        });
+        h.ctx.set_zoom_factor(zoom);
+        h.run_steps(4);
+        let top = |label: &str| h.get_all_by_label(label).map(|n| n.rect()).min_by(|a, b| a.top().total_cmp(&b.top())).unwrap();
+        let chip = top("Clean room");
+        let mut named = vec![("cost", top("about $3.21"))];
+        if mode == Mode::Experienced {
+            // A segment sits 2 pt inside its switch, top and bottom, at the bar's scale (which
+            // undoes the zoom only on macOS).
+            let advanced = top("Advanced");
+            let s = if craft_anything_ui_egui::titlebar::NATIVE_FRAME { 1.0 / zoom } else { 1.0 };
+            named.push(("Settings", top("Settings")));
+            named.push(("Simple · Advanced", advanced.expand2(egui::vec2(0.0, 2.0 * s))));
+            named.push(("AI", h.get_all_by_role(egui::accesskit::Role::ComboBox).map(|n| n.rect()).min_by(|a, b| a.top().total_cmp(&b.top())).unwrap()));
+        }
+        for (name, r) in named {
+            assert!((r.height() - chip.height()).abs() < 0.5, "{mode:?} at {zoom}x: {name} is {} tall, Clean room {}", r.height(), chip.height());
+            assert!((r.center().y - chip.center().y).abs() < 0.5, "{mode:?} at {zoom}x: {name} isn't level with Clean room: {r:?} {chip:?}");
+        }
+    }
+}
+
 #[test]
 fn settings_window_tabs_draw() {
     let mut h = harness(|| {
