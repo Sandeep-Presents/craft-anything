@@ -1029,7 +1029,37 @@ fn ssh_run(host: &str, line: &str, timeout: std::time::Duration, stop: Option<&C
 
 /// `command -v` only promises a nonzero status for a missing program: 127 is the shell's own "not
 /// found", which [`crate::ssh::diagnose`] turns into how to install it or put it on the PATH.
-pub(super) const REMOTE_CHECK_LINE: &str = "command -v craft-anything-cli >/dev/null || exit 127";
+/// It prints where the helper is, which [`remote_cli_path`] reads.
+pub(super) const REMOTE_CHECK_LINE: &str = "command -v craft-anything-cli || exit 127";
+
+/// Where `craft-anything-cli` is on `host`, as an absolute path. Claude Code starts the tool server
+/// with its own PATH, not the one ssh gave this check: by bare name the server failed on a host
+/// where the check passed ("server status: failed"), and by absolute path it connected. None: the
+/// host didn't say, so the bare name stays and the build's own error explains.
+pub(super) fn remote_cli_path(host: &str) -> Option<String> {
+    let out = ssh_run(host, REMOTE_CHECK_LINE, std::time::Duration::from_secs(15), None).ok().filter(|out| out.success)?;
+    absolute_path_line(&out.stdout_text())
+}
+
+/// The first line of `text` when it is an absolute path; a shell function, alias or banner isn't.
+fn absolute_path_line(text: &str) -> Option<String> {
+    let line = text.lines().map(str::trim).find(|line| !line.is_empty())?;
+    line.starts_with('/').then(|| line.to_string())
+}
+
+#[cfg(test)]
+mod remote_path_tests {
+    use super::absolute_path_line;
+
+    #[test]
+    fn only_an_absolute_path_is_taken_as_the_helper_location() {
+        assert_eq!(absolute_path_line("/home/a/.cargo/bin/craft-anything-cli\n").as_deref(), Some("/home/a/.cargo/bin/craft-anything-cli"));
+        assert_eq!(absolute_path_line("\n  /opt/ca/craft-anything-cli  \n").as_deref(), Some("/opt/ca/craft-anything-cli"));
+        assert_eq!(absolute_path_line("craft-anything-cli"), None);
+        assert_eq!(absolute_path_line("alias craft-anything-cli='x'"), None);
+        assert_eq!(absolute_path_line(""), None);
+    }
+}
 
 /// The remote helper is on PATH, checked before a build starts (the remote server runs it). For
 /// every agent that's handed our tool server over SSH, as the local check is for one here.
