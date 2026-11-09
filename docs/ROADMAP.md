@@ -1285,6 +1285,16 @@ Gaps found while using the app for real projects.
       (`decompiled`), so a run reminds the builder only while it has never decompiled in this
       project. Unit test only; not run live
       — claimed: NeuTroNBZh, branch bugfix/r2.9-decompile-reminder-every-request
+- [x] `rebuild_check` said "no build is running" when the run had taken the check and one of its
+      steps hadn't finished: on a Windows Unity build, three checks in a row stopped at
+      "game-self-test" and the builder gave up after its default 20 minutes, below the run's own
+      30-minute limit on a check. The run now marks a request it takes, the tool tells "still
+      going" (`TimedOut`) from "no run took it", and its default wait (35 min) outlasts the run's
+      limit, so the run reports a stuck check itself. Unit tests only; the stuck self-test wasn't
+      reproduced (the same game's `--self-test` now exits in 16 s)
+      — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-wait
+- [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
+      past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
 - [x] Make → "What do you want to recreate?" offers Simple / Advanced, and always shows Clean room /
       Deep: Simple mode's title bar had no mode switch, so only Settings offered it, and the
       Clean room / Deep tiles appeared only once an original was picked (the switch is now beside
