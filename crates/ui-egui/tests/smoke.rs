@@ -3330,10 +3330,10 @@ fn a_long_status_note_in_the_work_rows_stays_in_the_window() {
 fn the_switches_under_the_prompt_box_never_overlap() {
     let d = tempfile::tempdir().unwrap();
     let ws = craft_anything_engine::workspace::Workspace::create(d.path(), "Notes", "A notes app", craft_anything_engine::workspace::TargetRef::None).unwrap();
-    for width in [1600.0, 1000.0, 700.0, 560.0] {
+    for (mode, width) in [(Mode::Experienced, 1600.0), (Mode::Beginner, 1600.0), (Mode::Beginner, 1000.0), (Mode::Beginner, 700.0), (Mode::Beginner, 560.0)] {
         let ws = ws.clone();
         let mut h = harness_sized(egui::vec2(width, 800.0), move || {
-            let mut a = demo::app(demo::engine(Mode::Beginner, true));
+            let mut a = demo::app(demo::engine(mode, true));
             a.workspace = Some(ws);
             a.state.screen = Screen::Project;
             a
@@ -3341,9 +3341,15 @@ fn the_switches_under_the_prompt_box_never_overlap() {
         h.run_steps(3);
         let sending = h.get_by_label("Just ask").rect();
         let (asking, title) = (h.get_by_label("Ask me").rect(), h.get_by_label("Builder's questions:").rect());
-        let hint = h.get_by_label("or start with /btw to just ask").rect();
         assert!(!sending.intersects(title) && !sending.intersects(asking), "at {width}: {sending:?}, {title:?}, {asking:?}");
-        assert!(!hint.intersects(title) && !hint.intersects(asking), "at {width}: {hint:?}, {title:?}, {asking:?}");
+        // The /btw hint is always shown whole, never cut to "or start with /b…": beside the
+        // switches when it fits, else on a line of its own, where it may wrap but loses nothing.
+        let hint = h.get_by_label("or start with /btw to just ask").rect();
+        let font = egui::FontId::proportional(craft_anything_ui_egui::theme::SMALL);
+        let one_line = h.ctx.fonts_mut(|f| f.layout_no_wrap("or start with /btw to just ask".into(), font, egui::Color32::WHITE)).size();
+        assert!(hint.width() >= one_line.x - 0.5 || hint.height() >= 1.5 * one_line.y, "at {width} the hint is cut short: {hint:?}, whole {one_line:?}");
+        assert!(!hint.intersects(title) && !hint.intersects(asking) && !hint.intersects(sending), "at {width}: {hint:?}, {title:?}, {asking:?}");
+        assert!(hint.right() <= width, "at {width} the hint stays in the window: {hint:?}");
         assert!(title.left() >= 0.0 && asking.right() <= width, "at {width} they stay in the window: {title:?}, {asking:?}");
     }
 }
