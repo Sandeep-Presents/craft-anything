@@ -538,6 +538,9 @@ pub struct CraftApp {
     roles_job: Option<u64>,
     /// A Start that waits for role choices to be saved, so the build uses them.
     start_after_roles: Option<state::MakeDraft>,
+    /// Jobs started before the last role save ended have this smaller id: their list of AIs may
+    /// predate the save, so it doesn't change the builder or extractor shown.
+    roles_floor: u64,
     /// Tools the UI started that wait for the person's consent, by the id on their card.
     pending_consent: std::collections::HashMap<u64, (String, Value, Route)>,
     next_consent: u64,
@@ -589,6 +592,7 @@ impl CraftApp {
             roles_wanted: Vec::new(),
             roles_job: None,
             start_after_roles: None,
+            roles_floor: 0,
             missing_key: Default::default(),
             detected: None,
             detect_hints: Vec::new(),
@@ -1442,6 +1446,8 @@ impl CraftApp {
         let roles_saved = self.roles_job == Some(job);
         if roles_saved {
             self.roles_job = None;
+            // Reads started from here on see this save; older ones may not have.
+            self.roles_floor = self.jobs.next_id();
         }
         self.chat_jobs.retain(|id| *id != job);
         let done = match done.result {
@@ -1538,9 +1544,10 @@ impl CraftApp {
                     self.state.backend = None;
                 }
                 self.backends = b;
-                // While role choices are being saved, another job's read of them may predate the
-                // save: keep what's shown until the save's own result arrives.
-                if roles_saved || !self.roles_saving() {
+                // While role choices are being saved, or when this read was started before the
+                // last save ended, its roles may predate the save: keep what's shown, which the
+                // save's own result (or the read after a failed one) set.
+                if roles_saved || (!self.roles_saving() && job >= self.roles_floor) {
                     self.builder = builder;
                     self.extractor = extractor;
                 }

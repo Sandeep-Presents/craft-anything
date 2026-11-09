@@ -87,6 +87,12 @@ impl<T: Send + 'static> Jobs<T> {
         self.repaint.as_ref()
     }
 
+    /// The id the next job will get. Ids only go up, so a job with a smaller id was started
+    /// earlier.
+    pub fn next_id(&self) -> u64 {
+        self.next
+    }
+
     /// Run `f` on a new thread. A panic inside it becomes an error result, never a crash.
     pub fn spawn(&mut self, title: impl Into<String>, visible: bool, f: impl FnOnce(&JobCtx) -> Result<T, String> + Send + 'static) -> u64 {
         let id = self.next;
