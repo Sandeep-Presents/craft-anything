@@ -1009,6 +1009,15 @@ impl AgentAdapter for GeminiCli {
                     p.input_tokens = st.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
                     p.output_tokens = st.get("output_tokens").and_then(Value::as_u64).unwrap_or(0);
                 }
+                // Documented stream-json only ever ends a run with `result` on success (a failure
+                // is its own `error` event instead), but a `status` other than "success" here, if
+                // one is ever sent, must still fail the turn rather than quietly counting as done:
+                // `saw_result` alone now also decides whether a lingering process is treated as
+                // finished (`RESULT_GRACE` in `run_cli`).
+                if let Some(status) = v.get("status").and_then(Value::as_str).filter(|s| *s != "success") {
+                    let why = v.get("error").and_then(Value::as_str).unwrap_or(status);
+                    out.push(AgentEvent::Error { message: format!("Gemini CLI: {why}"), remediation: None, log: None });
+                }
             }
             _ => {}
         }

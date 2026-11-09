@@ -2397,6 +2397,24 @@ mod tests {
         assert!(matches!(&ev[2], AgentEvent::ToolFinished { ok: false, .. }));
     }
 
+    /// CodeRabbit review on #1426: `saw_result` alone now decides whether a lingering process
+    /// counts as a finished turn (`run_cli`'s `RESULT_GRACE`), so a `result` event that itself
+    /// reports failure must still fail the turn, not quietly succeed. Documented stream-json only
+    /// ever ends a run with `result` on success (a failure is its own `error` event instead), but
+    /// this is defensive: if a non-"success" status is ever sent on `result`, it must not be
+    /// silently swallowed the way an unrecognised field would be.
+    #[test]
+    fn a_gemini_result_that_reports_failure_still_fails_the_turn() {
+        let mut p = StreamParser::new(adapter_for("gemini-cli"));
+        let ev = p.line(&json!({"type":"result","status":"error","error":"the model refused the request"}).to_string());
+        assert!(p.saw_result, "a result line always marks the stream's turn as done");
+        assert!(ev.iter().any(|e| matches!(e, AgentEvent::Error { message, .. } if message.contains("the model refused the request"))), "{ev:?}");
+        // An ordinary successful result still reports nothing extra.
+        let mut ok = StreamParser::new(adapter_for("gemini-cli"));
+        let ev = ok.line(&json!({"type":"result","status":"success","stats":{"input_tokens":1,"output_tokens":1}}).to_string());
+        assert!(ok.saw_result && ev.is_empty(), "{ev:?}");
+    }
+
     /// Login-shell, tool and network failures are not evidence that the account needs sign-in.
     #[test]
     fn codex_sign_in_guidance_only_matches_authentication_failures() {
@@ -2764,7 +2782,9 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
         use std::os::unix::fs::PermissionsExt;
         let program = dir.join("claude");
         let reply = r#"{"type":"result","subtype":"success","is_error":false,"num_turns":1,"session_id":"s1"}"#;
-        std::fs::write(&program, format!("#!/bin/sh\necho '{reply}'\nsleep 20\n")).unwrap();
+        // `exec`: sleep replaces the shell rather than running as its child, so the group kill
+        // that ends this stand-in doesn't depend on also reaching a grandchild process.
+        std::fs::write(&program, format!("#!/bin/sh\necho '{reply}'\nexec sleep 20\n")).unwrap();
         std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
         program
     }
