@@ -17,6 +17,14 @@ pub fn asks_dir(project: &Path) -> PathBuf {
     project.join("checks").join("asks")
 }
 
+/// The mark a run leaves beside a check request it has taken, until it answers, so
+/// `rebuild_check` can tell a check that is still going from a request no run took. None for an
+/// id that isn't an inbox id (a request's file can carry any `id`): no mark outside the folder.
+pub fn taken_mark(project: &Path, id: &str) -> Option<PathBuf> {
+    let valid = !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    valid.then(|| asks_dir(project).join(format!("{id}.taken")))
+}
+
 /// Projects whose build runs in this process. A builder in this process (an API backend) calls
 /// tools with the engine locked, so its `rebuild_check` could never be answered by this run.
 static BUILDING_HERE: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
@@ -123,6 +131,12 @@ impl Worker {
         let Some((kind, good_enough)) = self.self_check.clone() else { return Ok(()) };
         let asks = Inbox::new(asks_dir(&ws.root));
         for r in asks.pending() {
+            let mark = taken_mark(&ws.root, &r.id);
+            if let Some(mark) = &mark
+                && let Err(e) = std::fs::write(mark, b"")
+            {
+                log::warn!("couldn't mark the builder's check as taken ({}): {e}", mark.display());
+            }
             let checking = if ws.manifest.target == TargetRef::None {
                 "The builder is checking its work…"
             } else {
@@ -141,6 +155,9 @@ impl Worker {
                 Err(e) => (format!("The check couldn't run: {}", e.message), "The builder's check couldn't run.".to_string()),
             };
             asks.answer(&r.id, &Answer { text: Some(text), ..Default::default() })?;
+            if let Some(mark) = &mark {
+                let _ = std::fs::remove_file(mark);
+            }
             self.step(ws, Step::Build, Status::Building, &line)?;
         }
         Ok(())
