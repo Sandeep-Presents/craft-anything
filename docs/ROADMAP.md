@@ -1187,6 +1187,7 @@ Gaps found while using the app for real projects.
 - [x] Delete a private browser's temporary profile when it closes or fails to start (#810) — PR #822
 - [ ] Stop private browsers that outlive the app after an abrupt exit, and investigate the Brave
       Helper crash (#810); both still need macOS reproduction
+      — claimed: justinjohn0306, branch bugfix/r2.9-browser-ends-with-app (stopping private browsers)
 - [ ] Claude Code's Ultracode switch (a setting, not an effort level; the effort environment
       variable we use can't turn it on)
 - [x] A model the list doesn't offer (`opusplan`, `[1m]` variants, one another harness serves) can
