@@ -917,6 +917,7 @@ fn website_choice_stays_picked_while_the_address_is_empty() {
     assert!(h.query_by_label("Type the website's address:").is_none());
 }
 
+/// Make's Simple / Advanced switch changes the app's mode and keeps the screen and the draft (#1286).
 #[test]
 fn the_make_card_switches_simple_and_advanced_and_keeps_the_draft() {
     let mut h = harness(|| {
@@ -940,6 +941,8 @@ fn the_make_card_switches_simple_and_advanced_and_keeps_the_draft() {
     assert_eq!(h.state().state.make.request, "a calculator");
 }
 
+/// At the app's smallest window the Simple / Advanced switch moves under the ways in, inside the
+/// window (#1286).
 #[test]
 fn the_make_mode_switch_stays_inside_the_narrowest_window() {
     // The app's smallest window (main.rs): the switch moves under the ways in instead of off the edge.
