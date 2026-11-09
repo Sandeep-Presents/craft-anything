@@ -106,7 +106,7 @@ fn overlay_dir() -> Result<std::path::PathBuf, ToolError> {
 
 /// A builder for one run's own folder, owner-only from the moment it exists.
 #[cfg(unix)]
-fn private_dir() -> std::fs::DirBuilder {
+pub(super) fn private_dir() -> std::fs::DirBuilder {
     use std::os::unix::fs::DirBuilderExt as _;
     let mut builder = std::fs::DirBuilder::new();
     // Made owner-only as it's created, so it's never readable by anyone else, not even briefly.
@@ -116,7 +116,7 @@ fn private_dir() -> std::fs::DirBuilder {
 
 /// A builder for one run's own folder; Windows keeps each person's temporary folder to themselves.
 #[cfg(not(unix))]
-fn private_dir() -> std::fs::DirBuilder {
+pub(super) fn private_dir() -> std::fs::DirBuilder {
     std::fs::DirBuilder::new()
 }
 
