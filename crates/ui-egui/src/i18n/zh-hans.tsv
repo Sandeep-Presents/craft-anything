@@ -1043,6 +1043,7 @@ Smart contract interface	智能合约接口
 Software I made, bought, or have permission to examine.	我制作、购买或获准检查的软件。
 Solana program (sBPF)	Solana 程序 (sBPF)
 Some plugins couldn't be read:	部分插件无法读取：
+Some shared files had to be copied ({copied}) because the drive doesn't support hard links.	由于驱动器不支持硬链接，部分共享文件只能改为复制（{copied}）。
 Something a program borrows from the operating system or a library, like "open a file".	程序从操作系统或库调用的功能，例如“打开文件”。
 Something a program or library offers for other programs to use.	程序或库提供给其他程序使用的功能。
 Source	源代码

@@ -1043,6 +1043,7 @@ Smart contract interface	Interface do contrato inteligente
 Software I made, bought, or have permission to examine.	Software que criei, comprei ou tenho permissão para examinar.
 Solana program (sBPF)	Programa Solana (sBPF)
 Some plugins couldn't be read:	Não foi possível ler alguns plugins:
+Some shared files had to be copied ({copied}) because the drive doesn't support hard links.	Alguns arquivos compartilhados tiveram de ser copiados ({copied}) porque a unidade não oferece suporte a links físicos.
 Something a program borrows from the operating system or a library, like "open a file".	Algo que um programa utiliza do sistema operacional ou de uma biblioteca, como "abrir um arquivo".
 Something a program or library offers for other programs to use.	Algo que um programa ou biblioteca oferece para outros programas utilizarem.
 Source	Código-fonte

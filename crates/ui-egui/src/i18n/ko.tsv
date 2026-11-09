@@ -1043,6 +1043,7 @@ Smart contract interface	스마트 계약 인터페이스
 Software I made, bought, or have permission to examine.	내가 만들었거나 샀거나 살펴볼 권한이 있는 소프트웨어.
 Solana program (sBPF)	Solana 프로그램 (sBPF)
 Some plugins couldn't be read:	읽지 못한 플러그인이 있습니다:
+Some shared files had to be copied ({copied}) because the drive doesn't support hard links.	드라이브가 하드 링크를 지원하지 않아 일부 공유 파일을 복사했습니다({copied}).
 Something a program borrows from the operating system or a library, like "open a file".	프로그램이 운영체제나 라이브러리에서 빌려 쓰는 기능. "파일 열기" 같은 것입니다.
 Something a program or library offers for other programs to use.	프로그램이나 라이브러리가 다른 프로그램이 쓰도록 내놓는 기능.
 Source	소스

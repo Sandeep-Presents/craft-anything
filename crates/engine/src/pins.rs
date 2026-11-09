@@ -410,7 +410,8 @@ pub fn create(ws: &Workspace, mode: PinMode, name: Option<&str>, godot: Option<&
         (None, Some(r)) => format!("{project} · round {r}"),
         (None, None) => format!("{project} · pin {id}"),
     };
-    let mut pin = Pin { version: PIN_VERSION, id, name, mode, created_ms: now_ms(), round, bytes: 0, shared_bytes: 0, copied_shared_bytes: 0, program: recorded_program };
+    let mut pin =
+        Pin { version: PIN_VERSION, id, name, mode, created_ms: now_ms(), round, bytes: 0, shared_bytes: 0, copied_shared_bytes: 0, program: recorded_program };
     let made = (|| {
         (pin.bytes, pin.shared_bytes, pin.copied_shared_bytes) = copy(ws, &program, &pin.app_dir(ws), mode, progress)?;
         pin.launch(ws, godot)?;
@@ -442,10 +443,7 @@ fn copy(ws: &Workspace, program: &Path, to: &Path, mode: PinMode, progress: &mut
         if mode == PinMode::Light && f.shared && std::fs::hard_link(&f.from, &f.to).is_ok() {
             shared = shared.saturating_add(f.len);
         } else {
-            std::fs::copy(&f.from, &f.to).map_err(|e| {
-                ToolError::io(f.from.display(), e)
-                    .with_remediation("Check there's room on the drive for the copy.")
-            })?;
+            std::fs::copy(&f.from, &f.to).map_err(|e| ToolError::io(f.from.display(), e).with_remediation("Check there's room on the drive for the copy."))?;
             if mode == PinMode::Light && f.shared {
                 copied_shared = copied_shared.saturating_add(f.len);
             }

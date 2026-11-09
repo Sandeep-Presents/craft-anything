@@ -1043,6 +1043,7 @@ Smart contract interface	อินเทอร์เฟซสมาร์ตค�
 Software I made, bought, or have permission to examine.	ซอฟต์แวร์ที่ฉันสร้าง ซื้อ หรือได้รับอนุญาตให้ตรวจ
 Solana program (sBPF)	โปรแกรม Solana (sBPF)
 Some plugins couldn't be read:	อ่านปลั๊กอินบางตัวไม่ได้:
+Some shared files had to be copied ({copied}) because the drive doesn't support hard links.	ไฟล์ที่แชร์บางไฟล์ต้องถูกคัดลอก ({copied}) เพราะไดรฟ์ไม่รองรับฮาร์ดลิงก์
 Something a program borrows from the operating system or a library, like "open a file".	สิ่งที่โปรแกรมยืมจากระบบปฏิบัติการหรือไลบรารี เช่น "เปิดไฟล์"
 Something a program or library offers for other programs to use.	สิ่งที่โปรแกรมหรือไลบรารีเปิดให้โปรแกรมอื่นใช้
 Source	ซอร์ส

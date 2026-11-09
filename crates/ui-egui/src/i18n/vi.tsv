@@ -1043,6 +1043,7 @@ Smart contract interface	Giao diện hợp đồng thông minh
 Software I made, bought, or have permission to examine.	Phần mềm do tôi làm, mua, hoặc được phép xem xét.
 Solana program (sBPF)	Chương trình Solana (sBPF)
 Some plugins couldn't be read:	Không đọc được một số plugin:
+Some shared files had to be copied ({copied}) because the drive doesn't support hard links.	Một số tệp dùng chung phải được sao chép ({copied}) vì ổ đĩa không hỗ trợ liên kết cứng.
 Something a program borrows from the operating system or a library, like "open a file".	Thứ mà chương trình mượn từ hệ điều hành hoặc một thư viện, như "mở một tệp".
 Something a program or library offers for other programs to use.	Thứ mà một chương trình hoặc thư viện cung cấp để các chương trình khác dùng.
 Source	Nguồn
