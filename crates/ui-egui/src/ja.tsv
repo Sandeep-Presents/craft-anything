@@ -103,6 +103,10 @@ Builds at once	同時ビルド数
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	操作の前に確認を求めずにビルドを続けます。ただしビルダーはプロジェクト外の削除、システム設定の変更、公開は行わず、各プロジェクトのアセット予算も守ります。
 Builds use this one. Click to choose automatically again.	ビルドはこれを使います。クリックすると自動選択に戻ります。
 Built by	作成元
+Extracted by	抽出担当
+No separate AI	別の AI なし
+The builder takes what it needs itself.	ビルダーが必要なものを自分で取り出します。
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	調査のあと、この AI がゲーム自身のファイルをビルダー用に取り出します。作るものすべてに適用されます（設定 → AI の「抽出」と同じ）。
 Built with	使用技術
 Built with {stack}, as you asked, so no game engine is needed.	ご指定の {stack} でビルドするため、ゲームエンジンは不要です。
 Cancel	キャンセル

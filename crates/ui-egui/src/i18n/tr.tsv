@@ -207,6 +207,10 @@ Builds at once	Aynı anda derleme
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Derlemeler bir eylemden önce durup sormadan devam eder. Oluşturucu yine de projesinin dışında hiçbir şeyi silmez, sistem ayarlarını değiştirmez, hiçbir şey yayımlamaz ve her projenin varlık bütçesini aşmaz.
 Builds use this one. Click to choose automatically again.	Derlemeler bunu kullanıyor. Yeniden otomatiğe dönmek için tıklayın.
 Built by	Yapan
+Extracted by	Çıkaran
+No separate AI	Ayrı yapay zekâ yok
+The builder takes what it needs itself.	Oluşturucu ihtiyacını kendisi alır.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	İncelemeden sonra bu yapay zekâ oyunun kendi dosyalarını oluşturucu için çıkarır. Yaptığınız her şey için geçerlidir, Ayarlar → Yapay zekâ'daki "Çıkarmalar" gibi.
 Built with	Şununla derlendi
 Built with {stack}, as you asked, so no game engine is needed.	İstediğiniz gibi {stack} ile derlendi, bu yüzden oyun motoru gerekmiyor.
 Call graph	Çağrı grafiği

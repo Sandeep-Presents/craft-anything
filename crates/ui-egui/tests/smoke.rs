@@ -114,6 +114,84 @@ fn simple_title_bar_keeps_only_the_essentials() {
     h.get_by_label("Clean room");
 }
 
+/// "Extracted by" on Make: an original game in Deep mode offers the app's extractor there, among
+/// the AIs reached over their API that can start (a local server needs no key; a hosted AI without
+/// its key isn't offered), and picking one sets the same role as Settings → AI.
+#[test]
+fn make_offers_the_ai_that_takes_a_games_files_out_in_deep_mode() {
+    use craft_anything_ai::{BackendConfig, BackendKind, Role};
+    use craft_anything_engine::workspace::TargetRef;
+    let d = tempfile::tempdir().unwrap();
+    let game = d.path().join("game");
+    std::fs::create_dir_all(&game).unwrap();
+    let app = move |deep: bool| {
+        let game = game.clone();
+        move || {
+            let mut a = demo::app(demo::engine(Mode::Beginner, true));
+            let local = BackendConfig {
+                name: "Local model".into(),
+                kind: BackendKind::OpenaiCompatible,
+                model: "qwen".into(),
+                base_url: Some("http://localhost:11434/v1".into()),
+                ssh_host: None,
+                enabled: true,
+            };
+            a.hub.add_backend(local, None).unwrap();
+            // A hosted AI added without a key (it may still find one in the environment).
+            let hosted = BackendConfig {
+                name: "Hosted".into(),
+                kind: BackendKind::Anthropic,
+                model: "claude-opus-5-5".into(),
+                base_url: None,
+                ssh_host: None,
+                enabled: true,
+            };
+            a.hub.add_backend(hosted, None).unwrap();
+            a.settings.deep_mode = deep;
+            a.state.make.target = TargetRef::Local { path: game };
+            a.state.make.game = true;
+            a.state.make.request = "Recreate this game".into();
+            a
+        }
+    };
+    // Clean room never takes anything out of the original: no such choice.
+    let mut h = harness_sized(egui::vec2(1280.0, 1300.0), app(false));
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Local model")));
+    h.run_steps(3);
+    assert!(h.query_by_label("Extracted by").is_none(), "Clean room: nothing is taken out");
+
+    let mut h = harness_sized(egui::vec2(1280.0, 1300.0), app(true));
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Local model")));
+    // Which AIs lack a key is read with the backends, the same way `has_key` decides it.
+    let missing = !h.state().hub.has_key("Hosted");
+    assert_eq!(h.state().missing_key.contains("Hosted"), missing, "read with the backends");
+    // Whatever this machine's environment holds: an AI without its key isn't offered.
+    h.state_mut().missing_key.insert("Hosted".into());
+    h.run_steps(3);
+    h.get_by_label("After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.");
+    // The label and the drop-down share the name, as "Built by" does: the drop-down is the second.
+    h.get_all_by_label("Extracted by").last().unwrap().click();
+    h.run_steps(2);
+    assert!(h.query_by_label("Hosted").is_none(), "a hosted AI without its key can't start the extraction");
+    h.get_by_label("Local model").click();
+    assert!(wait(&mut h, |a| a.extractor.as_deref() == Some("Local model")), "the app's extractor is set");
+    assert_eq!(h.state().hub.chosen(Role::Extractor).as_deref(), Some("Local model"), "the same role as Settings → AI");
+
+    // Nothing qualifies any more (the chosen one now lacks a key too): the row stays while one is
+    // chosen, so it can still be cleared from here. (An AI turned off is no longer chosen at all:
+    // `chosen` skips it, so there's nothing to clear.)
+    h.state_mut().missing_key.insert("Local model".into());
+    h.run_steps(3);
+    h.get_all_by_label("Extracted by").last().unwrap().click();
+    h.run_steps(2);
+    assert!(h.query_all_by_label("Local model").count() <= 1, "not offered again, only shown as the current choice");
+    h.get_by_label("No separate AI").click();
+    assert!(wait(&mut h, |a| a.extractor.is_none()), "cleared");
+    assert_eq!(h.state().hub.chosen(Role::Extractor), None, "the role is cleared too");
+}
+
 #[test]
 fn a_game_is_built_with_its_engine_and_a_missing_engine_is_got_first() {
     use craft_anything_engine::workspace::TargetRef;
@@ -3176,4 +3254,92 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
     let content = h.ctx.content_rect();
     let start = h.get_by_label("Start").rect();
     assert!(start.left() >= 0.0 && start.right() <= content.right(), "Start ({start:?}) stays inside the window ({content:?})");
+}
+
+/// Choosing who extracts right before Start (#1290's review): quick choices are saved in the order
+/// they were made, and the build waits until they're saved, so it uses the latest.
+#[test]
+fn a_start_waits_for_the_ai_choices_being_saved() {
+    use craft_anything_ai::rebuild::StandIns;
+    use craft_anything_ai::{BackendConfig, BackendKind, Role};
+    let d = tempfile::tempdir().unwrap();
+    let runs = StandIns::new();
+    let (dir, r) = (d.path().to_path_buf(), runs.clone());
+    let mut h = harness(move || {
+        let a = stand_in_app(dir, &r);
+        for name in ["Local one", "Local two"] {
+            let local = BackendConfig {
+                name: name.into(),
+                kind: BackendKind::OpenaiCompatible,
+                model: "qwen".into(),
+                base_url: Some("http://localhost:11434/v1".into()),
+                ssh_host: None,
+                enabled: true,
+            };
+            a.hub.add_backend(local, None).unwrap();
+        }
+        a
+    });
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Local two")));
+    {
+        let a = h.state_mut();
+        a.set_role(Role::Extractor, Some("Local one".into()));
+        a.set_role(Role::Extractor, Some("Local two".into()));
+        a.state.make.request = "A notes app".into();
+        a.start_make();
+        assert!(a.roles_saving(), "the choices are still being saved");
+        assert!(a.creating.is_none(), "Start waits for them");
+    }
+    assert!(wait(&mut h, |a| !a.roles_saving()), "saved");
+    assert_eq!(h.state().hub.chosen(Role::Extractor).as_deref(), Some("Local two"), "the latest choice wins");
+    assert_eq!(h.state().extractor.as_deref(), Some("Local two"));
+    assert!(wait(&mut h, |_| !runs.started().is_empty()), "the waiting Start built once they were saved");
+}
+
+/// A choice that can't be saved keeps a waiting Start from building with the old one.
+#[test]
+fn a_start_waiting_for_an_ai_choice_that_fails_to_save_does_not_build() {
+    use craft_anything_ai::Role;
+    use craft_anything_ai::rebuild::StandIns;
+    let d = tempfile::tempdir().unwrap();
+    let runs = StandIns::new();
+    let (dir, r) = (d.path().to_path_buf(), runs.clone());
+    let mut h = harness(move || stand_in_app(dir, &r));
+    h.run_steps(2);
+    {
+        let a = h.state_mut();
+        a.set_role(Role::Extractor, Some("No such AI".into()));
+        a.state.make.request = "A notes app".into();
+        a.start_make();
+    }
+    assert!(wait(&mut h, |a| !a.roles_saving()), "the save ended");
+    h.run_steps(5);
+    assert!(h.state().creating.is_none() && runs.started().is_empty(), "no build after a failed save");
+    assert!(h.state().state.toasts.iter().any(|(_, error)| *error), "the failure is shown");
+}
+
+/// A batch of role choices that saves one and then fails on the next shows what was saved
+/// (#1290's review): the builder chosen in it is shown, not the one from before.
+#[test]
+fn a_role_save_that_fails_part_way_shows_what_was_saved() {
+    use craft_anything_ai::Role;
+    use craft_anything_ai::rebuild::StandIns;
+    let d = tempfile::tempdir().unwrap();
+    let runs = StandIns::new();
+    let (dir, r) = (d.path().to_path_buf(), runs.clone());
+    let mut h = harness(move || stand_in_app(dir, &r));
+    h.state_mut().refresh_backends();
+    assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Claude Code")));
+    assert_eq!(h.state().builder, None);
+    {
+        let a = h.state_mut();
+        // The first choice is being saved; the next two wait for it and go out together.
+        a.set_role(Role::Extractor, None);
+        a.set_role(Role::Builder, Some("Claude Code".into()));
+        a.set_role(Role::Extractor, Some("No such AI".into()));
+    }
+    assert!(wait(&mut h, |a| !a.roles_saving()), "the saves ended");
+    assert_eq!(h.state().hub.chosen(Role::Builder).as_deref(), Some("Claude Code"), "saved before the failure");
+    assert!(wait(&mut h, |a| a.builder.as_deref() == Some("Claude Code")), "and shown");
 }

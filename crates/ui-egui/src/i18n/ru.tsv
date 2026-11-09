@@ -194,6 +194,10 @@ Builds at once	Сборок одновременно
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Сборки продолжаются, не останавливаясь, чтобы спросить вас перед действием. Конструктор всё равно никогда не удаляет ничего вне проекта, не меняет системные настройки и не публикует ничего, а также остаётся в рамках бюджета ресурсов каждого проекта.
 Builds use this one. Click to choose automatically again.	Сборки используют этот. Нажмите, чтобы снова выбрать автоматически.
 Built by	Собрано
+Extracted by	Извлекает
+No separate AI	Без отдельного ИИ
+The builder takes what it needs itself.	Сборщик сам берёт то, что ему нужно.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	После изучения этот ИИ извлекает собственные файлы игры для сборщика. Для всего, что вы создаёте, как «Извлечения» в Настройках → ИИ.
 Built with	Собрано с помощью
 Built with {stack}, as you asked, so no game engine is needed.	Собрано с помощью {stack}, как вы просили, поэтому игровой движок не нужен.
 Call graph	Граф вызовов

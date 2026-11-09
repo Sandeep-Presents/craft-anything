@@ -207,6 +207,10 @@ Builds at once	Criações simultâneas
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	O agente continua trabalhando sem pedir autorização a cada ação. Ele não exclui arquivos fora do projeto, não altera configurações do sistema nem publica conteúdo, e respeita o orçamento de recursos de cada projeto.
 Builds use this one. Click to choose automatically again.	Esta IA está definida para criar os projetos. Clique para voltar à seleção automática.
 Built by	Criado por
+Extracted by	Extraído por
+No separate AI	Nenhuma IA à parte
+The builder takes what it needs itself.	O construtor pega sozinho o que precisa.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Depois do estudo, esta IA tira os arquivos do próprio jogo para o construtor. Vale para tudo o que você faz, como “Extrai recursos” em Configurações → IA.
 Built with	Criado com
 Built with {stack}, as you asked, so no game engine is needed.	Criado com {stack}, conforme solicitado. Não é necessária uma engine de jogo.
 Call graph	Grafo de chamadas

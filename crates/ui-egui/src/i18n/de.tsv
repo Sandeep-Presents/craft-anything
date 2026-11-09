@@ -207,6 +207,10 @@ Builds at once	Baut sofort
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Builds laufen weiter, ohne vor einer Aktion bei dir nachzufragen. Der Builder löscht trotzdem nie etwas außerhalb seines Projekts, ändert keine Systemeinstellungen und veröffentlicht nichts, und er bleibt innerhalb des Asset-Budgets jedes Projekts.
 Builds use this one. Click to choose automatically again.	Builds verwenden diese. Klicke, um wieder automatisch zu wählen.
 Built by	Gebaut von
+Extracted by	Extrahiert von
+No separate AI	Keine eigene KI
+The builder takes what it needs itself.	Der Builder holt sich selbst, was er braucht.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Nach der Analyse holt diese KI die eigenen Dateien des Spiels für den Builder heraus. Gilt für alles, was du machst, wie „Extrakte“ in Einstellungen → KI.
 Built with	Gebaut mit
 Built with {stack}, as you asked, so no game engine is needed.	Gebaut mit {stack}, wie du es wolltest, deshalb ist keine Spiel-Engine nötig.
 Call graph	Aufrufgraph

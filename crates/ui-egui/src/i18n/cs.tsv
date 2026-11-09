@@ -207,6 +207,10 @@ Builds at once	Souběžná sestavení
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Sestavování pokračuje bez dotazů před jednotlivými akcemi. Sestavovací agent stále nesmí mazat mimo svůj projekt, měnit nastavení systému ani cokoli publikovat a dodržuje rozpočet podkladů každého projektu.
 Builds use this one. Click to choose automatically again.	Pro sestavování se používá tento agent. Kliknutím obnovíte automatický výběr.
 Built by	Sestavovací agent
+Extracted by	Extrahuje
+No separate AI	Žádná samostatná AI
+The builder takes what it needs itself.	Tvůrce si vezme, co potřebuje, sám.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Po prozkoumání tato AI vyjme vlastní soubory hry pro tvůrce. Platí pro vše, co vytváříte, jako „Provádí extrakci“ v Nastavení → AI.
 Built with	Sestaveno pomocí
 Built with {stack}, as you asked, so no game engine is needed.	Podle vašeho zadání se sestavení provádí pomocí {stack}, takže není potřeba herní engine.
 Call graph	Graf volání

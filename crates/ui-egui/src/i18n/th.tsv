@@ -207,6 +207,10 @@ Builds at once	บิลด์พร้อมกัน
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	บิลด์ทำต่อโดยไม่หยุดถามก่อนทำการใด ๆ ตัวสร้างยังไม่ลบไฟล์นอกโปรเจกต์ ไม่เปลี่ยนการตั้งค่าระบบ ไม่เผยแพร่สิ่งใด และอยู่ในงบแอสเซ็ตของแต่ละโปรเจกต์
 Builds use this one. Click to choose automatically again.	บิลด์ใช้ตัวนี้ คลิกเพื่อกลับไปเลือกอัตโนมัติ
 Built by	สร้างโดย
+Extracted by	ดึงไฟล์โดย
+No separate AI	ไม่มี AI แยก
+The builder takes what it needs itself.	ตัวสร้างจะนำสิ่งที่ต้องการไปเอง
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	หลังการศึกษา AI นี้จะดึงไฟล์ของเกมออกมาให้ตัวสร้าง ใช้กับทุกสิ่งที่คุณสร้าง เหมือน "แตกไฟล์" ในการตั้งค่า → AI
 Built with	สร้างด้วย
 Built with {stack}, as you asked, so no game engine is needed.	สร้างด้วย {stack} ตามที่ขอ จึงไม่ต้องใช้เกมเอนจิน
 Call graph	กราฟการเรียก

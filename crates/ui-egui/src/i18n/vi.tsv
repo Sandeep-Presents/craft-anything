@@ -207,6 +207,10 @@ Builds at once	Xây dựng ngay lập tức
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Các lượt xây dựng tiếp tục chạy mà không dừng lại hỏi bạn trước mỗi hành động. Trình xây dựng vẫn không bao giờ xóa bên ngoài dự án của nó, thay đổi cài đặt hệ thống hay đăng tải bất cứ thứ gì, và luôn nằm trong ngân sách tài nguyên của từng dự án.
 Builds use this one. Click to choose automatically again.	Các lượt xây dựng dùng cái này. Nhấn để chọn tự động lại.
 Built by	Xây dựng bởi
+Extracted by	Trích xuất bởi
+No separate AI	Không dùng AI riêng
+The builder takes what it needs itself.	Trình dựng tự lấy những gì nó cần.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Sau khi nghiên cứu, AI này lấy các tệp của chính trò chơi ra cho trình dựng. Áp dụng cho mọi thứ bạn làm, như "Phần trích xuất" trong Cài đặt → AI.
 Built with	Xây dựng bằng
 Built with {stack}, as you asked, so no game engine is needed.	Được xây dựng bằng {stack} theo yêu cầu của bạn, nên không cần công cụ làm trò chơi.
 Call graph	Đồ thị lời gọi

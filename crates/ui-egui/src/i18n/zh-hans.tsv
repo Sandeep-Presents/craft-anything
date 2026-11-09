@@ -207,6 +207,10 @@ Builds at once	同时构建数量
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	构建会持续进行，不会在每次操作前停下询问。构建助手仍不会删除项目外的内容、修改系统设置或发布任何内容，并遵守各项目的素材预算。
 Builds use this one. Click to choose automatically again.	构建时使用此助手。点击可恢复自动选择。
 Built by	构建助手
+Extracted by	提取者
+No separate AI	不用单独的 AI
+The builder takes what it needs itself.	构建者自己取用所需内容。
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	研究完成后，这个 AI 会为构建者取出游戏自身的文件。适用于你制作的所有内容，与“设置 → AI”中的“提取内容”相同。
 Built with	构建工具
 Built with {stack}, as you asked, so no game engine is needed.	已按你的要求使用 {stack} 构建，因此不需要游戏引擎。
 Call graph	调用图

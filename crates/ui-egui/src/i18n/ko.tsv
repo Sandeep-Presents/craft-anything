@@ -207,6 +207,10 @@ Builds at once	동시 빌드 수
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	빌드가 작업 전에 멈춰서 묻지 않고 계속 진행합니다. 그래도 빌더는 프로젝트 밖에서 삭제하거나 시스템 설정을 바꾸거나 무언가를 공개하지 않으며, 프로젝트별 에셋 예산을 넘지 않습니다.
 Builds use this one. Click to choose automatically again.	빌드에 이 항목을 씁니다. 누르면 다시 자동으로 고릅니다.
 Built by	빌더
+Extracted by	추출 담당
+No separate AI	별도 AI 없음
+The builder takes what it needs itself.	빌더가 필요한 것을 직접 가져옵니다.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	조사 후 이 AI가 게임 자체 파일을 빌더용으로 꺼냅니다. 만드는 모든 것에 적용됩니다(설정 → AI의 '추출 담당'과 같음).
 Built with	만든 도구
 Built with {stack}, as you asked, so no game engine is needed.	요청한 대로 {stack} 기반으로 만들어서 게임 엔진이 필요 없습니다.
 Call graph	호출 그래프

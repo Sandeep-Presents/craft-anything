@@ -14,6 +14,10 @@ Building needs a coding agent such as Claude Code, or an AI with an API key.	Pou
 Set one up	En configurer un
 Automatic ({name})	Automatique ({name})
 Built by	Construit par
+Extracted by	Extrait par
+No separate AI	Aucune IA à part
+The builder takes what it needs itself.	Le constructeur prend lui-même ce dont il a besoin.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Après l'étude, cette IA sort les fichiers du jeu pour le constructeur. Pour tout ce que vous créez, comme « Extrait » dans Réglages → IA.
 Whatever Settings → AI builds with.	Celui utilisé dans Réglages → IA pour construire.
 found on this computer; set up when you start	trouvé sur cet ordinateur ; configuré au démarrage
 Set up a builder	Configurer un constructeur

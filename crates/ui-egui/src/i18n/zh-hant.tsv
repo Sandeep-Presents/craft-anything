@@ -207,6 +207,10 @@ Builds at once	同時建置數量
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	建置會持續進行，不會在每次操作前停下詢問。建置助手仍不會刪除專案外的內容、修改系統設定或發佈任何內容，並遵守各專案的素材預算。
 Builds use this one. Click to choose automatically again.	建置時使用此助手。按一下可恢復自動選擇。
 Built by	建置助手
+Extracted by	擷取者
+No separate AI	不用另外的 AI
+The builder takes what it needs itself.	建構者自己取用所需內容。
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	研究完成後，這個 AI 會為建構者取出遊戲本身的檔案。適用於你製作的所有內容，與「設定 → AI」中的「擷取內容」相同。
 Built with	建置工具
 Built with {stack}, as you asked, so no game engine is needed.	已依你的要求使用 {stack} 建置，因此不需要遊戲引擎。
 Call graph	呼叫圖

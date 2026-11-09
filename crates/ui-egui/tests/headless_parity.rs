@@ -152,6 +152,7 @@ const PLUMBING: &[(&str, &str)] = &[
     ("acted", "shows a button tool's result (toast, open the preview)"),
     ("engines_found", "a job's result"), ("engine_got", "a job's result"), ("ghidra_got", "a job's result"),
     ("ghidra_ready", "a query"), ("ghidra_missing", "a query"),
+    ("save_roles", "part of set_role: saves the queued role choices in order"),
     ("load_prefs", "startup"), ("after_first_frames", "startup"), ("install_menu_bar", "startup; its items run palette commands"), ("log", "the log panel"), ("toast", "a message"),
     ("check_pictures", "a picture-size preflight"), ("picture_check_finished", "a preflight's result"),
     ("keep_attachments", "part of pictures_checked"),

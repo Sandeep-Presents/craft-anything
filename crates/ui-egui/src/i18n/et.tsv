@@ -207,6 +207,10 @@ Builds at once	Samaaegsed ehitused
 Builds keep going without stopping to ask you before an action. The builder still never deletes outside its project, changes system settings or publishes anything, and stays within each project's asset budget.	Ehitused jätkuvad ilma, et enne toimingut sinult küsitaks. Ehitaja ei kustuta ikkagi midagi väljaspool oma projekti, ei muuda süsteemiseadeid ega avalda midagi ning jääb iga projekti varade eelarve piiresse.
 Builds use this one. Click to choose automatically again.	Ehitused kasutavad seda. Automaatseks valimiseks klõpsa uuesti.
 Built by	Ehitanud
+Extracted by	Eraldab
+No separate AI	Eraldi tehisaru pole
+The builder takes what it needs itself.	Ehitaja võtab vajaliku ise.
+After the study, this AI takes the game's own files out for the builder. For everything you make, like Extracts in Settings → AI.	Pärast uurimist võtab see tehisaru mängu enda failid ehitaja jaoks välja. Kehtib kõigele, mida teed, nagu „Väljavõtted“ seadetes → tehisaru.
 Built with	Ehitatud kasutades
 Built with {stack}, as you asked, so no game engine is needed.	Ehitatud kasutades {stack}, nagu soovisid, seega pole mängumootorit vaja.
 Call graph	Kutsete graaf
