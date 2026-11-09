@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	Conectando a {name}… {seconds} s
 Stopped adding {name}.	A adição de {name} foi interrompida.
 It isn't there any more, so {program} runs in its place.	Ele não está mais lá, então {program} é usado no lugar.
 Use it	Usar este
+Found on this computer. Nothing is uploaded unless you choose it.	Encontrado neste computador. Nada é enviado até que você escolha.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	A detecção olha para este computador: chaves de API no seu ambiente, servidores de modelos rodando aqui ou na sua rede, e agentes de programação já instalados. Ela pede a esses servidores a lista de modelos. Nada é enviado, e nada é adicionado até que você escolha.
+How detection works	Como a detecção funciona

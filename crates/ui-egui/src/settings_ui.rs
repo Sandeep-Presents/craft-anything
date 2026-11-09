@@ -757,7 +757,10 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
             let tab = crate::detect_tabs::buttons(ui, &mut app.state.detect_tab, &detected);
             if app.detecting {
                 ui.add(crate::widgets::Spinner::new().color(t.accent));
-            } else if widgets::secondary(ui, Some("radar"), "Detect").clicked() {
+            } else if widgets::secondary(ui, Some("radar"), "Detect")
+                .on_hover_text(tr("Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it."))
+                .clicked()
+            {
                 app.detect_backends();
             }
             tab

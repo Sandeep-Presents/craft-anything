@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	กำลังเชื่อมต่อ�
 Stopped adding {name}.	หยุดเพิ่ม {name} แล้ว
 It isn't there any more, so {program} runs in its place.	ไม่มีอยู่ที่นั่นแล้ว จึงใช้ {program} แทน
 Use it	ใช้อันนี้
+Found on this computer. Nothing is uploaded unless you choose it.	พบบนคอมพิวเตอร์เครื่องนี้ จะไม่มีการอัปโหลดจนกว่าคุณจะเลือก
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	การตรวจจับจะดูที่คอมพิวเตอร์เครื่องนี้: คีย์ API ในสภาพแวดล้อมของคุณ เซิร์ฟเวอร์โมเดลที่ทำงานอยู่ที่นี่ หรือบนเครือข่ายของคุณ และเอเจนต์เขียนโค้ดที่ติดตั้งไว้แล้ว ระบบจะขอรายการโมเดลจากเซิร์ฟเวอร์เหล่านั้น ไม่มีการอัปโหลดใดๆ และจะไม่มีการเพิ่มสิ่งใดจนกว่าคุณจะเลือก
+How detection works	การตรวจจับทำงานอย่างไร

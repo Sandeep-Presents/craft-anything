@@ -1462,3 +1462,6 @@ Couldn't change the approvals:	Impossible de modifier les autorisations :
 What the builder may do without asking you, in this project.	Ce que le constructeur peut faire sans vous demander, dans ce projet.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	Par défaut suit le mode automatique : activé, ce qui peut être annulé se fait et le reste est refusé ; désactivé, le constructeur demande.
 Connecting to {name}… {seconds} s	Connexion à {name}… {seconds} s
+Found on this computer. Nothing is uploaded unless you choose it.	Trouvé sur cet ordinateur. Rien n'est envoyé tant que vous ne le choisissez pas.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	La détection regarde cet ordinateur : les clés d'API de votre environnement, les serveurs de modèles qui tournent ici ou sur votre réseau, et les agents de codage déjà installés. Elle demande leur liste de modèles à ces serveurs. Rien n'est envoyé, et rien n'est ajouté tant que vous ne le choisissez pas.
+How detection works	Comment fonctionne la détection

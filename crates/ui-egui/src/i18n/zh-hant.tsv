@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
 Stopped adding {name}.	已停止新增 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那裡，因此改用 {program}。
 Use it	使用它
+Found on this computer. Nothing is uploaded unless you choose it.	在此電腦上找到。在你選擇之前，不會上傳或新增任何內容。
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	偵測會查看這台電腦：環境變數中的 API 金鑰、在本機或網路上執行的模型伺服器，以及已安裝的程式設計代理。它會向這些伺服器詢問模型清單。不會向外部上傳任何內容，也不會在你選擇之前新增。
+How detection works	偵測的運作方式
