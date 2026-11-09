@@ -414,7 +414,7 @@ pub struct ProcessRow {
 pub fn parse_ps(text: &str) -> Vec<ProcessRow> {
     let mut lines = text.lines().take(MAX_LINES);
     let Some(header) = lines.next() else { return Vec::new() };
-    let cols: Vec<&str> = header.split_whitespace().collect();
+    let cols: Vec<&str> = crate::capped_line(header, MAX_LINE).split_whitespace().collect();
     let find = |want: &str| cols.iter().position(|c| c.eq_ignore_ascii_case(want));
     let (user_i, pid_i, ppid_i) = (find("USER"), find("PID"), find("PPID"));
     // NAME / CMD / ARGS is usually the last column; take everything from there to end of line.
@@ -584,6 +584,16 @@ mod tests {
         assert_eq!(svcs.len(), 2);
         assert_eq!(svcs[0].name, "activity");
         assert_eq!(svcs[0].interface.as_deref(), Some("android.app.IActivityManager"));
+    }
+
+    #[test]
+    fn ps_ignores_columns_beyond_the_header_limit() {
+        // The last byte within the cap belongs to a multibyte character. USER follows it.
+        let padding = " ".repeat(MAX_LINE - "PID NAME".len() - 1);
+        let rows = parse_ps(&format!("PID NAME{padding}é USER\n42 worker unused root"));
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].pid, Some(42));
+        assert_eq!(rows[0].user, None);
     }
 
     #[test]

@@ -52,6 +52,9 @@ pub struct Answered {
     /// The AI that answered.
     pub backend: String,
     pub cost_usd: Option<f64>,
+    /// The cost is the agent's own estimate at API prices, not a key's charge.
+    #[serde(default)]
+    pub cost_is_estimate: bool,
     /// The saved builder that was off or gone, when another AI answered in its place.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub builder_notice: Option<String>,
@@ -96,7 +99,7 @@ pub fn ask(
         };
         crate::cli_agents::conversation(spec)
     };
-    let (mut conv, mut from): (Box<dyn Conversation>, AnsweredFrom) = match entry.config.kind {
+    let (mut conv, mut from, builder_session): (Box<dyn Conversation>, AnsweredFrom, Option<String>) = match entry.config.kind {
         BackendKind::AgentCli => {
             let session = ws.manifest.agent_session_for_mode(&entry.config.model, deep).map(str::to_string);
             if let Some(id) = session.as_deref() {
@@ -106,6 +109,7 @@ pub fn ask(
             // Copilot's ACP question starts fresh, even when the project has a saved session id.
             let native_session = crate::cli_agents::adapter_for(&entry.config.model).resumes();
             let from = answered_from(session.as_deref(), native_session);
+            let builder_session = session.clone();
             let spec = CliSpec {
                 question: true,
                 deep,
@@ -114,7 +118,7 @@ pub fn ask(
                 preamble: Some(PREAMBLE.into()),
                 ..CliSpec::new(entry.config.clone(), entry.options.clone(), false, Some(ws.root.clone()))
             };
-            (crate::cli_agents::conversation(spec), from)
+            (crate::cli_agents::conversation(spec), from, builder_session)
         }
         _ => {
             // An engine of its own, pointed at this project, so a build running meanwhile keeps its.
@@ -125,12 +129,20 @@ pub fn ask(
             let toolsets = [Toolset::Core, Toolset::Build].into_iter().collect();
             let conv =
                 crate::agent::ApiConversation::start_with(host, vec![slot], LoopConfig { prices: cfg.prices.clone(), ..LoopConfig::default() }, toolsets)?;
-            (Box::new(conv), AnsweredFrom::TheFiles)
+            (Box::new(conv), AnsweredFrom::TheFiles, None)
         }
     };
     let prompt = |from| match from {
         AnsweredFrom::BuildersSession => format!("{}\n\nQuestion: {question}", context(ws)),
         AnsweredFrom::TheFiles => format!("{PREAMBLE}{}\n\nQuestion: {question}", context(ws)),
+    };
+    // Read the builder's total before the question starts: a build turn that finishes meanwhile
+    // may advance the same session, and the fork's total includes that too.
+    let cost_file = logs.as_deref().and_then(Path::parent).map(crate::cli_agents::claude_cost::path_in);
+    let mut builder_before = if from == AnsweredFrom::BuildersSession && entry.config.model == "claude-code" {
+        cost_file.as_deref().zip(builder_session.as_deref()).and_then(|(path, builder)| crate::cli_agents::claude_cost::kept_total(path, builder))
+    } else {
+        None
     };
     conv.send(&prompt(from));
     let mut answered = collect(conv.as_mut(), cancel, WAIT);
@@ -143,15 +155,28 @@ pub fn ask(
             let _ = forget_lost_session(&ws.root, lost);
         }
         from = AnsweredFrom::TheFiles;
+        builder_before = None;
         conv = cli(None);
         conv.send(&prompt(from));
         answered = collect(conv.as_mut(), cancel, WAIT);
     }
-    let (answer, cost_usd) = answered?;
+    let (answer, cost_usd, cost_is_estimate) = answered?;
     // A copy of a session reports the whole session's running cost, not this question's (a
-    // live run said $22.67 for a few cents of cache reads): say nothing rather than that.
-    let cost_usd = cost_usd.filter(|_| from != AnsweredFrom::BuildersSession);
-    Ok(Answered { answer, from, backend: entry.config.name.clone(), cost_usd, builder_notice })
+    // live run said $22.67 for a few cents of cache reads): the difference from the builder's
+    // kept total is what the question added.
+    let (cost_usd, cost_is_estimate) = if from == AnsweredFrom::BuildersSession {
+        // Claude Code reports the whole session's total; other adapters' costs stay as reported.
+        if entry.config.model == "claude-code" {
+            let cost = cost_usd.and_then(|total| crate::cli_agents::claude_cost::fork_cost_from(builder_before, Some(total)));
+            (cost, cost.is_some())
+        } else {
+            // A fork of another agent's session is still the whole session's total; don't show it.
+            (None, false)
+        }
+    } else {
+        (cost_usd, cost_is_estimate)
+    };
+    Ok(Answered { answer, from, backend: entry.config.name.clone(), cost_usd, cost_is_estimate, builder_notice })
 }
 
 /// The builder's session, kept in the project, put back where its agent looks when this computer
@@ -183,8 +208,9 @@ fn forget_lost_session(root: &Path, lost: &str) -> Result<bool, ToolError> {
     Ok(true)
 }
 
-/// The answer's text and cost, once its turn is done.
-fn collect(conv: &mut dyn Conversation, cancel: &CancelToken, wait: Duration) -> Result<(String, Option<f64>), ToolError> {
+/// The answer's text and cost, once its turn is done. `cost_is_estimate` says whether the cost is
+/// the agent's own estimate rather than a key's charge.
+fn collect(conv: &mut dyn Conversation, cancel: &CancelToken, wait: Duration) -> Result<(String, Option<f64>, bool), ToolError> {
     let start = Instant::now();
     let mut text = String::new();
     let mut idle_since: Option<Instant> = None;
@@ -192,7 +218,7 @@ fn collect(conv: &mut dyn Conversation, cancel: &CancelToken, wait: Duration) ->
         for e in conv.poll() {
             match e {
                 AgentEvent::TextDelta { text: t } => text.push_str(&t),
-                AgentEvent::TurnDone { cost_usd, .. } => return Ok((text.trim().to_string(), cost_usd)),
+                AgentEvent::TurnDone { cost_usd, cost_is_estimate, .. } => return Ok((text.trim().to_string(), cost_usd, cost_is_estimate)),
                 AgentEvent::Error { message, remediation, .. } => {
                     let e = ToolError::new(ErrorCode::ProgramFailed, message);
                     return Err(match remediation {
@@ -218,7 +244,7 @@ fn collect(conv: &mut dyn Conversation, cancel: &CancelToken, wait: Duration) ->
             if text.trim().is_empty() {
                 return Err(ToolError::new(ErrorCode::ProgramFailed, "The AI stopped without answering.").with_remediation("Ask again."));
             }
-            return Ok((text.trim().to_string(), None));
+            return Ok((text.trim().to_string(), None, false));
         }
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -322,16 +348,24 @@ mod tests {
         use crate::{AiHub, BackendConfig, BackendEntry, BackendKind, BackendOptions, KeyStore};
         use std::os::unix::fs::PermissionsExt;
 
-        fn ask_with(deep: bool, saved_args: bool) -> (Result<(Answered, String), ToolError>, bool) {
+        fn ask_with(deep: bool, saved_args: bool, baseline: Option<f64>, advance: Option<f64>) -> (Result<(Answered, String), ToolError>, bool) {
             let d = tempfile::tempdir().unwrap();
             let program = d.path().join("claude");
-            std::fs::write(&program, "#!/bin/sh\nd=$(dirname \"$0\")\nprintf '%s\\n' \"$@\" > \"$d/argv\"\ncat \"$d/reply.jsonl\"\n").unwrap();
+            let mut script = String::from("#!/bin/sh\nd=$(dirname \"$0\")\nprintf '%s\\n' \"$@\" > \"$d/argv\"\n");
+            if let Some(advance) = advance {
+                script.push_str(&format!("printf '{{\"version\":1,\"totals\":{{\"deep-session\":{advance}}}}}' > \"$d/claude-session-costs.json\"\n"));
+            }
+            script.push_str("cat \"$d/reply.jsonl\"\n");
+            std::fs::write(&program, script).unwrap();
             std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
             std::fs::write(
                 d.path().join("reply.jsonl"),
-                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"It is a notes app.\"}]}}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"session_id\":\"new-session\"}\n",
+                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"It is a notes app.\"}]}}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"session_id\":\"new-session\",\"total_cost_usd\":1.02}\n",
             )
             .unwrap();
+            if let Some(baseline) = baseline {
+                std::fs::write(d.path().join("claude-session-costs.json"), format!("{{\"version\":1,\"totals\":{{\"deep-session\":{baseline}}}}}")).unwrap();
+            }
             let engine = Arc::new(Engine::new(craft_anything_engine::testing::session()));
             let hub = AiHub::with_stores(engine, d.path().join("settings.toml"), KeyStore::file_only(d.path().join("keys.toml")));
             let mut cfg = hub.config();
@@ -358,25 +392,39 @@ mod tests {
             ws.manifest.agent_session_by = Some("claude-code".into());
             ws.manifest.agent_session_deep = Some(true);
             ws.save().unwrap();
-            let answered = ask(&hub, &settings, None, &ws, "What is it?", &CancelToken::default());
+            let answered = ask(&hub, &settings, Some(d.path().join("logs")), &ws, "What is it?", &CancelToken::default());
             let argv = std::fs::read_to_string(d.path().join("argv")).unwrap_or_default();
             let spawned = !argv.is_empty();
             (answered.map(|a| (a, argv)), spawned)
         }
 
-        let (clean, clean_spawned) = ask_with(false, false);
+        let (clean, clean_spawned) = ask_with(false, false, Some(1.0), None);
         assert!(clean_spawned, "Clean room spawns the agent");
         let (clean, clean_argv) = clean.unwrap();
         assert_eq!(clean.from, AnsweredFrom::TheFiles);
         assert!(!clean_argv.lines().any(|a| a == "--resume" || a == "deep-session"), "{clean_argv:?}");
 
-        let (deep, deep_spawned) = ask_with(true, false);
+        let (deep, deep_spawned) = ask_with(true, false, Some(1.0), None);
         assert!(deep_spawned, "Deep spawns the agent");
         let (deep, deep_argv) = deep.unwrap();
         assert_eq!(deep.from, AnsweredFrom::BuildersSession);
         assert!(deep_argv.lines().any(|a| a == "--resume") && deep_argv.lines().any(|a| a == "deep-session"), "{deep_argv:?}");
+        let cost = deep.cost_usd.unwrap();
+        assert!((cost - 0.02).abs() < 1e-9, "the fork's total less the builder's kept total: {cost}");
+        assert!(deep.cost_is_estimate);
 
-        let (err, spawned) = ask_with(false, true);
+        let (unknown, unknown_spawned) = ask_with(true, false, None, None);
+        assert!(unknown_spawned);
+        let (unknown, _) = unknown.unwrap();
+        assert_eq!(unknown.cost_usd, None, "without a kept builder total the whole session's total isn't this question's");
+
+        let (advanced, advanced_spawned) = ask_with(true, false, Some(1.0), Some(1.01));
+        assert!(advanced_spawned);
+        let (advanced, _) = advanced.unwrap();
+        let cost = advanced.cost_usd.unwrap();
+        assert!((cost - 0.02).abs() < 1e-9, "the builder's total is read before the question starts: {cost}");
+
+        let (err, spawned) = ask_with(false, true, Some(1.0), None);
         assert!(!spawned, "refused before the agent starts");
         assert!(err.unwrap_err().message.contains("saved in Deep mode"), "the guard's message");
     }
@@ -441,7 +489,7 @@ mod tests {
         let words = |t: &str| AgentEvent::TextDelta { text: t.into() };
         let done = AgentEvent::TurnDone { backend: "A".into(), input_tokens: 1, output_tokens: 1, cost_usd: Some(0.02), cost_is_estimate: false };
         let mut ok = Scripted(vec![words("They're in "), words("app/src."), done]);
-        assert_eq!(collect(&mut ok, &CancelToken::default(), WAIT).unwrap(), ("They're in app/src.".to_string(), Some(0.02)));
+        assert_eq!(collect(&mut ok, &CancelToken::default(), WAIT).unwrap(), ("They're in app/src.".to_string(), Some(0.02), false));
         let mut bad = Scripted(vec![AgentEvent::Error { message: "not signed in".into(), remediation: Some("Sign in".into()), log: None }]);
         let e = collect(&mut bad, &CancelToken::default(), WAIT).unwrap_err();
         assert_eq!((e.message.as_str(), e.remediation.as_deref()), ("not signed in", Some("Sign in")));

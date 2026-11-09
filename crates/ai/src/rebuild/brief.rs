@@ -356,10 +356,11 @@ pub(super) fn added_prompt(notes: &[String]) -> String {
 
 /// For an agent continuing its own session after its last run stopped part-way (paused, the app
 /// closed, or the computer stopped).
-pub(super) fn continue_prompt(kind: &dyn TargetKind) -> String {
+pub(super) fn continue_prompt(kind: &dyn TargetKind, api_loop: bool) -> String {
     let build = kind.rebuild_words();
+    let check = next_check(api_loop);
     format!(
-        "Your last run stopped before it finished (it was paused, or the app or the computer stopped). Everything you made so far is in app/. Pick up where you left off: see what's done and what's left (your checklist and core_unknowns_show), finish the task, then {build}, fix any errors and check it with rebuild_check. Reply with 1-3 plain sentences on what you did."
+        "Your last run stopped before it finished (it was paused, or the app or the computer stopped). Everything you made so far is in app/. Pick up where you left off: see what's done and what's left (your checklist and core_unknowns_show), finish the task, then {build}, fix any errors. {check} Reply with 1-3 plain sentences on what you did."
     )
 }
 
@@ -413,9 +414,12 @@ pub(super) fn just_asked(asked: &[craft_anything_engine::questions::AskedQuestio
     )
 }
 
-pub(super) fn follow_up(message: &str, kind: &dyn TargetKind) -> String {
+fn next_check(api_loop: bool) -> &'static str {
+    if api_loop { "Craft Anything checks your build after your turn." } else { "Check it with rebuild_check." }
+}
+
+pub(super) fn follow_up(message: &str, kind: &dyn TargetKind, api_loop: bool) -> String {
     let build = kind.rebuild_words();
-    format!(
-        "The person asks: \"{message}\"\n\nMake the change in app/, then {build}, fix any errors and check it with rebuild_check. Reply with 1-3 plain sentences on what changed."
-    )
+    let check = next_check(api_loop);
+    format!("The person asks: \"{message}\"\n\nMake the change in app/, then {build}, fix any errors. {check} Reply with 1-3 plain sentences on what changed.")
 }
