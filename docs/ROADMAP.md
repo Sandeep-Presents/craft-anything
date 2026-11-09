@@ -754,8 +754,13 @@ Owner: open · Status: in progress
       a restart keeps it (#1225). An OpenCode error without a message shows its name, status and the
       start of its response body. Not run live; the run-5 cause in #1225 still needs its log.
       — claimed: fabox-os, branch bugfix/1225-opencode-go-session
-- [ ] Settings → AI can only add an agent it detected: add one by choosing its program, for a CLI
-      kept somewhere we don't look (#1060)
+- [x] Settings → AI can add a known agent by choosing its command-line program, even when
+      detection did not find it (#1060). The backend and program are saved together, duplicate
+      names get a number, and cancelling the picker saves nothing. The picker keeps its original
+      agent if the list selection changes before it returns. Linux callback, persistence and UI
+      regressions and offscreen Settings snapshots pass; native Windows/macOS dialogs and an
+      authenticated agent run have not been checked.
+      — claimed: marlonferreira1800-hue, branch feature/r2.2-add-agent-program
 - [ ] Verify OpenCode model discovery and an explicit thinking selection on a live SSH host,
       and complete a live generation with the selected model and variant (local catalogue verified).
 - [x] A stopped, failed or killed OpenCode turn deletes its session, so OpenCode's shared service

@@ -594,6 +594,40 @@ impl AiHub {
         Ok(true)
     }
 
+    /// Add an agent app by its program, for one installed where it isn't looked for (#1060).
+    /// `agent` is one of [`cli_agents::KNOWN`]'s ids. The AI is named after the agent, with a number
+    /// when that name is taken, so adding it never replaces one already set up. The backend and its
+    /// program are saved together, or neither is. Returns the name it was added under.
+    pub fn add_agent_program(&self, agent: &str, program: &str) -> Result<String, ToolError> {
+        let program = program.trim();
+        if !cli_agents::KNOWN.iter().any(|(id, _, _)| *id == agent) {
+            return Err(ToolError::invalid(format!("{agent:?} isn't an agent we know how to run.")).with_remediation("Pick one of the agents in the list."));
+        }
+        if program.is_empty() {
+            return Err(ToolError::invalid("Say where the agent's program is.").with_remediation("Choose the agent's command-line program."));
+        }
+        if std::path::Path::new(program).is_dir() {
+            return Err(ToolError::invalid(format!("{program} is a folder, so it can't be the agent's program. On a Mac an app is a folder."))
+                .with_remediation("Pick the agent's command-line program instead, such as `agy`."));
+        }
+        let mut cfg = self.config_to_change()?;
+        let base = cli_agents::display_for(agent);
+        let taken = |n: &str| cfg.backends.iter().any(|b| b.config.name == n);
+        let name = if taken(&base) {
+            (2..100)
+                .map(|i| format!("{base} {i}"))
+                .find(|n| !taken(n))
+                .ok_or_else(|| ToolError::invalid(format!("There are already many AIs named {base}.")))?
+        } else {
+            base
+        };
+        let config = BackendConfig { name: name.clone(), kind: BackendKind::AgentCli, model: agent.to_string(), base_url: None, ssh_host: None, enabled: true };
+        cfg.upsert(BackendEntry { config, options: BackendOptions { command: Some(program.to_string()), ..Default::default() } });
+        give_session_id(&mut cfg);
+        self.save_config(&cfg)?;
+        Ok(name)
+    }
+
     /// The folder an agent app keeps its sign-in, settings and sessions in ([`folder_var`]), so
     /// each AI can be another account (`None` or empty: its usual one). A full path or one under
     /// `~/`; over SSH it's a folder on that computer. Returns false when there was no such backend.

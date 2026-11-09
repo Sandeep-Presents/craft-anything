@@ -307,6 +307,8 @@ pub enum Pick {
     SavePicture,
     /// The program an agent app runs ([`CraftApp::picking_program_for`] says which).
     AgentProgram,
+    /// The program of an agent the scan didn't find ([`CraftApp::new_agent`] says which agent).
+    NewAgentProgram,
 }
 
 /// One open target, as the UI shows it.
@@ -443,6 +445,10 @@ pub struct CraftApp {
     pub model_tuning: std::collections::BTreeMap<String, ModelTuningDraft>,
     /// The agent app whose program the file dialog is choosing.
     pub picking_program_for: Option<String>,
+    /// The agent picked in Settings → AI to add by its program (an id from `cli_agents::KNOWN`).
+    pub new_agent: Option<String>,
+    /// The agent when its file dialog was opened, kept even if the list selection changes.
+    pub picking_new_agent: Option<String>,
     /// Claude Code folders being typed in Settings → AI, by AI, until they're saved.
     pub folder_inputs: std::collections::BTreeMap<String, String>,
     /// The backend the person chose to build with (Settings → AI), if any.
@@ -567,6 +573,8 @@ impl CraftApp {
             model_request: 0,
             model_tuning: Default::default(),
             picking_program_for: None,
+            new_agent: None,
+            picking_new_agent: None,
             folder_inputs: Default::default(),
             builder: None,
             extractor: None,
@@ -1114,7 +1122,7 @@ impl CraftApp {
                 Pick::ExtraProjectsDir => pollster::block_on(d.set_title(tr("Pick a folder with projects in it")).pick_folder()),
                 Pick::GameFolder => pollster::block_on(d.set_title(tr("Pick the game's folder")).pick_folder()),
                 Pick::SavePicture => pollster::block_on(d.set_title(tr("Save the picture")).add_filter("PNG", &["png"]).set_file_name(&suggested).save_file()),
-                Pick::AgentProgram => pollster::block_on(d.set_title(tr("Where is the program?")).pick_file()),
+                Pick::AgentProgram | Pick::NewAgentProgram => pollster::block_on(d.set_title(tr("Where is the program?")).pick_file()),
                 Pick::Pictures | Pick::Attach => None,
             };
             Ok(Done::Picked { pick, path: handle.map(|h| h.path().to_path_buf()) })
@@ -1219,6 +1227,18 @@ impl CraftApp {
         self.jobs.spawn(i18n::trf("Connect {name}", &[("name", &name)]), true, move |_| {
             let result = hub.add_backend(config, key);
             Ok(Done::BackendAdded { name, result, choices })
+        });
+    }
+
+    /// Add an agent app the scan didn't find, from the program the person chose (#1060). Ends like
+    /// any add: the AI is ready, and selected unless another was chosen meanwhile.
+    pub fn add_agent_program(&mut self, agent: &str, program: String) {
+        let (hub, agent) = (self.hub.clone(), agent.to_string());
+        let choices = self.backend_choices;
+        self.jobs.spawn(i18n::trf("Connect {name}", &[("name", &craft_anything_ai::cli_agents::display_for(&agent))]), true, move |_| {
+            let added = hub.add_agent_program(&agent, &program);
+            let name = added.clone().unwrap_or_else(|_| craft_anything_ai::cli_agents::display_for(&agent));
+            Ok(Done::BackendAdded { name, result: added.map(|_| ()), choices })
         });
     }
 
@@ -1579,6 +1599,13 @@ impl CraftApp {
                 Err(e) => self.toast(e.for_people(), true),
             },
             Done::Picked { pick, path } => {
+                if pick == Pick::NewAgentProgram {
+                    let agent = self.picking_new_agent.take();
+                    if let (Some(agent), Some(path)) = (agent, path) {
+                        self.add_agent_program(&agent, path.display().to_string());
+                    }
+                    return;
+                }
                 if let Some(path) = path {
                     match pick {
                         Pick::OpenFile | Pick::OpenFolder => self.open_path(path),
@@ -1607,7 +1634,8 @@ impl CraftApp {
                             if let Some(name) = self.picking_program_for.take() {
                                 self.set_agent_program(&name, Some(path.display().to_string()));
                             }
-                        } // Several files: these come back as Done::Pictures / Done::ToAttach.
+                        }
+                        Pick::NewAgentProgram => {} // Several files: these come back as Done::Pictures / Done::ToAttach.
                         Pick::Pictures | Pick::Attach => {}
                     }
                 }

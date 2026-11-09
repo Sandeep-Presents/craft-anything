@@ -748,6 +748,8 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(6.0);
     }
     server_form(app, ui);
+    ui.add_space(14.0);
+    add_agent_by_program(app, ui);
 }
 
 /// An AI that "Look for AI" can't find: a server on another computer or a hosted service, added by
@@ -1323,5 +1325,122 @@ mod model_options_tests {
         assert!(text.contains("new-model") && text.contains("Context window") && text.contains("Thinking depth"), "{text}");
         assert_eq!(app.model_tuning["Copilot test"].cli_model.as_deref(), Some("new-model"));
         assert_eq!(app.model_tuning["Copilot test"].error, None);
+    }
+}
+
+/// "Not found? Add an agent by its program" (#1060): the agent first, then the file dialog, for an
+/// agent app kept where the scan doesn't look.
+fn add_agent_by_program(app: &mut CraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    let agents = craft_anything_ai::cli_agents::KNOWN;
+    let shown = app.new_agent.as_deref().map_or_else(|| tr("Pick an agent"), craft_anything_ai::cli_agents::display_for);
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(tr("Not listed? Add an agent by its program")).color(t.text_dim));
+        egui::ComboBox::from_id_salt("new-agent").icon(widgets::combo_icon).selected_text(shown).width(180.0).show_ui(ui, |ui| {
+            for (id, _, name) in agents {
+                ui.selectable_value(&mut app.new_agent, Some(id.to_string()), *name);
+            }
+        });
+        if app.new_agent.is_some() {
+            let choose = ui.add_enabled_ui(app.picking_new_agent.is_none(), |ui| widgets::secondary(ui, Some("folder-open"), "Choose program…")).inner;
+            if choose.clicked() {
+                app.picking_new_agent = app.new_agent.clone();
+                app.pick(Pick::NewAgentProgram);
+            }
+        }
+    });
+}
+
+#[cfg(test)]
+mod add_agent_by_program_tests {
+    use super::*;
+    use crate::Done;
+    use crate::jobs::Finished;
+
+    fn app() -> CraftApp {
+        crate::demo::app(crate::demo::engine(craft_anything_engine::Mode::Beginner, false))
+    }
+
+    fn settle(app: &mut CraftApp, want: impl Fn(&CraftApp) -> bool) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !want(app) && std::time::Instant::now() < deadline {
+            app.take_finished_jobs();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    fn render(app: &mut CraftApp) -> String {
+        let context = egui::Context::default();
+        crate::theme::install_fonts(&context);
+        let mut output = context.run_ui(egui::RawInput::default(), |ui| ai(app, ui));
+        output.textures_delta.clear();
+        output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// #1060: the file dialog's answer for the agent picked in the list adds that agent with the
+    /// chosen program, and it is selected like any AI that finished connecting.
+    #[test]
+    fn a_chosen_program_adds_the_picked_agent() {
+        let mut app = app();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("opencode-cli");
+        std::fs::write(&file, "#!/bin/sh\n").unwrap();
+        app.new_agent = Some("codex".into());
+        app.picking_new_agent = Some("opencode".into());
+        app.handle_done(Finished { job: 0, result: Ok(Done::Picked { pick: Pick::NewAgentProgram, path: Some(file.clone()) }) });
+        settle(&mut app, |a| a.state.backend.as_deref() == Some("OpenCode"));
+        assert_eq!(app.state.backend.as_deref(), Some("OpenCode"), "added and selected");
+        let entry = app.hub.config().backends.into_iter().find(|b| b.config.name == "OpenCode").expect("saved");
+        assert_eq!(entry.options.command.as_deref(), Some(file.display().to_string().as_str()));
+    }
+
+    /// #1060: closing the file dialog adds nothing, and the picked agent stays picked; a program
+    /// chosen with no agent picked adds nothing either.
+    #[test]
+    fn cancelling_the_dialog_or_no_agent_adds_nothing() {
+        let mut app = app();
+        app.new_agent = Some("opencode".into());
+        app.picking_new_agent = Some("opencode".into());
+        app.handle_done(Finished { job: 0, result: Ok(Done::Picked { pick: Pick::NewAgentProgram, path: None }) });
+        assert_eq!(app.new_agent.as_deref(), Some("opencode"));
+        assert!(app.picking_new_agent.is_none(), "the cancelled picker is cleared");
+        assert!(app.jobs.list.is_empty(), "no job for a cancelled dialog");
+        app.new_agent = None;
+        app.handle_done(Finished { job: 0, result: Ok(Done::Picked { pick: Pick::NewAgentProgram, path: Some(std::path::PathBuf::from("/x/y")) }) });
+        assert!(app.jobs.list.is_empty(), "no agent picked, nothing to add");
+        assert!(app.hub.config().backends.is_empty());
+    }
+
+    /// #1060: a program that can't run (a folder) is refused with a message, and nothing is added.
+    #[test]
+    fn a_folder_is_refused_as_the_program() {
+        let mut app = app();
+        let dir = tempfile::tempdir().unwrap();
+        app.new_agent = Some("opencode".into());
+        app.picking_new_agent = Some("opencode".into());
+        app.handle_done(Finished { job: 0, result: Ok(Done::Picked { pick: Pick::NewAgentProgram, path: Some(dir.path().to_path_buf()) }) });
+        settle(&mut app, |a| a.jobs.running().next().is_none());
+        assert!(app.hub.config().backends.is_empty(), "nothing added for a folder");
+        assert_eq!(app.state.backend, None);
+    }
+
+    /// #1060: Settings → AI offers the row, and "Choose program…" only once an agent is picked.
+    #[test]
+    fn the_row_offers_choose_program_only_after_an_agent_is_picked() {
+        let mut app = app();
+        let text = render(&mut app);
+        assert!(text.contains("Not listed? Add an agent by its program") && text.contains("Pick an agent"), "{text}");
+        assert!(!text.contains("Choose program"), "{text}");
+        app.new_agent = Some("opencode".into());
+        let text = render(&mut app);
+        assert!(text.contains("OpenCode") && text.contains("Choose program"), "{text}");
     }
 }
