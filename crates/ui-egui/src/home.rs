@@ -174,6 +174,7 @@ pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
                 Modal::NeedBuilder { start } => crate::builders::need_builder_modal(app, ui, *start, &mut close),
                 Modal::Rename(root) => crate::manage::rename_modal(app, ui, root, &mut close),
                 Modal::Delete(root) => crate::manage::delete_modal(app, ui, root, &mut close),
+                Modal::RestartProject(root) => crate::project::restart_modal(app, ui, root, &mut close),
                 Modal::Pin => crate::pins::pin_modal(app, ui, &mut close),
                 Modal::PinRename(root, id) => crate::pins::rename_modal(app, ui, root, *id, &mut close),
                 Modal::PinDelete(root, id) => crate::pins::delete_modal(app, ui, root, *id, &mut close),

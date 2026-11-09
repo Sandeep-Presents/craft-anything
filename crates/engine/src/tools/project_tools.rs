@@ -56,7 +56,7 @@ pub fn specs() -> Vec<ToolSpec> {
         ToolSpec {
             id: "project_play",
             title: "Play a project's result",
-            summary: "Start the finished game or app a project built (its program, a Unity or Unreal package, or a Godot project in Godot), in its own window. If it's already running, says so instead of starting a second copy, unless `another` is true. A start that quits within two seconds is reported with its exit code and last output. It runs the code the builder wrote, so it needs the person's consent. Websites use project_preview instead. Known limit on Windows: when the caller's output is a pipe, the started program inherits it, so a caller reading that output to its end waits until the program exits (#207).",
+            summary: "Start the finished game or app a project built (its program, a Unity or Unreal package, or a Godot project in Godot), in its own window. If it's already running, says so instead of starting a second copy, unless `another` is true. `restart` stops the running copy first (unsaved work may be lost). A start that quits within two seconds is reported with its exit code and last output. It runs the code the builder wrote, so it needs the person's consent. Websites use project_preview instead. Known limit on Windows: when the caller's output is a pipe, the started program inherits it, so a caller reading that output to its end waits until the program exits (#207).",
             beginner: "Opens the game or app that was made.",
             toolset: Toolset::Projects,
             effects: Effects::LAUNCHES_PROCESS.union(Effects::EXECUTES_FOREIGN_CODE),
@@ -483,6 +483,9 @@ pub struct PlayParams {
     /// Start another copy even if one is running.
     #[serde(default)]
     pub another: bool,
+    /// Stop the app started in this session before opening the current build. Unsaved work may be lost.
+    #[serde(default)]
+    pub restart: bool,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -615,7 +618,10 @@ fn project_play(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolErro
     if crate::outputs::site_dir(&app).is_some() {
         return Err(ToolError::new(ErrorCode::NotSupported, "This project made a website.").with_remediation("Use project_preview to see it."));
     }
-    let out = super::pin_tools::start(ctx, &app, &crate::pins::play_log(&ws), p.another, "the finished project")?;
+    let mut out = super::pin_tools::start(ctx, &app, &crate::pins::play_log(&ws), p.another, p.restart, "the finished project")?;
+    if let Some(obj) = out.as_object_mut() {
+        obj.insert("project".into(), json!(ws.root));
+    }
     Ok(ToolOutput::Value(out))
 }
 

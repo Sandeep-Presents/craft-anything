@@ -182,20 +182,28 @@ pub(crate) fn runs(ctx: &mut Ctx<'_>) -> Arc<Runs> {
 
 /// Start what `app` holds through the run list, logging to `log`, and describe what happened. A
 /// program that quit straight away with an error is an error carrying its last output.
-pub(crate) fn start(ctx: &mut Ctx<'_>, app: &Path, log: &Path, another: bool, label: &str) -> Result<Value, ToolError> {
+pub(crate) fn start(ctx: &mut Ctx<'_>, app: &Path, log: &Path, another: bool, restart: bool, label: &str) -> Result<Value, ToolError> {
     let Some((program, args)) = crate::outputs::launch(app, godot(ctx).as_deref()) else {
         return Err(ToolError::new(ErrorCode::NotFound, "There's nothing to start: no built program here.")
             .with_remediation("Finish a build first (rebuild), or open the folder to look."));
     };
-    start_program(ctx, app, log, another, label, (program, args))
+    start_program(ctx, app, log, another, restart, label, (program, args))
 }
 
-fn start_program(ctx: &mut Ctx<'_>, app: &Path, log: &Path, another: bool, label: &str, (program, args): (PathBuf, Vec<String>)) -> Result<Value, ToolError> {
+fn start_program(
+    ctx: &mut Ctx<'_>,
+    app: &Path,
+    log: &Path,
+    another: bool,
+    restart: bool,
+    label: &str,
+    (program, args): (PathBuf, Vec<String>),
+) -> Result<Value, ToolError> {
     if let Some(dir) = log.parent() {
         std::fs::create_dir_all(dir).map_err(|e| ToolError::io(dir.display(), e))?;
     }
     let launch = Launch::new(&program).args(&args).cwd(app).hide_console().log_to(log).label(label).remediation("Open the folder and start it by hand.");
-    let (launched, quit) = match runs(ctx).open(app, launch, another)? {
+    let (launched, quit) = match runs(ctx).open_or_restart(app, launch, another, restart)? {
         Opened::AlreadyRunning(l) => return Ok(json!({"already_running": true, "pid": l.pid(), "started": program.display().to_string()})),
         Opened::Started { launched, quit } => (launched, quit),
     };
@@ -271,7 +279,7 @@ fn project_pin_open(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, Tool
     let ws = open_project(&p.project)?;
     let pin = pins::get(&ws, p.pin)?;
     let launch = pin.launch(&ws, godot(ctx).as_deref())?;
-    let mut out = start_program(ctx, &pin.app_dir(&ws), &pin.log_path(&ws), p.another, &pin.name, launch)?;
+    let mut out = start_program(ctx, &pin.app_dir(&ws), &pin.log_path(&ws), p.another, false, &pin.name, launch)?;
     if let Some(o) = out.as_object_mut() {
         o.insert("pin".into(), json!(pin.id));
     }

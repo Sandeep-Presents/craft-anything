@@ -525,10 +525,25 @@ impl Runs {
     /// Start `launch` from `dir`, unless something already runs from there and `another` isn't
     /// asked for. Waits up to [`QUICK_EXIT`] to see whether it quits straight away.
     pub fn open(&self, dir: &Path, launch: Launch, another: bool) -> Result<Opened, ToolError> {
+        self.open_or_restart(dir, launch, another, false)
+    }
+
+    /// Restart only the programs this session started, or start normally if none remain.
+    pub fn open_or_restart(&self, dir: &Path, launch: Launch, another: bool, restart: bool) -> Result<Opened, ToolError> {
         let launched = {
             let mut map = self.0.lock().unwrap_or_else(PoisonError::into_inner);
             let list = map.entry(key(dir)).or_default();
             list.retain(Launched::is_running);
+            if restart {
+                for running in list.iter() {
+                    if !running.stop() {
+                        return Err(
+                            ToolError::new(ErrorCode::ProgramFailed, "Could not stop the running app.").with_remediation("Close it yourself, then try again.")
+                        );
+                    }
+                }
+                list.clear();
+            }
             if !another && let Some(first) = list.first() {
                 return Ok(Opened::AlreadyRunning(first.clone()));
             }
@@ -849,6 +864,21 @@ mod tests {
 
     fn shell(script: &str) -> Launch {
         if cfg!(windows) { Launch::new("cmd").args(["/C", script]).hide_console() } else { Launch::new("sh").args(["-c", script]) }
+    }
+
+    #[test]
+    fn restart_replaces_the_tracked_running_copy() {
+        let d = tempfile::tempdir().unwrap();
+        let runs = Runs::default();
+        let long = if cfg!(windows) { "ping -n 30 127.0.0.1 > NUL" } else { "sleep 30" };
+        let Opened::Started { launched: old, quit: None } = runs.open(d.path(), shell(long), false).unwrap() else { panic!("it should be running") };
+        let Opened::Started { launched: new, quit: None } = runs.open_or_restart(d.path(), shell(long), false, true).unwrap() else {
+            panic!("it should restart")
+        };
+        assert!(!old.is_running());
+        assert_ne!(old.pid(), new.pid());
+        assert_eq!(runs.running(d.path()).len(), 1);
+        assert_eq!(runs.stop(d.path()), 1);
     }
 
     #[test]
