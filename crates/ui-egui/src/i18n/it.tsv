@@ -1469,3 +1469,9 @@ Connecting to {name}… {seconds} s	Connessione a {name}… {seconds} s
 Stopped adding {name}.	Aggiunta di {name} interrotta.
 It isn't there any more, so {program} runs in its place.	Non è più lì, quindi al suo posto si usa {program}.
 Use it	Usalo
+Interface font	Carattere dell'interfaccia
+The font for the whole window.	Il carattere di tutta la finestra.
+Add a font file…	Aggiungi un file di carattere…
+That file is not a .ttf or .otf font.	Quel file non è un carattere .ttf o .otf.
+That font file is too large.	Quel file di carattere è troppo grande.
+That file is not a font this app can read.	Quel file non è un carattere che questa app può leggere.

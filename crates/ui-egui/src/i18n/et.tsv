@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
 Stopped adding {name}.	{name} lisamine peatati.
 It isn't there any more, so {program} runs in its place.	Seda pole enam seal, nii et selle asemel käivitub {program}.
 Use it	Kasuta seda
+Interface font	Liidese font
+The font for the whole window.	Kogu akna font.
+Add a font file…	Lisa fondifail…
+That file is not a .ttf or .otf font.	See fail ei ole .ttf- või .otf-font.
+That font file is too large.	See fondifail on liiga suur.
+That file is not a font this app can read.	See fail ei ole font, mida see rakendus oskab lugeda.

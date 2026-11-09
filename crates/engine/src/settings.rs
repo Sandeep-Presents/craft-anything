@@ -97,6 +97,9 @@ pub struct Settings {
     pub theme: String,
     /// UI language (BCP 47), empty = system.
     pub language: String,
+    /// Interface font: empty for the default, `embedded:<Family>` for one bundled with the app, or
+    /// `file:<name>` for a font the person added to `<config dir>/fonts/`.
+    pub font: String,
     pub first_run_done: bool,
     pub engines: EngineSettings,
     /// AI backends and roles. Owned and parsed by the `ai` crate; kept opaque here so the engine
@@ -200,6 +203,7 @@ impl Default for Settings {
             deep_mode: false,
             theme: "studio".into(),
             language: String::new(),
+            font: String::new(),
             first_run_done: false,
             engines: EngineSettings::default(),
             ai: toml::Table::new(),
@@ -218,11 +222,59 @@ impl Default for Settings {
     }
 }
 
+/// The largest font file we copy into the fonts folder.
+pub const MAX_FONT_BYTES: u64 = 32 * 1024 * 1024;
+
+/// Copy a font file into `<config dir>/fonts/` under a name that is not taken yet, and return that
+/// name. It lives here, not in the UI, so the CLI and MCP can reach it too; the caller is expected to
+/// have checked that the bytes are a font egui can read.
+pub fn add_font_file(source: &std::path::Path) -> Result<String, String> {
+    let ext = source.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+    if !(ext == "ttf" || ext == "otf") {
+        return Err("That file is not a .ttf or .otf font.".into());
+    }
+    let size = std::fs::metadata(source).map_err(|e| e.to_string())?.len();
+    if size == 0 || size > MAX_FONT_BYTES {
+        return Err("That font file is empty or too large.".into());
+    }
+    let bytes = std::fs::read(source).map_err(|e| e.to_string())?;
+
+    let dir = config_dir().join("fonts");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let mut stem: String = source.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    // A plain name: no separators, control characters, trailing dots or spaces.
+    stem = stem.chars().filter(|c| !c.is_control() && *c != '/' && *c != '\\' && *c != ':').collect();
+    stem = stem.trim_end_matches(['.', ' ']).to_string();
+    if stem.is_empty() || stem == ".." {
+        return Err("That file has no usable name.".into());
+    }
+    // Create the destination exclusively: two imports at once pick the same free name, and a font
+    // that is already stored must never be replaced under a stored choice.
+    use std::io::Write;
+    for n in 1..1000 {
+        let name = if n == 1 { format!("{stem}.{ext}") } else { format!("{stem}-{n}.{ext}") };
+        let path = dir.join(&name);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(&bytes) {
+                    drop(file);
+                    let _ = std::fs::remove_file(&path);
+                    return Err(e.to_string());
+                }
+                return Ok(name);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err("The fonts folder has no free name left.".into())
+}
+
 /// The current `config.toml` format version. Bumping it means appending a step to [`SETTINGS_STEPS`].
-pub const SETTINGS_VERSION: u32 = 3;
+pub const SETTINGS_VERSION: u32 = 4;
 
 /// The steps that bring an older `config.toml` forward; step `i` goes from version `i` to `i + 1`.
-const SETTINGS_STEPS: &[Step<toml::Table>] = &[settings_v0_to_v1, settings_v1_to_v2, settings_v2_to_v3];
+const SETTINGS_STEPS: &[Step<toml::Table>] = &[settings_v0_to_v1, settings_v1_to_v2, settings_v2_to_v3, settings_v3_to_v4];
 const _: () = assert!(SETTINGS_STEPS.len() == SETTINGS_VERSION as usize, "one step per config.toml version");
 
 /// Version 0 (no `version` key) has the same shape as version 1; only the number is new.
@@ -249,6 +301,11 @@ fn settings_v1_to_v2(table: &mut toml::Table) -> Result<(), String> {
 /// Version 3 adds more project folders and the answer about a picked folder's files; both start
 /// empty. The number is new so an older build doesn't save over the list (and lose it).
 fn settings_v2_to_v3(_: &mut toml::Table) -> Result<(), String> {
+    Ok(())
+}
+
+/// Version 4 adds `font` (empty = the built-in font); nothing to move.
+fn settings_v3_to_v4(_: &mut toml::Table) -> Result<(), String> {
     Ok(())
 }
 
@@ -463,6 +520,27 @@ impl Settings {
     pub fn engine_not_found(&self, id: &str) -> (String, String) {
         use craft_anything_engines::ToolPathLookup;
         craft_anything_engines::not_found_help(id, self.engines.tools.override_for(id).as_deref(), craft_anything_platform::in_flatpak())
+    }
+}
+
+#[cfg(test)]
+mod font_tests {
+    use super::*;
+
+    /// The interface font survives saving and reading, and an older file gets the default.
+    #[test]
+    fn the_interface_font_round_trips() {
+        let mut s = Settings::default();
+        assert_eq!(s.font, "");
+        s.font = "embedded:BIZ UDPGothic".into();
+        let text = toml::to_string(&s).expect("save");
+        let back = read_settings(&text).expect("read");
+        assert_eq!(back.font, "embedded:BIZ UDPGothic");
+
+        let older = "version = 3\ntheme = \"studio\"\n";
+        let read = read_settings(older).expect("read an older file");
+        assert_eq!(read.font, "");
+        assert_eq!(read.version, SETTINGS_VERSION);
     }
 }
 
