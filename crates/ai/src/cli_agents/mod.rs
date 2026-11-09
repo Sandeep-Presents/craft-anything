@@ -1110,10 +1110,16 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
     } else if let Some(id) = &p.session_id {
         *session.lock().unwrap_or_else(PoisonError::into_inner) = Some(id.clone());
     }
+    // The stream already said the turn was done (its terminal `result` line): whatever ended the
+    // process after that — our own cancellation once `RESULT_GRACE` passed, or a wall/idle
+    // deadline that happened to fire in that same window — isn't a failure of the turn itself. A
+    // genuine protocol failure (`p.failure`, handled above) and a deadline hit before any result
+    // was parsed still are: this never excuses a turn that didn't finish.
+    let ended_after_result = p.saw_result && matches!(result.as_ref().err().map(|e| e.code), Some(ErrorCode::Cancelled) | Some(ErrorCode::TimedOut));
     if p.failure.is_none() {
         let failed = match &result {
             Ok(out) if !out.success => Some(TurnFailure::process_exit(out.code)),
-            Err(e) if e.code != ErrorCode::Cancelled => Some(TurnFailure::from_process(e)),
+            Err(e) if e.code != ErrorCode::Cancelled && !ended_after_result => Some(TurnFailure::from_process(e)),
             _ => None,
         };
         *failure.lock().unwrap_or_else(PoisonError::into_inner) = failed;
@@ -1146,10 +1152,10 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
             }
         }
         Ok(_) => {}
-        // The stream already said the turn was done; it's that result, not this cancellation,
-        // that ends the turn. Whatever kept the process itself running past that (a shutdown
-        // hook, logging, cleanup) isn't ours to wait on or report as a stop.
-        Err(e) if e.code == craft_anything_evidence::ErrorCode::Cancelled && p.saw_result => {}
+        // The stream already said the turn was done; it's that result, not this cancellation or
+        // deadline, that ends the turn. Whatever kept the process itself running past that (a
+        // shutdown hook, logging, cleanup) isn't ours to wait on or report as a stop or a failure.
+        Err(_) if ended_after_result => {}
         Err(e) if e.code == craft_anything_evidence::ErrorCode::Cancelled => {
             let _ = tx.send(AgentEvent::Status { text: "Stopped.".into() });
         }
@@ -2803,6 +2809,39 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
         }
         let bad = |e: &AgentEvent| matches!(e, AgentEvent::Error { .. }) || matches!(e, AgentEvent::Status { text } if text == "Stopped.");
         assert!(!events.iter().any(bad), "{events:?}");
+    }
+
+    /// PR #1426 review: a wall deadline shorter than `RESULT_GRACE` can fire before our own grace
+    /// period does, even though the stream already parsed the terminal result. That race must
+    /// still count as the turn completing, not as a retryable failure (a builder could otherwise
+    /// retry a turn that had already finished).
+    #[test]
+    fn a_wall_deadline_during_result_grace_still_counts_as_done() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = hangs_after_its_result(dir.path());
+        let config =
+            BackendConfig { name: "Claude".into(), kind: BackendKind::AgentCli, model: "claude-code".into(), base_url: None, ssh_host: None, enabled: true };
+        // Shorter than RESULT_GRACE: the result is parsed almost at once, but the process (asleep
+        // for 20 s) is still alive when this deadline, not our own grace period, ends the run.
+        let options = BackendOptions { command: Some(program.display().to_string()), timeout_secs: Some(2), ..Default::default() };
+        let mut spec = CliSpec::new(config, options, false, None);
+        spec.preamble = Some("P:".into());
+        let mut c = CliConversation::new(spec);
+        c.send("go");
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut events = Vec::new();
+        loop {
+            let got = c.poll();
+            let done = got.iter().any(|e| matches!(e, AgentEvent::TurnDone { .. }));
+            events.extend(got);
+            if done {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "no TurnDone: {events:?}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let bad = |e: &AgentEvent| matches!(e, AgentEvent::Error { .. }) || matches!(e, AgentEvent::Status { text } if text == "Stopped.");
+        assert!(!events.iter().any(bad), "a result parsed before the wall deadline must not be reported as a failure: {events:?}");
     }
 
     /// #91: a Mac app with no CLI beside it reached Claude Code, which stopped with a stack trace.

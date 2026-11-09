@@ -349,6 +349,13 @@ Every round spends the person's money or quota. One that can't do anything shoul
       write the project and show its build's output, not to fix a build (`NO_PROJECT_PROMPT`). — claimed: fabox-os, branch bugfix/736-stop-empty-build-loop
 - [ ] Live-check #736 on Windows with gemini-cli: an empty app/ and a builder that claims `npm run build`
       stops after two turns (or 10 checks) with the "no files yet" note, and Try again doesn't restart it
+- [x] A finished builder turn whose own CLI process lingers after its stream already said it was
+      done (e.g. a stuck shutdown hook) no longer leaves the build on "Building"/"Pausing" for as
+      long as the idle timeout allows (hours, for a builder turn): `run_cli` ends the turn
+      `RESULT_GRACE` after its terminal `result` line instead of waiting for the process itself to
+      exit. A wall or idle deadline that fires during that grace period (the result was already
+      parsed) counts as completion, not a failure; a deadline with no parsed result still stops the
+      turn as before — claimed: claude, branch bugfix/builder-stuck-after-turn-completes, PR #1426
 
 ### R5.4 Local models can build
 Owner: open · Status: todo
