@@ -70,12 +70,12 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
 pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
     let Some(modal) = app.state.modal.clone() else {
         // Closed, however it was: the website field is focused again when it next opens.
-        ctx.data_mut(|d| d.remove::<bool>(egui::Id::new("website-dialog-focused")));
+        ctx.data_mut(|d| d.remove::<bool>(egui::Id::unique("website-dialog-focused")));
         return;
     };
     let t = Tokens::get(ctx);
     let mut close = false;
-    let resp = egui::Modal::new(egui::Id::new("craft-modal"))
+    let resp = egui::Modal::new(egui::Id::unique("craft-modal"))
         .frame(egui::Frame::new().fill(t.card).corner_radius(t.r_lg()).inner_margin(Margin::same(24)).stroke(egui::Stroke::new(1.0, t.card_border)))
         .show(ctx, |ui| {
             ui.set_width(440.0);
@@ -104,7 +104,7 @@ pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
                     );
                     widgets::named(r.clone(), "Website address");
                     // Ready to type into as the dialog opens.
-                    let opened = egui::Id::new("website-dialog-focused");
+                    let opened = egui::Id::unique("website-dialog-focused");
                     if !ui.data(|d| d.get_temp::<bool>(opened).unwrap_or(false)) {
                         r.request_focus();
                         ui.data_mut(|d| d.insert_temp(opened, true));

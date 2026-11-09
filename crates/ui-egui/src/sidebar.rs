@@ -30,7 +30,7 @@ const EDGE: f32 = 14.0;
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let fold = folded(app, ui.ctx());
-    ui.data_mut(|d| d.insert_temp(egui::Id::new("sidebar-folded"), fold));
+    ui.data_mut(|d| d.insert_temp(egui::Id::unique("sidebar-folded"), fold));
     let w = ui.available_width();
     // Settings sits at the bottom under a rule, as far from the window's edge as New project is
     // from the title bar; everything else scrolls above it.
@@ -140,7 +140,7 @@ pub(crate) fn section_gap(ui: &mut Ui, fold: bool, height: f32) {
 /// needs the person (`urgent`). `on` = the open one.
 pub(crate) fn row(ui: &mut Ui, icon: &str, label: &str, status: Option<(egui::Color32, &str, bool)>, on: bool) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let fold = ui.data(|d| d.get_temp::<bool>(egui::Id::new("sidebar-folded")).unwrap_or(false));
+    let fold = ui.data(|d| d.get_temp::<bool>(egui::Id::unique("sidebar-folded")).unwrap_or(false));
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), ROW_H), Sense::click());
     let h = widgets::hover_t(ui, &resp);
     let fill = if on { t.pressed } else { theme::mix(egui::Color32::TRANSPARENT, t.hover, h) };
@@ -162,7 +162,7 @@ pub(crate) fn row(ui: &mut Ui, icon: &str, label: &str, status: Option<(egui::Co
             ui.painter().circle_filled(egui::pos2(rect.right() - 10.0, rect.top() + 9.0), 4.0, color);
         }
         widgets::focus_ring(ui, &resp, rect);
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, &name));
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, &name));
         return resp.on_hover_text(name).on_hover_cursor(egui::CursorIcon::PointingHand);
     }
     // An urgent status is a small pill on the right; the name gives way to it.
@@ -189,6 +189,6 @@ pub(crate) fn row(ui: &mut Ui, icon: &str, label: &str, status: Option<(egui::Co
         (None, None) => {}
     }
     widgets::focus_ring(ui, &resp, rect);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, &name));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, &name));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

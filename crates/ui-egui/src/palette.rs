@@ -109,8 +109,8 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
     let width = 620.0_f32.min(screen.width() - 40.0);
     let pos = egui::pos2(screen.center().x - width / 2.0, screen.top() + 80.0);
     // Scrim
-    ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new("palette-scrim"))).rect_filled(screen, 0.0, t.shadow.gamma_multiply(0.6));
-    let resp = egui::Area::new(egui::Id::new("palette")).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+    ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::unique("palette-scrim"))).rect_filled(screen, 0.0, t.shadow.gamma_multiply(0.6));
+    let resp = egui::Area::new(egui::Id::unique("palette")).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
         egui::Frame::new()
             .fill(t.card)
             .stroke(egui::Stroke::new(1.0, t.card_border))
@@ -153,7 +153,7 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
                             Entry::App(_, title, icon) => (*icon, tr(title), String::new(), tr("App")),
                             Entry::Tool { id, title, summary, toolset } => ("wrench", tr(title), format!("{id} · {summary}"), tr(toolset)),
                         };
-                        r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, &title));
+                        r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, &title));
                         icons::paint(
                             ui,
                             egui::Rect::from_min_size(rect.min + Vec2::new(8.0, 12.0), Vec2::splat(16.0)),
@@ -255,7 +255,7 @@ fn form(app: &mut CraftApp, ctx: &egui::Context, tool: &str) {
     let mut back = false;
     let mut open = true;
     egui::Window::new(RichText::new(tr(spec.title)).font(theme::semibold(theme::BODY)))
-        .id(egui::Id::new("tool-form"))
+        .id(egui::Id::unique("tool-form"))
         .open(&mut open)
         .collapsible(false)
         .resizable(true)

@@ -197,7 +197,7 @@ impl Tokens {
 }
 
 fn tokens_id() -> egui::Id {
-    egui::Id::new("craft-anything-theme")
+    egui::Id::unique("craft-anything-theme")
 }
 
 // ---- fonts -------------------------------------------------------------------------------------
@@ -241,6 +241,9 @@ pub fn install_fonts(ctx: &egui::Context) {
     let fallbacks = sans_first(fallbacks);
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "DMSans".to_owned());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_owned());
+    // Navigation hints use arrows absent from DM Sans and egui's new minimal sans stack.
+    // This bundled fallback keeps those glyphs available even without optional craft-fonts.
+    fonts.families.entry(FontFamily::Proportional).or_default().push("JetBrainsMono".to_owned());
     for fam in [FontFamily::Proportional, FontFamily::Monospace] {
         fonts.families.entry(fam).or_default().extend(fallbacks.iter().cloned());
     }
@@ -647,6 +650,19 @@ mod tests {
         assert_eq!(fallback_rank("craft:Unknown Face:Regular"), FallbackRank::Other);
         assert_eq!(fallback_rank("craft:BIZ UDMincho:Regular"), FallbackRank::Serif);
         assert_eq!(fallback_rank("craft:BIZ UDPGothic:Regular"), FallbackRank::Local);
+    }
+
+    #[test]
+    fn navigation_arrows_do_not_require_optional_fonts() {
+        let ctx = egui::Context::default();
+        install_fonts(&ctx);
+        ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Panic);
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            for font in [FontId::proportional(14.0), medium(14.0), semibold(14.0)] {
+                ui.label(egui::RichText::new("Settings → AI ← ↑ ↓").font(font));
+            }
+        });
+        output.textures_delta.clear();
     }
 
     /// Releases are built with craft-fonts (#19), and so is CI; a build without them has only

@@ -11,7 +11,9 @@ fn harness(mut settings: Settings, dir: &Path) -> Harness<'static, CraftApp> {
     // Keep every engine path under the test directory, including after a saved-settings reload.
     settings.engines.store_dir = Some(dir.join("engines"));
     settings.projects_dir = Some(dir.join("projects"));
-    Harness::builder().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
+    // This checks locale selection and persistence, not glyph coverage. Minimal test builds
+    // omit optional craft-fonts; do not depend on the host's installed Chinese fonts.
+    Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
         CraftApp::setup_context(&cc.egui_ctx);
         let engine = demo::engine(Mode::Beginner, true);
         {
@@ -47,7 +49,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         // Startup must apply the saved locale itself, rather than relying on a manual call to
         // set_language after app construction. Check both lookup and a rendered settings row.
         assert_eq!(i18n::language(), initial);
-        h.get_by_label(translated_language);
+        h.get_by_role_and_label(egui::Role::ComboBox, translated_language);
         assert_eq!(i18n::trf("Opened {name}", &[("name", "sample.exe")]), translated_open);
         assert_eq!(i18n::tr("A deliberately uncatalogued message"), "A deliberately uncatalogued message");
         assert_eq!(i18n::trf("Uncatalogued {name}", &[("name", "sample.exe")]), "Uncatalogued sample.exe");
@@ -95,7 +97,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         restored.run_steps(3);
         assert_eq!(i18n::language(), other);
         restored.get_by_value(other_native);
-        restored.get_by_label(if other == "zh-hans" { "语言" } else { "語言" });
+        restored.get_by_role_and_label(egui::Role::ComboBox, if other == "zh-hans" { "语言" } else { "語言" });
 
         // English remains available from either Chinese catalog and takes effect immediately.
         restored.get_by_value(other_native).click();
@@ -107,7 +109,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         assert_eq!(i18n::language(), "en");
         assert_eq!(restored.state().settings.language, "en");
         assert_eq!(restored.state().engine.session().settings.language, "en");
-        restored.get_by_label("Language");
+        restored.get_by_role_and_label(egui::Role::ComboBox, "Language");
         assert!(restored.query_by_label("语言").is_none());
         assert!(restored.query_by_label("語言").is_none());
 
@@ -134,7 +136,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         let mut existing = harness(settings, &temp.path().join(code));
         existing.run_steps(3);
         assert_eq!(i18n::language(), code);
-        existing.get_by_label(label);
+        existing.get_by_role_and_label(egui::Role::ComboBox, label);
         existing.get_by_value(native);
     }
     i18n::set_language("unsupported-locale");

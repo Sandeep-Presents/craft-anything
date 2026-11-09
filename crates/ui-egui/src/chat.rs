@@ -223,7 +223,7 @@ pub fn conversation(app: &mut CraftApp, ui: &mut Ui, dense: bool) {
     let pad = ((width - max_w) / 2.0).max(0.0);
     // The history gets exactly what the composer leaves (its height is measured last frame), so
     // a panel never grows to fit us.
-    let comp_id = ui.id().with(("composer-h", dense));
+    let comp_id = ui.scope_id().with(("composer-h", dense));
     // Before the first measure, a guess that isn't short: anything left over on that frame grows
     // the console's panel, and it keeps that size.
     let comp_h = ui.data(|d| d.get_temp::<f32>(comp_id)).unwrap_or(if dense { 125.0 } else { 70.0 });
@@ -716,8 +716,7 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
         let text = "Run `cargo build` in the app folder,\nthen open it.";
         for item in [ChatItem::User(text.into()), ChatItem::Assistant { text: text.into(), backend: None, streaming: false }] {
-            let mut h = Harness::builder().build_ui(move |ui| {
-                theme::install_fonts(ui.ctx());
+            let mut h = Harness::builder().with_context_setup(crate::CraftApp::setup_context).build_ui(move |ui| {
                 item_ui(ui, &item, false, false, false, &mut Vec::new());
             });
             h.get_by_label("Copy the message").click();

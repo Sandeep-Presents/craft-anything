@@ -637,7 +637,7 @@ const PLAN_MIN: f32 = 48.0;
 fn plan_divider(ui: &mut Ui, t: &Tokens, height: &mut Option<f32>, shown: f32) {
     let hint = tr("Drag to give the plan more or less room; double-click to reset");
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 10.0), egui::Sense::click_and_drag());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, &hint));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Unknown, true, &hint));
     let resp = resp.on_hover_cursor(egui::CursorIcon::ResizeVertical).on_hover_text(&hint);
     let active = resp.hovered() || resp.dragged() || resp.has_focus();
     ui.painter().rect_filled(egui::Rect::from_center_size(rect.center(), Vec2::new(36.0, 3.0)), 2.0, if active { t.text_faint } else { t.card_border });
@@ -719,7 +719,7 @@ fn checklist(ui: &mut Ui, steps: &[PlanStep], t: &Tokens, began: Option<std::tim
                             // Sighted users get the warning marker above; screen readers
                             // get the status through the accessible label and the text.
                             let name = format!("{}: {}", s.text, tr("Stopped here"));
-                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &name));
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &name));
                             ui.label(RichText::new(tr("Stopped here")).size(theme::SMALL).color(t.warning));
                         }
                     });
@@ -893,7 +893,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         let pad = ((width - max_w) / 2.0).max(0.0);
         // The feed gets what the prompt box leaves; the box grows with its text, so its height
         // is measured each frame and used on the next.
-        let comp_id = ui.id().with("project-composer-h");
+        let comp_id = ui.scope_id().with("project-composer-h");
         let comp_h = ui.data(|d| d.get_temp::<f32>(comp_id)).unwrap_or(110.0);
         let rest = Vec2::new(width, (ui.available_height() - comp_h - chat::COMPOSER_GAP).max(40.0));
         ui.allocate_ui_with_layout(rest, egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -1129,7 +1129,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
             };
             // Painted, so named for screen readers: "Build: Now".
             let name = if state.is_empty() { tr(s.label()) } else { format!("{}: {state}", tr(s.label())) };
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &name));
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &name));
             if !state.is_empty() {
                 let ink = if now || here { t.accent_ink } else { t.text_faint };
                 let g = widgets::label_galley(ui, &state, theme::CAPTION, ink);
@@ -1699,7 +1699,7 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
         }
         claims_list(ui, c, &t);
         // Several pages: each one's likeness; clicking one shows its pictures below.
-        let picked_id = egui::Id::new(("check-page", c.round));
+        let picked_id = egui::Id::unique(("check-page", c.round));
         let mut picked: usize = ui.data(|d| d.get_temp(picked_id)).unwrap_or(0);
         if c.pages.len() > 1 {
             picked = picked.min(c.pages.len() - 1);
@@ -1749,7 +1749,7 @@ fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens) {
     if let Some(steps) = plan(&app.state.feed).filter(|p| running || p.iter().any(|s| s.status != PlanStatus::Done)) {
         let began = app.open_run().filter(|_| running).map(RebuildRun::started);
         let mut fold = false;
-        let shown_id = egui::Id::new("plan-steps-shown");
+        let shown_id = egui::Id::unique("plan-steps-shown");
         let mut height = app.state.plan_height;
         ui.allocate_ui(Vec2::new(width, 0.0), |ui| {
             let shown = ui.data(|d| d.get_temp::<f32>(shown_id)).unwrap_or(PLAN_HEIGHT);

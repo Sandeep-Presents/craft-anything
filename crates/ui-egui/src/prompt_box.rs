@@ -159,7 +159,7 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
                                 let (rect, resp) = ui.allocate_exact_size(egui::Vec2::splat(TILE), egui::Sense::hover());
                                 egui::Image::new((tex.id(), rect.size())).uv(middle(tex.size_vec2())).corner_radius(t.r_lg()).paint_at(ui, rect);
                                 ui.painter().rect_stroke(rect, t.r_lg(), egui::Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside);
-                                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, true, &name));
+                                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Image, true, &name));
                                 resp.on_hover_ui(|ui| {
                                     ui.add(egui::Image::new((tex.id(), fit(tex.size_vec2(), PREVIEW_HOVER))));
                                     ui.label(RichText::new(p.display().to_string()).size(theme::CAPTION));
@@ -362,7 +362,7 @@ fn send_button(ui: &mut Ui, ready: bool) -> egui::Response {
     ui.painter().rect_filled(rect, t.radius, fill);
     icons::paint(ui, rect, "send", 16.0, if ready { t.on_accent } else { t.text_faint });
     widgets::focus_ring(ui, &resp, rect);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tr("Send (Enter)")));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tr("Send (Enter)")));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(tr("Send (Enter)"))
 }
 
@@ -439,7 +439,7 @@ mod tests {
     fn picture_tiles_sit_side_by_side_in_one_row() {
         use egui_kittest::kittest::Queryable as _;
         let files: Vec<PathBuf> = ["a.png", "b.png", "c.png"].map(PathBuf::from).to_vec();
-        let mut h = egui_kittest::Harness::new_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_context_setup(crate::CraftApp::setup_context).build_ui_state(
             move |ui, text: &mut String| {
                 let tex = ui.ctx().load_texture("tile", egui::ColorImage::filled([4, 2], egui::Color32::RED), egui::TextureOptions::LINEAR);
                 let previews = vec![Some(tex); 3];

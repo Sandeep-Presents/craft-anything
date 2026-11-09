@@ -31,3 +31,5 @@ winresource = "0.1"
 
 [dev-dependencies]
 tempfile = "3"
+toml = { workspace = true }
+semver = "1"

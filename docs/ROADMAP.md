@@ -1053,7 +1053,7 @@ Owner: maintainers · Status: in progress
 ### R2.9 Everyday use: typing, projects, settings
 Owner: maintainers · Status: in progress
 Gaps found while using the app for real projects.
-- [ ] Prevent the native macOS Touch Bar shutdown crash by adopting the published AccessKit KVO
+- [x] Prevent the native macOS Touch Bar shutdown crash by adopting the published AccessKit KVO
       fix through the coordinated GUI stack, preserving accessibility and normal shutdown;
       add dependency regression coverage and verify native Quit/window close — claimed: dbzx6r,
       branch bugfix/r2.9-macos-touchbar-upstream

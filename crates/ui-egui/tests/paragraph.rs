@@ -27,6 +27,7 @@ fn a_formatted_glossary_word_after_unicode_still_has_its_hover_hint() {
     let end = text.galley.pos_from_cursor(egui::text::CCursor { index: egui::text::CharIndex(8), prefer_next_row: false });
     let pointer = egui::pos2((start.left() + end.left()) / 2.0, start.center().y) + text.pos.to_vec2();
     h.input_mut().events.push(egui::Event::PointerMoved(pointer));
-    h.run_steps(3);
+    // Tooltips wait for pointer stillness as well as tooltip_delay in egui 0.37.
+    h.run_steps(24);
     h.get_by_label("Inter-process communication: how two parts of an app (or two apps) send messages to each other.");
 }

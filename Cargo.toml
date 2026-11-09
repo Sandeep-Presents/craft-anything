@@ -36,10 +36,11 @@ bitflags = { version = "2", features = ["serde"] }
 schemars = "1"
 log = "0.4"
 toml = "0.9"
-eframe = { version = "0.36", default-features = false }
-egui = "0.36"
-egui_extras = { version = "0.36", default-features = false }
-egui_kittest = "0.36"
+# Keep the GUI stack together: 0.37 permits accesskit_macos 0.27.2's Touch Bar KVO fix.
+eframe = { version = "0.37", default-features = false }
+egui = "0.37"
+egui_extras = { version = "0.37", default-features = false }
+egui_kittest = "0.37"
 rfd = "0.17"
 # Pictures pasted from the clipboard (egui only receives pasted text); egui-winit already uses it.
 arboard = { version = "3.6", default-features = false, features = ["image-data"] }
