@@ -325,6 +325,12 @@ Cursor address	ที่อยู่เคอร์เซอร์
 Cursor function	ฟังก์ชันเคอร์เซอร์
 Custom	กำหนดเอง
 Cutter command	คำสั่ง Cutter
+Kuna function inventory	รายการฟังก์ชันของ Kuna
+Kuna decompile	การดีคอมไพล์ Kuna
+Kuna cross-references	การอ้างอิงไขว้ของ Kuna
+Kuna strings	สตริงของ Kuna
+Kuna project export	การส่งออกโปรเจกต์ Kuna
+Kuna decompiler	ตัวดีคอมไพล์ Kuna
 DOS load image	อิมเมจโหลดของ DOS
 Databases	ฐานข้อมูล
 Decide yourself	ตัดสินใจเอง

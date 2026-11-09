@@ -325,6 +325,12 @@ Cursor address	Địa chỉ con trỏ
 Cursor function	Hàm tại con trỏ
 Custom	Tùy chỉnh
 Cutter command	Lệnh Cutter
+Kuna function inventory	Bảng hàm của Kuna
+Kuna decompile	Biên dịch ngược Kuna
+Kuna cross-references	Tham chiếu chéo Kuna
+Kuna strings	Chuỗi Kuna
+Kuna project export	Xuất dự án Kuna
+Kuna decompiler	Trình biên dịch ngược Kuna
 DOS load image	Ảnh nạp DOS
 Databases	Cơ sở dữ liệu
 Decide yourself	Tự quyết định

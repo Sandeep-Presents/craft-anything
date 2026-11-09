@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 
 /// The first word of a tool id (docs/tool-ids.md).
 pub const AREAS: &[&str] = &[
-    "core", "native", "managed", "java", "android", "apple", "harmony", "js", "web", "app", "firmware", "formats", "radio", "packets", "db", "assets", "game",
-    "project", "rebuild", "build", "runtime", "adb", "frida", "engines", "settings", "plugins", "setup",
+    "core", "native", "kuna", "managed", "java", "android", "apple", "harmony", "js", "web", "app", "firmware", "formats", "radio", "packets", "db", "assets",
+    "game", "project", "rebuild", "build", "runtime", "adb", "frida", "engines", "settings", "plugins", "setup",
 ];
 
 /// A tool defined at run time rather than in code: a plugin's, or one proxied from an external

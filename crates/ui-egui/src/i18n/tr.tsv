@@ -325,6 +325,12 @@ Cursor address	İmleç adresi
 Cursor function	İmleçteki fonksiyon
 Custom	Özel
 Cutter command	Cutter komutu
+Kuna function inventory	Kuna işlev envanteri
+Kuna decompile	Kuna dekompilasyonu
+Kuna cross-references	Kuna çapraz referansları
+Kuna strings	Kuna dizeleri
+Kuna project export	Kuna proje dışa aktarma
+Kuna decompiler	Kuna dekompilatörü
 DOS load image	DOS yükleme imajı
 Databases	Veritabanları
 Decide yourself	Kendin karar ver

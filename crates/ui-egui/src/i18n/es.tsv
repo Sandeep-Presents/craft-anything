@@ -325,6 +325,12 @@ Cursor address	Dirección del cursor
 Cursor function	Función del cursor
 Custom	Personalizado
 Cutter command	Comando de Cutter
+Kuna function inventory	Inventario de funciones de Kuna
+Kuna decompile	Descompilación de Kuna
+Kuna cross-references	Referencias cruzadas de Kuna
+Kuna strings	Cadenas de Kuna
+Kuna project export	Exportación de proyecto de Kuna
+Kuna decompiler	Descompilador de Kuna
 DOS load image	Imagen de carga de DOS
 Databases	Bases de datos
 Decide yourself	Decidir tú

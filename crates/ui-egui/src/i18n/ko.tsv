@@ -325,6 +325,12 @@ Cursor address	커서 주소
 Cursor function	커서 위치 함수
 Custom	사용자 지정
 Cutter command	Cutter 명령
+Kuna function inventory	Kuna 함수 인벤토리
+Kuna decompile	Kuna 디컴파일
+Kuna cross-references	Kuna 교차 참조
+Kuna strings	Kuna 문자열
+Kuna project export	Kuna 프로젝트 내보내기
+Kuna decompiler	Kuna 디컴파일러
 DOS load image	DOS 로드 이미지
 Databases	데이터베이스
 Decide yourself	알아서 정하기

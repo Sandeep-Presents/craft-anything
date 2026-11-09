@@ -325,6 +325,12 @@ Cursor address	Kursori aadress
 Cursor function	Kursori funktsioon
 Custom	Kohandatud
 Cutter command	Cutteri käsk
+Kuna function inventory	Kuna funktsioonide loend
+Kuna decompile	Kuna dekompileerimine
+Kuna cross-references	Kuna ristviited
+Kuna strings	Kuna stringid
+Kuna project export	Kuna projekti eksport
+Kuna decompiler	Kuna dekompilaator
 DOS load image	DOS-i laadimiskujutis
 Databases	Andmebaasid
 Decide yourself	Otsusta ise

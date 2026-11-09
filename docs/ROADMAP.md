@@ -2257,6 +2257,18 @@ Owner: open · Status: in progress
 - [x] Preserve empty query pairs when matching older stand-in recordings, without treating raw
       query separators as pairs — claimed: Afloat16, branch `bugfix/r3.13-preserve-empty-query-pairs-20261103`
 
+### R3.14 Kuna decompiler as a Deep-mode engine
+Owner: open · Status: in progress
+      — claimed: cargo-build, branch `feature/r3.14-kuna-decompiler`
+- [x] Five kuna tools behind `Requires::Engine("kuna")`, Deep-mode only: `kuna_functions_list`,
+      `kuna_decompile`, `kuna_xrefs`, `kuna_strings`, `kuna_project_export`; the engine is found
+      through the engine table (PATH plus the `KUNA_COMMAND` override, no home paths hardcoded),
+      invoked argv-only through `craft_anything_platform::process`, with target content marked
+      `CARRIES_TARGET_CONTENT`
+      Bounded exports skip PE import slots. Export evidence lists written files and treats
+      individual function completion as unverified.
+- [ ] A managed installer and version pins for kuna (`Install::Manual` today)
+
 ---
 
 ## M4 Release

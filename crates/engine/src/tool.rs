@@ -69,6 +69,8 @@ pub enum Toolset {
     Core,
     /// Deep native: listings, navigation, annotations, xrefs, bytes, call graphs, value traces.
     Native,
+    /// The external Kuna decompiler (a second opinion on native code).
+    Kuna,
     /// Mach-O, code signing, plists, Swift/ObjC, Interface Builder, asset catalogs, dyld.
     Apple,
     /// Target-free formats and diagnostics: Go, WASM, EVM, PE resources, ELF layout, crashes, firmware.
@@ -110,9 +112,10 @@ impl Serialize for Toolset {
 }
 
 impl Toolset {
-    pub const ALL: [Toolset; 17] = [
+    pub const ALL: [Toolset; 18] = [
         Toolset::Core,
         Toolset::Native,
+        Toolset::Kuna,
         Toolset::Apple,
         Toolset::Formats,
         Toolset::Managed,
@@ -134,6 +137,7 @@ impl Toolset {
         match self {
             Toolset::Core => "core",
             Toolset::Native => "native",
+            Toolset::Kuna => "kuna",
             Toolset::Apple => "apple",
             Toolset::Formats => "formats",
             Toolset::Managed => "managed",
@@ -162,6 +166,7 @@ impl Toolset {
         match self {
             Toolset::Core => "Essentials",
             Toolset::Native => "Programs (native code)",
+            Toolset::Kuna => "Kuna decompiler",
             Toolset::Apple => "Apple apps",
             Toolset::Formats => "File formats",
             Toolset::Managed => ".NET apps",
