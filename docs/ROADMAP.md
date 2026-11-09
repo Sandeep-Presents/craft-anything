@@ -487,8 +487,6 @@ been run live.
       taking the first (#1434): `/api/ps` helps only while a model is loaded, and LM Studio and
       llama.cpp routers don't answer it
       — claimed: jgt87, branch feature/r5.4-pick-server-model (a draft for the maintainers to decide on) — PR #1436
-- [ ] "Look for AI" (`detect::probe_local`) still saves the first chat model a local server lists;
-      LM Studio lists every model downloaded, so it may load one the person isn't using (#1434)
 - [x] The first run's AI step can add a model server on another computer by its address (llama.cpp,
       Ollama or LM Studio on a home server), the same form as Settings → AI
 - [ ] A chat sent while a llama.cpp router is still loading the model ended after 31 s with "The
