@@ -801,6 +801,21 @@ pub(crate) fn server_form(app: &mut CraftApp, ui: &mut Ui) {
         field(ui, &mut form.key, "API key, if it needs one", w, "API key", true);
         add = widgets::primary_icon(ui, Some("plus"), "Add", ready).clicked() && ready;
     });
+    // The server listed several chat models and didn't say which is loaded: the person chooses
+    // (#1434). A list for another address is out of date and isn't offered.
+    if let Some((_, models)) = form.choices.as_ref().filter(|(a, _)| *a == form.address.trim()) {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(tr("This server lists several chat models. Choose one:")).color(t.text_faint).size(theme::CAPTION));
+            let shown = if form.model.trim().is_empty() { tr("Choose a model") } else { form.model.clone() };
+            egui::ComboBox::from_id_salt("server-model-choice").icon(widgets::combo_icon).selected_text(shown).show_ui(ui, |ui| {
+                for m in models {
+                    if ui.selectable_label(form.model.trim() == m, m.as_str()).clicked() {
+                        form.model = m.clone();
+                    }
+                }
+            });
+        });
+    }
     // A server still starting or loading a model may take up to a minute to answer: say it's being
     // asked and for how long, so the form doesn't look like nothing happened (#1429).
     if let Some((_, name, started)) = &form.connecting {
@@ -1312,25 +1327,52 @@ mod model_options_tests {
             .join("\n")
     }
 
+    /// The text the address form draws.
+    fn draw(app: &mut CraftApp) -> String {
+        let context = egui::Context::default();
+        crate::theme::install_fonts(&context);
+        let mut output = context.run_ui(egui::RawInput::default(), |ui| server_form(app, ui));
+        output.textures_delta.clear();
+        output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// #1434: a server that lists several chat models and doesn't say which is loaded offers them
+    /// to choose from; the choice fills the model field, and a list for another address isn't shown.
+    #[test]
+    fn a_server_with_several_models_offers_them_to_choose_from() {
+        let mut app = app_with_backend();
+        app.server_form.name = "Npu".into();
+        app.server_form.address = "http://127.0.0.1:0/v1".into();
+        let refused = craft_anything_engine::evidence::ToolError::invalid("lists 2 chat models")
+            .with_details(serde_json::json!({ "choose_model": ["deepseek-r1:8b", "qwen3:8b"] }));
+        let added = |result| crate::jobs::Finished { job: 7, result: Ok(crate::Done::BackendAdded { name: "Npu".into(), result, choices: 0 }) };
+        app.handle_done(added(Err(refused)));
+        let choices = app.server_form.choices.clone().expect("offered");
+        assert_eq!(choices.1, ["deepseek-r1:8b", "qwen3:8b"]);
+        let text = draw(&mut app);
+        assert!(text.contains("This server lists several chat models. Choose one:") && text.contains("Choose a model"), "{text}");
+        app.server_form.model = "qwen3:8b".into();
+        assert!(draw(&mut app).contains("qwen3:8b"), "the choice shows");
+        app.server_form.address = "http://127.0.0.1:0/other/v1".into();
+        assert!(!draw(&mut app).contains("Choose one"), "another address's list isn't offered");
+        // Another error leaves no list.
+        app.server_form = crate::ServerForm { name: "Npu".into(), address: "http://x/v1".into(), ..Default::default() };
+        app.handle_done(added(Err(craft_anything_engine::evidence::ToolError::invalid("down"))));
+        assert!(app.server_form.choices.is_none());
+    }
+
     /// #1429: while a server is asked for its models the form says so, with the seconds waited, and
     /// Add waits; the line goes when the job ends, whether the server was added or not.
     #[test]
     fn a_server_being_added_shows_that_it_is_connecting() {
-        let draw = |app: &mut CraftApp| {
-            let context = egui::Context::default();
-            crate::theme::install_fonts(&context);
-            let mut output = context.run_ui(egui::RawInput::default(), |ui| server_form(app, ui));
-            output.textures_delta.clear();
-            output
-                .shapes
-                .iter()
-                .filter_map(|shape| match &shape.shape {
-                    egui::epaint::Shape::Text(text) => Some(text.galley.text().to_string()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
         let mut app = app_with_backend();
         assert!(!draw(&mut app).contains("Connecting to"), "nothing to say before Add");
         // Port zero refuses at once: the job never reaches a network.

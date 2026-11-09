@@ -277,12 +277,15 @@ pub enum Done {
 pub struct ServerForm {
     pub name: String,
     pub address: String,
-    /// Empty: the first model it lists that can chat.
+    /// Empty: the one it has loaded, or its only chat model; with several, the person chooses.
     pub model: String,
     pub key: String,
     /// The server being asked for its models (the job, its name, when it started); the form says
     /// it's connecting and for how long (#1429).
     pub connecting: Option<(u64, String, Instant)>,
+    /// The chat models the server at `address` listed when it couldn't be told which one is in use
+    /// (#1434): the form offers them to choose from while the address stays the same.
+    pub choices: Option<(String, Vec<String>)>,
 }
 
 /// What a file dialog was for.
@@ -1611,7 +1614,14 @@ impl CraftApp {
                     }
                     self.refresh_backends();
                 }
-                Err(e) => self.toast(e.for_people(), true),
+                Err(e) => {
+                    // Several chat models and none known to be loaded: offer them in the form.
+                    let models = craft_anything_ai::models_to_choose(&e);
+                    if !models.is_empty() && self.server_form.name.trim() == name {
+                        self.server_form.choices = Some((self.server_form.address.trim().to_string(), models));
+                    }
+                    self.toast(e.for_people(), true);
+                }
             },
             Done::Picked { pick, path } => {
                 if let Some(path) = path {
