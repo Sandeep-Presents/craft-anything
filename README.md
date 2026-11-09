@@ -165,13 +165,10 @@ exists but hasn't been verified on a real install yet. **GitHub Copilot** can us
 Copilot CLI through ACP: sign in separately with `copilot login`. **Grok Build** can use your
 installed `grok` program through ACP (`grok agent stdio`): sign in separately with `grok login`.
 See [docs/grok.md](docs/grok.md). Other agents that speak ACP (Gemini CLI,
-Qwen Code, opencode, goose, Hermes, Maki) can be switched to it per backend; of those, only Maki has
-been run live. Anthropic, OpenAI, OpenRouter, xAI (Grok, when `XAI_API_KEY` is set) and local
-Copilot CLI through ACP: sign in separately with `copilot login`. Other agents that speak ACP (Gemini CLI,
 Qwen Code, opencode, goose, Hermes, Maki, Devin) can be switched to it per backend; of those, Maki
 and Devin have been run live (Devin authenticates with the backend's stored key — its own CLI
-sign-in doesn't count over ACP). Anthropic, OpenAI, OpenRouter and local
-OpenAI-compatible servers are available for questions and analysis (Settings → AI).
+sign-in doesn't count over ACP). Anthropic, OpenAI, OpenRouter, xAI (Grok, when `XAI_API_KEY` is
+set) and local OpenAI-compatible servers are available for questions and analysis (Settings → AI).
 
 ## Built for agents
 
