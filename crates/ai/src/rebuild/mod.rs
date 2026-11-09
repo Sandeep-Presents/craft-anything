@@ -944,15 +944,16 @@ impl Worker {
         } else if ws.manifest.not_working_checks >= NOT_WORKING_CHECK_LIMIT {
             return Err(not_working(ws));
         }
+        // The builder finished and only the check didn't: the build is there to check.
+        let mut only_check = carrying_on && !first && opts.message.is_none() && ws.manifest.awaiting_check;
         // Each run's conversation starts without the pictures' bytes (a kept transcript has only
-        // their names), so the original's go with its first message.
-        if attaches {
+        // their names), so the original's go with its first message. A run that only checks sends
+        // its first message after the check, with the check's pictures, the original's among them.
+        if attaches && !only_check {
             self.show_pictures(agent.as_mut(), ws, pictures::for_first_message(ws, crate::agent::MAX_PICTURES));
         }
         let mut refinements = 0;
         let mut reminded = false;
-        // The builder finished and only the check didn't: the build is there to check.
-        let mut only_check = carrying_on && !first && opts.message.is_none() && ws.manifest.awaiting_check;
         loop {
             if !std::mem::take(&mut only_check) {
                 progress = BuildProgress::load(&ws.root)?;

@@ -2324,6 +2324,61 @@ mod picking_up_a_build {
         }
     }
 
+    /// "Try again" when the last check couldn't run: the run checks first and its first message
+    /// is the fix after that check, so it carries the check's pictures once, not the original's
+    /// first-message pictures as well (which repeated the original and could crowd the build's out).
+    #[test]
+    fn a_run_that_only_checks_shows_the_checks_pictures_not_the_first_messages_too() {
+        use crate::agent::tests::{Scripted, turn};
+        use crate::agent::{ApiConversation, EngineHost, LoopConfig, ModelSlot};
+        use crate::model::{Block, StopReason};
+        let b = bench();
+        let mut ws = worked_on(&b);
+        std::fs::write(ws.capture_dir().join("screenshot-1280.png"), PNG).unwrap();
+        std::fs::create_dir_all(ws.reference_dir()).unwrap();
+        std::fs::write(ws.reference_dir().join("picture-1.png"), PNG).unwrap();
+        ws.manifest.awaiting_check = true;
+        ws.save().unwrap();
+        let seen = Arc::default();
+        // The fix changes app/, so the check after it looks again.
+        let write =
+            Block::ToolUse { id: "w".into(), name: "build_file_write".into(), input: serde_json::json!({"path": "app/index.html", "content": "Closer"}) };
+        let done = turn(vec![Block::Text { text: "Done.".into() }], StopReason::EndTurn);
+        let script = Scripted { turns: std::collections::VecDeque::from([turn(vec![write], StopReason::ToolUse), done]), seen: Arc::clone(&seen) };
+        let mut worker = check_worker(&ws, false);
+        let slot = ModelSlot {
+            name: "Scripted".into(),
+            model: Box::new(script),
+            local: true,
+            effort: None,
+            max_turns: 10,
+            context_tokens: 0,
+            tools: Default::default(),
+            vision: crate::Vision::Yes,
+        };
+        let build = std::collections::BTreeSet::from([craft_anything_engine::Toolset::Core, craft_anything_engine::Toolset::Build]);
+        let api = ApiConversation::start_with(Arc::new(EngineHost(worker.engine.clone())), vec![slot], LoopConfig::default(), build).unwrap();
+        let entry = crate::BackendEntry {
+            config: crate::BackendConfig {
+                name: "Scripted".into(),
+                kind: BackendKind::OpenaiCompatible,
+                model: "scripted".into(),
+                base_url: None,
+                ssh_host: None,
+                enabled: true,
+            },
+            options: Default::default(),
+        };
+        let mut opts = RunOptions::default();
+        opts.kinds.register(Arc::new(PicturedKind));
+        worker.run(&mut ws, entry, Some(api), None, super::super::KeptHistory { in_mode: true, elsewhere: false }, &opts).unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 2, "the check first, then one refinement that writes a file and answers");
+        let names: Vec<String> =
+            seen[0].last().unwrap().blocks.iter().filter_map(|b| if let Block::Image { name, .. } = b { Some(name.clone()) } else { None }).collect();
+        assert_eq!(names, ["capture/screenshot-1280.png", "checks/round-1/screenshot-1280.png"]);
+    }
+
     #[test]
     fn new_notes_during_a_turn_or_check_get_their_own_attempt_but_empty_notes_do_not() {
         use crate::agent::tests::{Scripted, turn};
