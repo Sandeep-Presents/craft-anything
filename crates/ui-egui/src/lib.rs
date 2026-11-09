@@ -456,6 +456,8 @@ pub struct CraftApp {
     pub detecting: bool,
     /// Local agent checks: None while the worker runs, then a credential-free status or error.
     pub agent_connections: std::collections::BTreeMap<String, Option<Result<String, String>>>,
+    /// Which agent owns each pending check, including failures before the worker body starts.
+    pub(crate) agent_connection_jobs: std::collections::BTreeMap<u64, String>,
     /// Counts AI choices, so an add that finishes later doesn't undo one made meanwhile.
     pub backend_choices: u64,
     pub log: Vec<LogLine>,
@@ -577,6 +579,7 @@ impl CraftApp {
             detect_hints: Vec::new(),
             detecting: false,
             agent_connections: Default::default(),
+            agent_connection_jobs: Default::default(),
             backend_choices: 0,
             log: Vec::new(),
             key_inputs: Default::default(),
@@ -1223,10 +1226,12 @@ impl CraftApp {
         }
         self.agent_connections.insert(name.clone(), None);
         let hub = self.hub.clone();
-        self.jobs.spawn("Check", true, move |_| {
-            let status = hub.test_backend(&name).map(|report| report.reply).map_err(|error| error.for_people());
-            Ok(Done::AgentConnection(name, status))
+        let agent = name.clone();
+        let job = self.jobs.spawn("Check", true, move |_| {
+            let status = hub.test_backend(&agent).map(|report| report.reply).map_err(|error| error.for_people());
+            Ok(Done::AgentConnection(agent, status))
         });
+        self.agent_connection_jobs.insert(job, name);
     }
 
     pub fn add_backend(&mut self, config: BackendConfig, key: Option<String>) {
@@ -1409,6 +1414,7 @@ impl CraftApp {
     /// Apply a completed background job, reporting failures and accepting picker results only for matching requests.
     fn handle_done(&mut self, done: jobs::Finished<Done>) {
         let job = done.job;
+        let checked_agent = self.agent_connection_jobs.remove(&job);
         if self.saving == Some(job) {
             self.saving = None;
         }
@@ -1419,6 +1425,9 @@ impl CraftApp {
         let done = match done.result {
             Ok(d) => d,
             Err(e) => {
+                if let Some(agent) = checked_agent {
+                    self.agent_connections.insert(agent, Some(Err(e.clone())));
+                }
                 self.detecting = false;
                 self.facts_read(job, None);
                 // A failed or cancelled engine download frees the button to try again.

@@ -19,7 +19,9 @@ quota access. Fixture tests cover bundle layouts, permissions, root order, statu
 parsing, the selected CLI and rendered results. Regression coverage also includes
 a second adapter's true/false/unknown results, its configuration folder, and
 unrelated login-shell errors. See [Codex setup and limits](codex.md).
-Local Apple Silicon verification: 775 AI/GUI unit, integration and smoke tests
+Each pending check is tracked by job ID: a worker-start failure or caught panic
+frees only that agent's Check action for retry, preserving concurrent checks.
+Local Apple Silicon verification: 777 AI/GUI unit, integration and smoke tests
 passed with four existing ignored (four test threads), including headless parity.
 All-target clippy with warnings denied, formatting, layers, locks, translation
 coverage and secrets passed. The companion CLI was built with locked dependencies.

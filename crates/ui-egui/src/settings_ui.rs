@@ -1076,6 +1076,36 @@ mod tests {
         assert!(text.contains("Agent test is installed but is not signed in."));
     }
 
+    /// A failed worker frees only its own Check button; unrelated pending/results remain intact.
+    #[test]
+    fn failed_agent_check_workers_can_be_retried_without_clearing_other_checks() {
+        let mut app = demo::app(demo::engine(craft_anything_engine::Mode::Experienced, true));
+        app.agent_connections.insert("Failed agent".into(), None);
+        app.agent_connections.insert("Running agent".into(), None);
+        app.agent_connections.insert("Finished agent".into(), Some(Ok("already checked".into())));
+        app.agent_connection_jobs.insert(41, "Failed agent".into());
+        app.agent_connection_jobs.insert(42, "Running agent".into());
+        // Jobs::spawn emits this same Err completion if the thread cannot start (or panics).
+        app.handle_done(Finished { job: 41, result: Err("Couldn't start a worker thread: test failure".into()) });
+        assert!(matches!(app.agent_connections.get("Failed agent"), Some(Some(Err(error))) if error.contains("Couldn't start a worker thread")));
+        assert!(!app.agent_connection_jobs.contains_key(&41));
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&None));
+        assert_eq!(app.agent_connection_jobs.get(&42).map(String::as_str), Some("Running agent"));
+        assert_eq!(app.agent_connections.get("Finished agent"), Some(&Some(Ok("already checked".into()))));
+        app.handle_done(Finished { job: 99, result: Err("unrelated job failed".into()) });
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&None));
+        app.handle_done(Finished { job: 42, result: Ok(Done::AgentConnection("Running agent".into(), Ok("checked".into()))) });
+        assert!(app.agent_connection_jobs.is_empty());
+        assert_eq!(app.agent_connections.get("Running agent"), Some(&Some(Ok("checked".into()))));
+        // The backend is intentionally absent: no real agent or credential access is needed.
+        app.check_agent_connection("Failed agent".into());
+        assert_eq!(app.agent_connections.get("Failed agent"), Some(&None));
+        assert_eq!(app.agent_connection_jobs.len(), 1, "retry was scheduled");
+        let count = app.jobs.list.len();
+        app.check_agent_connection("Failed agent".into());
+        assert_eq!(app.jobs.list.len(), count, "a pending retry cannot start a duplicate");
+    }
+
     #[test]
     fn identical_model_names_are_shown_once_in_the_shared_picker() {
         use craft_anything_ai::{AgentModel, BackendEntry, ModelContext};
