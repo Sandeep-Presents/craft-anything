@@ -140,9 +140,10 @@ fn read_table(data: &[u8], c: &Cookie) -> (Vec<Member>, Option<String>) {
             let name = r.slice(at + ENTRY_HEAD, len - ENTRY_HEAD)?;
             let end = name.iter().position(|b| *b == 0).unwrap_or(name.len());
             let path = String::from_utf8_lossy(name.get(..end)?).into_owned();
-            let compression = match flag {
-                0 => Compression::None,
-                1 => Compression::Zlib,
+            let in_payload = offset.checked_add(stored_size).is_some_and(|end| end <= c.toc_at as u64);
+            let compression = match (in_payload, flag) {
+                (true, 0) => Compression::None,
+                (true, 1) => Compression::Zlib,
                 _ => Compression::Unreadable,
             };
             let kind = TYPE_CODES
@@ -234,6 +235,9 @@ fn module_path(pyz: &str, name: &str, is_package: bool) -> String {
 }
 
 fn read_pyz(data: &[u8], member: &PackedEntry, room: usize, key_seen: bool) -> Result<PyzRead, String> {
+    if member.compression == Compression::Unreadable {
+        return Err("its stored bytes are not readable".into());
+    }
     if member.compression != Compression::None {
         return Err("it is itself compressed, which we don't unpack to list".into());
     }
@@ -308,6 +312,11 @@ impl PackedFormat for PyInstaller {
         if let Some(why) = stopped {
             notes.push(format!("{}, so the members after it aren't listed.", capitalise(&why)));
             truncated = true;
+        }
+        let payload_end = (cookie.start + cookie.toc_at) as u64;
+        let outside = members.iter().filter(|m| m.entry.offset.checked_add(m.entry.stored_size).is_none_or(|end| end > payload_end)).count();
+        if outside > 0 {
+            notes.push(format!("{outside} member(s) lie outside the CArchive payload and cannot be read."));
         }
         let key_seen = members.iter().any(|m| matches!(m.type_code, b'm' | b'M' | b's') && m.entry.path.contains("crypto_key"));
         let scripts: Vec<&str> = members.iter().filter(|m| m.type_code == b's').map(|m| m.entry.path.as_str()).collect();
@@ -419,6 +428,47 @@ mod tests {
             assert_eq!(&legacy[16..], &code);
             assert_eq!(find(&listing, "PYZ.pyz.members/future").compression, Compression::Unreadable);
         }
+    }
+
+    #[test]
+    fn members_cannot_read_the_table_cookie_or_signed_tail() {
+        for new_cookie in [false, true] {
+            let original = pyinstaller(&[("bad", b'x', b"bad", false), ("good", b'x', b"ok", false), ("runtime", b'o', b"", false)], new_cookie, 312);
+            let cookie = find_cookie(&original).unwrap();
+            let table = cookie.start + cookie.toc_at;
+            for offset in
+                [cookie.toc_at as u32 - 2, cookie.toc_at as u32, (cookie.toc_at + cookie.toc_len) as u32, (original.len() - cookie.start) as u32, u32::MAX]
+            {
+                let mut data = original.clone();
+                data.extend([0x55; 32]);
+                data[table + 4..table + 8].copy_from_slice(&offset.to_be_bytes());
+                let listing = PyInstaller.list(&data).unwrap();
+                assert!(!listing.truncated);
+                assert_eq!(find(&listing, "bad").compression, Compression::Unreadable);
+                assert!(PyInstaller.read(&data, find(&listing, "bad"), 100).is_err());
+                assert_eq!(PyInstaller.read(&data, find(&listing, "good"), 100).unwrap(), b"ok");
+                assert!(PyInstaller.read(&data, find(&listing, "runtime"), 0).unwrap().is_empty());
+                assert!(listing.notes.iter().any(|note| note.contains("outside the CArchive payload")));
+            }
+            let listing = PyInstaller.list(&original).unwrap();
+            assert_eq!(PyInstaller.read(&original, find(&listing, "good"), 2).unwrap(), b"ok");
+        }
+    }
+
+    #[test]
+    fn a_pyz_in_the_signed_tail_does_not_supply_nested_members() {
+        let code = code_311("m", "m", "m.py", 1, &[], &[], &[]);
+        let nested = pyz(3531, &[("module", 0, &code)], false, true);
+        let mut data = pyinstaller(&[("PYZ.pyz", b'z', &nested, false)], true, 312);
+        let cookie = find_cookie(&data).unwrap();
+        let table = cookie.start + cookie.toc_at;
+        let tail = (data.len() - cookie.start) as u32;
+        data[table + 4..table + 8].copy_from_slice(&tail.to_be_bytes());
+        data.extend(&nested);
+        let listing = PyInstaller.list(&data).unwrap();
+        assert_eq!(listing.entries.len(), 1);
+        assert_eq!(listing.entries[0].compression, Compression::Unreadable);
+        assert!(listing.notes.iter().any(|note| note.contains("not readable")));
     }
 
     #[test]

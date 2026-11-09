@@ -612,6 +612,16 @@ impl<'a> D<'a> {
         self.push(N::Global { prefix: prefix.into(), inner: Box::new(inner), suffix: String::new() })
     }
 
+    /// `WC`: the case's entity, such as `main.E.one(main.E.Type) -> main.E`, or a type. A module, a
+    /// bare name or another global (a metadata or witness symbol) before it is not a case.
+    fn enum_case(&mut self) -> R<()> {
+        if matches!(self.stack.last(), Some(N::Global { .. })) {
+            return Err("enum case of a global".into());
+        }
+        let inner = self.pop_type()?;
+        self.push(N::Global { prefix: "enum case for".into(), inner: Box::new(inner), suffix: String::new() })
+    }
+
     fn note_param(&mut self, idx: u64) {
         self.max_param = Some(self.max_param.map_or(idx, |m| m.max(idx)));
     }
@@ -744,7 +754,8 @@ impl<'a> D<'a> {
                     self.push(n)
                 }
                 b'y' => {
-                    let i = self.index()?;
+                    // Numbered like `q`: `Qy_` is the second generic parameter, `Qy0_` the third.
+                    let i = self.index()?.checked_add(1).ok_or("overflow")?;
                     let name = self.pop_name()?;
                     self.note_param(i);
                     let n = N::Member { base: Box::new(N::Param(0, i)), name };
@@ -824,6 +835,7 @@ impl<'a> D<'a> {
                         self.global(p)
                     }
                     b'L' => self.global("lazy protocol witness table cache variable for"),
+                    b'C' => self.enum_case(),
                     _ => Err("unsupported witness kind".into()),
                 }
             }
@@ -1120,6 +1132,17 @@ fn func_text(ty: &N, labels: &[Option<String>], depth: usize) -> String {
     }
 }
 
+/// The wrapped type of a `?` or `!` optional. A function type or a protocol composition goes in
+/// parentheses, so the `?` reads as applying to the whole type, not to the result or last protocol.
+fn optional_operand(t: &N, depth: usize) -> String {
+    let text = render(t, depth);
+    match t {
+        N::Func { .. } => format!("({text})"),
+        N::Existential(protos) if protos.len() > 1 => format!("({text})"),
+        _ => text,
+    }
+}
+
 fn render(n: &N, depth: usize) -> String {
     if depth > MAX_RENDER_DEPTH {
         return "…".into();
@@ -1133,8 +1156,8 @@ fn render(n: &N, depth: usize) -> String {
             match (b.as_str(), args.as_slice()) {
                 ("Swift.Array", [t]) => format!("[{}]", render(t, d)),
                 ("Swift.Dictionary", [k, v]) => format!("[{} : {}]", render(k, d), render(v, d)),
-                ("Swift.Optional", [t]) => format!("{}?", render(t, d)),
-                ("Swift.ImplicitlyUnwrappedOptional", [t]) => format!("{}!", render(t, d)),
+                ("Swift.Optional", [t]) => format!("{}?", optional_operand(t, d)),
+                ("Swift.ImplicitlyUnwrappedOptional", [t]) => format!("{}!", optional_operand(t, d)),
                 _ => format!("{b}<{}>", args.iter().map(|a| render(a, d)).collect::<Vec<_>>().join(", ")),
             }
         }
@@ -1167,8 +1190,10 @@ fn render(n: &N, depth: usize) -> String {
             let ty_text = |t: &Option<Box<N>>| t.as_ref().map(|t| func_text(t, labels, d)).unwrap_or_default();
             let body = match kind {
                 EKind::Func => format!("{c}.{}{}", name.clone().unwrap_or_default(), ty_text(ty)),
-                EKind::AllocInit => format!("{c}.__allocating_init{}", ty_text(ty)),
-                EKind::Init => format!("{c}.init{}", ty_text(ty)),
+                // The allocating name is kept for a class's own initialisers only. In a struct, an
+                // enum, a protocol or any extension, even of a class, it reads `init`.
+                EKind::AllocInit if matches!(ctx.as_ref(), N::Nominal { kind: 'C', .. }) => format!("{c}.__allocating_init{}", ty_text(ty)),
+                EKind::AllocInit | EKind::Init => format!("{c}.init{}", ty_text(ty)),
                 EKind::Deinit => format!("{c}.deinit"),
                 EKind::DeallocDeinit => format!("{c}.__deallocating_deinit"),
                 EKind::IvarDestroyer => format!("{c}.__ivar_destroyer"),

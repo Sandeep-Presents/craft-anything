@@ -392,8 +392,8 @@ impl<'a> Metadata<'a> {
         let length = r.u32_le(0)?;
         let start = r.u32_le(4)? as usize;
         let bytes = self.section(LITERAL_DATA).get(start..start.checked_add(length as usize)?)?;
-        let shown = bytes.get(..bytes.len().min(max_bytes))?;
-        Some(Literal { index, length, text: String::from_utf8_lossy(shown).into_owned(), complete: shown.len() == bytes.len() })
+        let (text, complete) = literal_text(bytes, max_bytes);
+        Some(Literal { index, length, text, complete })
     }
 
     /// The first image holding this type.
@@ -408,6 +408,38 @@ impl<'a> Metadata<'a> {
     pub fn field_count(&self) -> u64 {
         (0..self.type_count()).filter_map(|i| self.type_def(i)).map(|t| u64::from(t.field_count)).sum()
     }
+}
+
+fn literal_text(bytes: &[u8], max_bytes: usize) -> (String, bool) {
+    let shown = bytes.get(..bytes.len().min(max_bytes)).unwrap_or_default();
+    let mut text = String::new();
+    let mut consumed = 0;
+    for chunk in shown.utf8_chunks() {
+        let valid = chunk.valid();
+        let mut end = valid.len().min(max_bytes.saturating_sub(text.len()));
+        while !valid.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.push_str(valid.get(..end).unwrap_or_default());
+        consumed += end;
+        if end < valid.len() {
+            break;
+        }
+        let invalid = chunk.invalid();
+        if invalid.is_empty() {
+            continue;
+        }
+        if consumed + invalid.len() == shown.len() && shown.len() < bytes.len() && std::str::from_utf8(invalid).is_err_and(|error| error.error_len().is_none())
+        {
+            break;
+        }
+        if max_bytes.saturating_sub(text.len()) < '\u{FFFD}'.len_utf8() {
+            break;
+        }
+        text.push('\u{FFFD}');
+        consumed += invalid.len();
+    }
+    (text, consumed == bytes.len())
 }
 
 /// Text a compiler would write as a name: not empty, no control characters, and valid UTF-8 (a bad

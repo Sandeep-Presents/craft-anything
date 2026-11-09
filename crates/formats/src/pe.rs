@@ -60,6 +60,12 @@ impl PeHeaders {
         if rva < self.size_of_headers { usize::try_from(rva).ok() } else { None }
     }
 
+    fn image_va(&self, rva: u64) -> Option<u64> {
+        let rva = u32::try_from(rva).ok()?;
+        let address = self.image_base.checked_add(u64::from(rva))?;
+        (self.pe32_plus || address <= u64::from(u32::MAX)).then_some(address)
+    }
+
     pub fn dir(&self, i: usize) -> Option<(u32, u32)> {
         self.data_dirs.get(i).copied().filter(|(rva, size)| *rva != 0 && *size != 0)
     }
@@ -179,11 +185,11 @@ pub struct PeImport {
     pub slot_va: u64,
 }
 
-/// Walk the import directory: every imported function and the IAT slot the loader fills.
+/// Walk the import directory, retaining functions with representable IAT slot addresses.
 pub fn imports(data: &[u8], h: &PeHeaders) -> Vec<PeImport> {
     let mut table = ImportTable::default();
     normal_imports(data, h, &mut table);
-    table.rows.into_iter().map(|row| PeImport { library: row.library, name: row.name, ordinal: row.ordinal, slot_va: row.slot_va.unwrap_or(0) }).collect()
+    table.rows.into_iter().filter_map(|row| Some(PeImport { slot_va: row.slot_va?, library: row.library, name: row.name, ordinal: row.ordinal })).collect()
 }
 
 /// How a program links to an imported function.
@@ -296,8 +302,8 @@ fn normal_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
                 break;
             }
             let (name, hint, ordinal) = thunk_target(&r, h, v, |v| u32::try_from(v & 0x7fff_ffff).ok());
-            let slot_va = h.image_base.wrapping_add(u64::from(ft)).wrapping_add((i * thunk_size) as u64);
-            out.rows.push(ImportRow { library: library.clone(), kind: ImportKind::Normal, name, ordinal, hint, slot_va: Some(slot_va), bound });
+            let slot_va = u64::from(ft).checked_add((i * thunk_size) as u64).and_then(|rva| h.image_va(rva));
+            out.rows.push(ImportRow { library: library.clone(), kind: ImportKind::Normal, name, ordinal, hint, slot_va, bound });
         }
     }
 }
@@ -346,7 +352,7 @@ fn delay_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
             let (name, hint, ordinal) = thunk_target(&r, h, v, |v| {
                 if rva_based { u32::try_from(v & 0x7fff_ffff).ok() } else { v.checked_sub(h.image_base).and_then(|x| u32::try_from(x).ok()) }
             });
-            let slot_va = iat.map(|a| h.image_base.wrapping_add(u64::from(a)).wrapping_add((i * thunk_size) as u64));
+            let slot_va = iat.and_then(|a| u64::from(a).checked_add((i * thunk_size) as u64)).and_then(|rva| h.image_va(rva));
             out.rows.push(ImportRow { library: library.clone(), kind: ImportKind::Delay, name, ordinal, hint, slot_va, bound: false });
         }
     }
@@ -473,7 +479,11 @@ pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
         return Some(out);
     };
     let dir_end = u64::from(dir_rva).saturating_add(u64::from(dir_size));
-    for i in 0..nfuncs {
+    if nfuncs as usize > MAX_EXPORTS {
+        out.truncated = true;
+        out.warnings.push(format!("only the first {MAX_EXPORTS} export function slots were examined"));
+    }
+    for i in 0..nfuncs.min(MAX_EXPORTS as u32) {
         if out.entries.len() >= MAX_EXPORTS {
             out.truncated = true;
             break;
@@ -492,7 +502,11 @@ pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
             (u64::from(rva) >= u64::from(dir_rva) && u64::from(rva) < dir_end).then(|| h.rva_to_offset(rva).and_then(|o| r.cstr(o, 512)).unwrap_or_default());
         match named.remove(&i) {
             Some(list) => {
-                for name in list {
+                let room = MAX_EXPORTS.saturating_sub(out.entries.len());
+                if list.len() > room {
+                    out.truncated = true;
+                }
+                for name in list.into_iter().take(room) {
                     out.entries.push(PeExport { ordinal, name: Some(name), rva, forwarder: forwarder.clone() });
                 }
             }
@@ -541,24 +555,31 @@ pub fn enrich(data: &[u8], b: &mut Binary) {
         }
     };
     b.image_base = h.image_base;
-    b.entry = if h.entry_rva != 0 { Some(h.image_base.wrapping_add(u64::from(h.entry_rva))) } else { None };
+    b.entry = if h.entry_rva != 0 { h.image_va(u64::from(h.entry_rva)) } else { None };
+    if h.entry_rva != 0 && b.entry.is_none() {
+        b.warnings.push("the PE entry point exceeds the image address space".into());
+    }
     if h.characteristics & 0x2000 != 0 {
         b.kind = "shared-library";
     }
     let r = Reader::new(data);
     // Imports (ours carry IAT slots and ordinals).
-    let imps = imports(data, &h);
-    if !imps.is_empty() {
+    let mut imps = ImportTable::default();
+    normal_imports(data, &h, &mut imps);
+    if !imps.rows.is_empty() {
         b.imports.clear();
         let mut libs = BTreeSet::new();
-        for i in &imps {
+        for i in &imps.rows {
             let name = i.name.clone().unwrap_or_else(|| format!("{}#{}", i.library.trim_end_matches(".dll").trim_end_matches(".DLL"), i.ordinal.unwrap_or(0)));
             libs.insert(i.library.clone());
-            b.import_slots.push(ImportSlot { addr: i.slot_va, name: name.clone(), library: Some(i.library.clone()), kind: "slot" });
-            b.imports.push(Import { name, library: Some(i.library.clone()), ordinal: i.ordinal, slot: Some(i.slot_va) });
+            if let Some(slot) = i.slot_va {
+                b.import_slots.push(ImportSlot { addr: slot, name: name.clone(), library: Some(i.library.clone()), kind: "slot" });
+            }
+            b.imports.push(Import { name, library: Some(i.library.clone()), ordinal: i.ordinal, slot: i.slot_va });
         }
         b.libraries = libs.into_iter().collect();
     }
+    b.warnings.extend(imps.warnings);
     // Delay-loaded imports: calls go through their own slots, so they get names too.
     let mut delayed = ImportTable::default();
     delay_imports(data, &h, &mut delayed);
@@ -587,8 +608,10 @@ pub fn enrich(data: &[u8], b: &mut Binary) {
         let n = (size as usize / ent).min(MAX_UNWIND);
         for i in 0..n {
             let Some(begin) = r.u32_le(off + i * ent) else { break };
-            if begin != 0 {
-                b.function_starts.push(h.image_base.wrapping_add(u64::from(begin)));
+            if begin != 0
+                && let Some(address) = h.image_va(u64::from(begin))
+            {
+                b.function_starts.push(address);
             }
         }
     }

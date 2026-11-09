@@ -265,6 +265,8 @@ pub fn parse(data: &[u8], limits: Limits) -> Result<Table, FormatError> {
     if t != RES_TABLE {
         return Err(FormatError::Malformed(format!("not a resource table (chunk type {t:#x})")));
     }
+    let data = data.get(..size).ok_or_else(|| FormatError::Truncated("resource table payload".into()))?;
+    let r = Reader::new(data);
     let mut table = Table::default();
     let mut global = StringPool::default();
     let mut pos = h;
@@ -299,15 +301,39 @@ pub fn parse(data: &[u8], limits: Limits) -> Result<Table, FormatError> {
 }
 
 fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table: &mut Table, limits: Limits) {
+    let Some(data) = pos.checked_add(cs).and_then(|end| data.get(..end)) else {
+        table.warnings.push("package runs past its resource table".into());
+        return;
+    };
     let r = Reader::new(data);
     let hsize = usize::from(r.u16_le(pos + 2).unwrap_or(0));
+    if hsize < 284 {
+        table.warnings.push(format!("package at offset {pos}: incomplete header"));
+        return;
+    }
     let id = r.u32_le(pos + 8).unwrap_or(0);
     let name = utf16_fixed(&r, pos + 12, 128);
     let type_strings = r.u32_le(pos + 268).unwrap_or(0) as usize;
     let key_strings = r.u32_le(pos + 276).unwrap_or(0) as usize;
-    let end = pos + cs;
-    let types = if type_strings != 0 { StringPool::parse(data, pos + type_strings).unwrap_or_default() } else { StringPool::default() };
-    let keys = if key_strings != 0 { StringPool::parse(data, pos + key_strings).unwrap_or_default() } else { StringPool::default() };
+    let end = data.len();
+    let mut read_pool = |offset: usize, label: &str| {
+        if offset == 0 {
+            return StringPool::default();
+        }
+        let Some(start) = pos.checked_add(offset).filter(|&start| offset >= hsize && start < end) else {
+            table.warnings.push(format!("package {name}: {label} string pool is outside its payload"));
+            return StringPool::default();
+        };
+        match StringPool::parse(data, start) {
+            Ok(pool) => pool,
+            Err(error) => {
+                table.warnings.push(format!("package {name}: {label} string pool: {error}"));
+                StringPool::default()
+            }
+        }
+    };
+    let types = read_pool(type_strings, "type");
+    let keys = read_pool(key_strings, "key");
     let mut package = Package { id, name: name.clone(), types: Vec::new(), keys: keys.declared, libraries: Vec::new() };
     let p = Pkg { name: &name, id, types: &types, keys: &keys };
     let mut c = pos.saturating_add(hsize.max(8));
@@ -316,15 +342,22 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
             table.warnings.push(format!("package {name}: unreadable chunk at offset {c}"));
             break;
         };
+        // Each child was checked against its package; reads within it must also stop before
+        // the next sibling, including fixed-width library records and bag headers.
+        let Some(child) = data.get(..c.saturating_add(sz)) else {
+            table.warnings.push(format!("package {name}: child chunk runs past its package"));
+            break;
+        };
+        let r = Reader::new(child);
         match ct {
-            RES_TYPE_SPEC => {
+            RES_TYPE_SPEC if ch >= 16 => {
                 let tid = r.u8(c + 8).unwrap_or(0);
                 let count = r.u32_le(c + 12).unwrap_or(0);
                 if !package.types.iter().any(|t| t.id == tid) && package.types.len() < 256 {
                     package.types.push(TypeInfo { id: tid, name: type_name(&p, tid), entry_count: count, configs: Vec::new() });
                 }
             }
-            RES_TYPE => {
+            RES_TYPE if ch >= 24 => {
                 let tid = r.u8(c + 8).unwrap_or(0);
                 let (cfg, _) = config_qualifiers(&r, c + 20);
                 match package.types.iter_mut().find(|t| t.id == tid) {
@@ -341,14 +374,21 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
                 }
                 parse_type(&r, c, ch, sz, &p, global, table, limits);
             }
-            RES_LIBRARY => {
+            RES_LIBRARY if ch >= 12 => {
                 let n = r.u32_le(c + 8).unwrap_or(0) as usize;
-                for i in 0..n.min(256) {
+                let available = (sz - ch) / 260;
+                if n > available {
+                    table.warnings.push(format!("package {name}: library records run past their chunk"));
+                }
+                for i in 0..n.min(256).min(available) {
                     let e = c + ch + i * 260;
                     if let Some(lid) = r.u32_le(e) {
                         package.libraries.push((lid, utf16_fixed(&r, e + 4, 128)));
                     }
                 }
+            }
+            RES_TYPE_SPEC | RES_TYPE | RES_LIBRARY => {
+                table.warnings.push(format!("package {name}: incomplete chunk header at offset {c}"));
             }
             _ => {}
         }
