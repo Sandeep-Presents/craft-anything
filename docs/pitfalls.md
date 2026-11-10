@@ -55,6 +55,9 @@ added an app the new rule rejected; both were green on their own branch.
   And with a layout change: #687 moved coding agents onto their own tab of what Detect found, and
   #664, merged next, tested a button on that list without picking the tab. Checking that two PRs
   merge cleanly isn't checking that their tests pass together: run the UI tests on the merge.
+  And a new tool is a new UI string: #754 added five adb tools whose titles had no catalog entry,
+  so CI's gate failed on `i18n-coverage`, which the finish list doesn't name. A tool's title and
+  its toolset's title go into every catalog in the same PR; `cargo xtask ci` runs the check.
 
 **A table row kept twice by a merge.** Two PRs edited the same STATUS.md row; resolving the
 conflict kept both versions, so five rows reached `main` twice, each copy with a different
@@ -86,6 +89,11 @@ merged the day after it shipped. Before calling a report fixed or still open, fi
 names (`git merge-base --is-ancestor <fix> <release tag>`), and check the message text it quotes.
 
 ## Tests
+
+**A commit went out with a failing test because the shell chain keyed off `grep`.** `cargo test … | grep
+'^test result|FAILED' && git commit …` commits whenever grep printed anything, a FAILED line included.
+Key a chain off cargo's own exit status (`cargo test … ; test ${PIPESTATUS[0]} -eq 0 && git commit …`, or
+run the tests and read the result before a separate commit command), never off a filter's.
 
 **A heartbeat sampled before shutdown raced a successful stop.** A child could write between
 the baseline read and `stop()`, failing the descendant cleanup test even when cleanup worked.
@@ -132,6 +140,11 @@ It happened a third time with Ghidra: the test session's engine store was empty,
 still searched PATH, `~/.local/bin` and `/opt/ghidra`, so two Deep-mode tests got Ghidra's answer
 on a machine that had it. `testing::session()` now sets `engines.only_configured`, so it finds only
 the engines its settings or store name.
+And a fourth time with the adb screen tools: the test returned early "when adb is here" only before
+its missing-adb half, and its bad-input half, above that, needed adb found to get as far as the
+tool. It passed on every machine it was written on. No half of a test may lean on the machine:
+build one session with a stand-in and one that finds nothing, and before pushing run the tests
+with the program's folders covered (`bwrap --dev-bind / / --tmpfs <its folder> cargo test …`).
 
 **A failing crate hid the next crate's tests.** `cargo test -p a -p b` stopped after a failure in
 `a`, so `b`'s tests never ran; the rerun was filtered to the failing test, and a broken engine id
@@ -631,6 +644,30 @@ a note, a log line), and test the success path end to end, not just the picking.
 The fix then made the check create `checks/round-N/routes/` first, which made `round-N` exist, and
 `web_site_capture` (which refuses an existing folder) stopped the run. Create a tool's output parent
 right before that tool runs, never a folder that another tool must create itself.
+It happened again in the Android device check: it made `checks/round-N/device/` but not
+`device/states/`, and `adb_screen_state_capture` refuses a folder whose parent is missing, so
+every screen came back "couldn't be read" and the first live round scored 0% (the build check
+had passed). A check's first live run is on a build known to match; a 0% there is the check.
+And a third time, on the first real run: the builder checked its work twice in one round, the
+second pass reused `round-0/device/states/<id>` from the first, the capture refused each folder
+that was already there, and the scorecard went from 70% to 4% with every screen "couldn't be
+read"; the builder then went off reading our source for the reason. A check empties its own output
+folder before a pass. When a score collapses to a single failure kind, suspect the check first.
+And the gate failed in silence: the test device held an older build of the same package signed
+with another key, the install was refused, and the reason went only to the builder's tool result;
+nothing in the CLI's output, the feed or device.json said why `gate` stayed null. A check that
+couldn't look says so wherever its score is shown, and names what to do.
+Then the gate ran on a TV that had fallen asleep in the hour since its last pass: the app was
+launched with the screen off, every dump came back empty, and the first four screens were lost
+before a hand-sent WAKEUP. A device is woken before it is driven, every pass.
+And a run at 92% on both devices went on "Improving the build" instead of Ready: a check is good
+only when every claim it hands over holds, and the device check handed over all 600 of its detail
+claims, so the bar was 100%, whatever `good_enough` said, and the builder was told to fix all 50.
+A check with a likeness hands the run only what must hold (each screen read, no crash); its detail
+goes in its scorecard and its note. Read `CheckResult::good` before deciding what a check's claims are.
+And a second study failed in its first second: one dump of the original read as no controls
+(a screen between frames), the map gave up, and the builder went on without a map. A dump that
+reads empty is read again after a moment, twice, and every map capture wakes the device first.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
@@ -837,6 +874,49 @@ levels down), and make an install use a copy already found outside our store. Te
 backends from older versions or found from a key got a new id on every run. A fallback id for one
 run is a workaround, not a fix: give each saved provider backend its id once, at startup, before
 any session lock is held (`AiHub::ensure_session_id`), and test a restart keeps the same id.
+
+**A map that walked out of the app, and a walk the screen's identity made blind.** The first
+map of a two-screen trial app pressed BACK on its home screen, landed in the TV's launcher, and
+mapped the launcher and the next app as screens of the target (6 of 6 states, none of them the
+app's second screen). And once a screen was known by its shape and controls rather than every
+text, moving the focus made no new state, so the walk never pressed OK on the second button:
+the settings screen was unreachable by construction. A capture that shows another package is
+an exit, never a screen; and what a walk explores (screen plus focus position) is not what it
+counts (screens). Try a new map on an app with two screens and a BACK that leaves it before
+one with fifty.
+
+**A whole app folded into one screen.** The first map of a real TV player found one state in
+523 s: every key led back to s01. The player is one activity that stacks its screens as sibling
+`FrameLayout` layers with no ids, and the fingerprint folded a run of same-class siblings as a list,
+hashing only the first; the guide, the menu and the channel list were all layers after the first,
+so nothing after the player counted. The two-screen trial app had no such stack. A list is a run
+of siblings with the same subtree shape, not the same class; and before the real map, capture the
+original by hand on three screens that differ (`adb_screen_state_capture` with keys) and check
+that their fingerprints differ.
+The same map then made a screen of every focus position on the player's menu bar: the focused
+item carries a highlight view of its own, so its shape broke it out of the bar's run and its words
+counted as one control's. The focused sibling joins its run whatever its shape. Check a bar with
+the focus on its first, a middle and its last item before trusting a map of it.
+And the next map spent its 24 states on the guide at 20 cursor positions: its rows have three or
+four programme cells each, so their subtree shapes differed and the row fold broke, and the
+focused cell's highlight did the same inside its row. A shape counts a run of equal children
+once, and the focused control takes a sibling's shape. Before the real map, capture the busiest
+list at five cursor positions and scrolled, and check the fingerprints agree.
+Even then the guide hashed apart: its detail panel shows a picture for one programme and a
+progress bar for the one on now, and the playing channel's row carries two icons. Plain leaves
+(texts, pictures, progress bars) are what a screen shows, not what it is: they shape nothing.
+And once more: each guide row takes the focus for its cells, a focusable `RecyclerView` of plain
+texts, so it was read as a control and spoke with its cells' words, which change with the
+programmes on. A list (scrollable, or a list class) is a container whatever its focus. Each of
+these four rules was found by one more live capture: budget for that, not for one.
+
+**A device check that launched the original.** The Android device check installed the build's
+APK, then launched, drove and read the crash log of the *target's* package (the original app's),
+so a rebuild under its own id was never opened: the original was replayed against its own map
+and scored 100%, whatever the build did. Found by reading the code while setting up a trial
+with distinct package ids; a self-compare trial (the same app as original and build) would have
+hidden it. What a check drives is the thing it built, named by what was built (the APK's own
+manifest), never by the target; and a trial of a check compares two different things.
 
 ## Agent tooling
 
