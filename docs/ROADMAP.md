@@ -1471,6 +1471,7 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.11-standin-sample-metadata-20261103b
 - [ ] `native_publisher_show` hashes the file minus the signature fields, not section by section;
       a file with unusual gaps between sections can read as different
+      — claimed: muraa-p, branch bugfix/r3.11-publisher-hash-sections
 - [x] Enforce stand-in per-body and total byte budgets on the text that is actually retained after redaction;
       deduplicate consecutive samples before charging the capture budget.
       — claimed: Afloat16, branch bugfix/r3.11-standin-redacted-budget-20261103b
