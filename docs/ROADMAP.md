@@ -82,6 +82,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 2 Proof | R5.7 Live checks owed | — | Built but never run for real; each can reopen work above. Lines run when the machine or key they need is at hand, Clean room and the quick start first |
 | 3 Depth | The rest of R2.2 | — | Detection waits for reports from 0.3.0 or later; ACP after the adapters work |
 | 3 | R2.4 Runtime study, R2.5 Behaviour checks | scripted input (R2.4) before R2.5's sheet check | Makes "ready" mean more for apps and games |
+| 3 | R2.12 An app on a phone or TV as a target | R2.4 *(soft)* | Phones and TVs are where many apps people want to recreate live; today a device is a list of apps and a screenshot |
 | 3 | R2.7, R2.8 | — | Small gaps left in finished work |
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
 | 3 | R1.5 | — | Small leftovers |
@@ -1081,6 +1082,88 @@ Owner: open · Status: in progress
 - [ ] Hold the self-test to what the check can see too: picture the game after its scripted
       input and require it to differ from the `--screenshot` picture (a report alone is the
       build's own word)
+
+### R2.12 An app on a phone or TV as a target
+Owner: open · Status: in progress
+Study an app installed on an Android phone or TV the way a person uses it (the remote's keys, the
+screen, its controls), build an Android app from that, and judge each build on a device. Clean
+room throughout: nothing is pulled off the device or decoded.
+- [x] Screen tools over adb, all Clean room: `adb_app_launch` starts a TV app (`category`:
+      leanback), `adb_device_show` says whether the device is a TV and its density,
+      `adb_keys_press` (allowlisted keys, repeats, gaps), `adb_text_type`, `adb_ui_read`
+      (`uiautomator dump` in the node shape `runtime_ui_read` gives, bounds in px and dp),
+      `adb_screen_state_capture` (keys, wait, dump and screenshot in one shell call, with a lead so
+      the dump reads the screen right after the last key), `adb_crash_log_read` — claimed: rock-meister, branch feature/r2.12-adb-screen-tools
+- [x] `adb_ui_walkthrough_record` (scripted steps, a state per step) and `adb_app_map` (a bounded
+      breadth-first map of an app's screens from its keys: screens.json and a dump and picture per
+      state; a screen whose text matches a skip list is a row with no details) — claimed: rock-meister, branch feature/r2.12-app-map
+- [x] `TargetRef::Device { serial, package }` (`adb:<serial>/<package>`): the Make screen's third
+      choice, the CLI's `rebuild` argument, the brief's wording — claimed: rock-meister, branch feature/r2.12-device-target. The Make screen takes it in its address box (`adb:…`), not a tile of its own yet
+- [x] Study for a device target: device facts, a question before the first key, the map into
+      capture/, a README with the geometry rule (px ÷ density = dp, ±1 dp), and an optional pause
+      so the person reviews capture/ before the builder reads it — claimed: rock-meister, branch feature/r2.12-device-study
+- [x] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback
+      launcher, no touchscreen required), a Gradle arm in `build_check`, JDK and Android SDK as
+      engines `engines_list` reports — claimed: rock-meister, branch feature/r2.12-android-app-kind
+- [x] A device check: install the debug APK on the build device, replay each mapped state's keys,
+      claims per state (focused text, the original's focusable controls, paired bounds within the
+      tolerance, no crash), likeness from the claims — claimed: rock-meister, branch feature/r2.12-device-check
+- [x] A run nobody watches: the CLI's `--rounds` defaults to `build.max_rounds`; `--allow tool:<id>`
+      (repeatable) grants a device tool for the project up front, so `--unattended` doesn't refuse
+      it; a builder turn that changed no file but raised a check's likeness counts as progress
+      — claimed: rock-meister, branch feature/r2.12-unattended-run
+- [x] A screen is known by its structure and the texts of its controls, not by every text on it:
+      a live map of a TV guide made a new state of every scroll position and every minute of the
+      clock (digits in a label are read as one) — claimed: rock-meister, branch feature/r2.12-map-fingerprint
+- [x] The device check judges the look too: a run went Ready at 93% with another accent colour,
+      another typeface and placeholder logos, since a dump has no colours, type or icon glyphs,
+      and an icon without a content description isn't in it at all. Each read screen's picture
+      is scored against the original's (the screenshot check's measure, `picture` per screen and
+      `picture_likeness` in device.json, the least alike screens in the note) and, with
+      `picture_good_enough` set, claimed per screen ("it looks at least N% like the original";
+      a blank picture of the original, a video surface or an overlay already gone, is skipped,
+      and what the two devices photograph differently of one build, a video plane one of them
+      composes into its screenshot, is left out of both scores)
+      with the pass's likeness capped by the pictures' mean; the brief and the stack ask for a
+      contentDescription on every icon control and Material icons.
+- [x] A message given with `--resume` is dropped: `rebuild - "<message>" --continue-in <dir> --resume`
+      threw the message away, and five notes sent to a running rebuild that way reached the builder
+      only because it ran `ps` and read the CLI's command line; the sixth, cut short there, was lost
+      and the builder repeated its last check. The message is kept (`follow_up_message`: anything but
+      `-` or nothing) and the run hands it to the agent carrying on its session as the follow-up.
+- [x] A Rust core with a Kotlin shim: a person who wants one core for a TV app and later a desktop
+      one asks for "a Rust core"; before, every Android stack was Kotlin through and through. The
+      stack row `Rust core + Kotlin/Compose (Android)` (asked for by "rust core", "kotlin shim",
+      "uniffi"…: a cdylib under app/core with UniFFI bindings and no Android dependency, the shim
+      drawing and playing, one Gradle build that runs cargo-ndk first), the `cargondk` engine
+      (PATH or cargo's bin folder), the newest NDK under the SDK handed to Gradle as
+      `ANDROID_NDK_HOME`, and a preflight that names what's missing (cargo-ndk, the NDK, the
+      rustup targets). Not yet run live.
+- [ ] A skip text names a control, not a screen: `android_skip_texts` matches any visible text, so
+      "About" skipped a whole Settings list and "Recordings" a menu bar that merely listed them
+      (seen on the first real map). Skip a capture when the focused control or the state's name
+      matches, and never press OK on a focused control that matches.
+- [ ] A map that carries on: a second Study starts the map over from launch, so an app with more
+      screens than `android_max_states` never gets past the cap (a TV player's Settings pages
+      stayed unmapped at 24). Let a map continue from a kept screens.json, exploring only the
+      states whose keys were not all pressed.
+- [x] A map that starts deeper: `adb_app_map` takes `start_keys`, pressed after every launch
+      before the map begins, so a part of a big app the first map never reached (a TV player's
+      seven Settings pages) is mapped with the whole budget; every state's `path` includes them,
+      so the device check replays them as it does any path, and screens.json records them. Run
+      live on a TV player's Settings. — claimed: rockmeister, branch feature/r2.12-map-start-keys
+- [ ] The device check keeps every scorecard: a builder that checks twice in one round overwrites
+      round-N/device/device.json, so the feed's 70% then 4% can't be compared after the fact.
+- [ ] A gate that can't be checked says so where the person looks: on the first real run the test
+      device still held an older build of the same package under another key, the install failed
+      (INSTALL_FAILED_UPDATE_INCOMPATIBLE), and the reason reached only the builder's tool result;
+      the CLI printed the score alone and device.json kept `gate: null`. Put the gate's note in the
+      feed and the scorecard, and name the fix (uninstall the old build, or sign with the same key).
+- [ ] A map that fails is not a study: when the map of a device target fails, Study writes a
+      README and goes on to build with no screens at all, and a later resume sees capture/ and
+      skips Study for good (seen twice on the second study of a TV player). A failed map tries
+      once more, then stops the run with the reason; and Study counts as done only with a
+      screens.json.
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
