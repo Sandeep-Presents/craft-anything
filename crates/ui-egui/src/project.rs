@@ -1024,6 +1024,23 @@ fn outcome_button(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace, height: f32, 
     }
 }
 
+/// Ask before stopping the old app: it may contain unsaved work.
+pub fn restart_modal(app: &mut CraftApp, ui: &mut Ui, project: &Path, close: &mut bool) {
+    ui.label(theme::heading(tr("Restart the app?"), theme::SECTION));
+    ui.add_space(8.0);
+    ui.label(tr("The app is already open. Restart it to open the latest build. Unsaved work in the app may be lost."));
+    ui.add_space(12.0);
+    ui.horizontal(|ui| {
+        if widgets::secondary(ui, None, "Cancel").clicked() {
+            *close = true;
+        }
+        if widgets::primary(ui, "Restart app").clicked() {
+            app.act("project_play", serde_json::json!({"project": project, "restart": true}), tr("Restart app"));
+            *close = true;
+        }
+    });
+}
+
 /// Show a folder in the system file manager (a `file://` URL would open the browser instead).
 fn open_folder(app: &mut CraftApp, ws: &Workspace) {
     app.act("project_open_folder", serde_json::json!({"project": ws.root}), tr("Open the folder"));

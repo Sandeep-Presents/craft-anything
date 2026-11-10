@@ -383,6 +383,8 @@ pub enum Modal {
     Rename(PathBuf),
     /// Delete the project in this folder? (Asked, since it can't be undone.)
     Delete(PathBuf),
+    /// Confirm closing the running project app before starting its latest build.
+    RestartProject(PathBuf),
     /// Pin the open project's build: frozen or light (`UiState::pin_draft`).
     Pin,
     /// A new name for a pin (project folder, pin id).

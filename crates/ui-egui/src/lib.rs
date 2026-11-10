@@ -1013,7 +1013,11 @@ impl CraftApp {
                 self.preview.clone_from(&url);
                 self.open_url = url;
             }
-            ("project_play", Ok(v)) if v["already_running"].as_bool() == Some(true) => self.toast(tr("It's already open."), false),
+            ("project_play", Ok(v)) if v["already_running"].as_bool() == Some(true) => {
+                if let Some(project) = v["project"].as_str() {
+                    self.state.modal = Some(state::Modal::RestartProject(project.into()));
+                }
+            }
             ("project_play", Ok(v)) if !v["closed_at_once"].is_null() => self.toast(pins::quit_at_once(&v), true),
             ("project_play", Ok(_)) => self.toast(tr("Starting… it opens in its own window."), false),
             ("project_play", Err(e)) => self.toast(format!("{} {}", tr("Couldn't start it."), e.for_people()), true),
