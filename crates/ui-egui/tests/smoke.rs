@@ -2792,6 +2792,52 @@ fn only_the_claude_desktop_app_is_named_when_nothing_can_build() {
     assert!(h.query_by_label("The Claude desktop app is installed, but building needs Claude Code, its separate command-line tool. Install Claude Code, sign in to it once in a terminal, then look again.").is_none());
 }
 
+/// The discovery tabs and Detect action stay separate and evenly spaced in Settings → AI.
+#[test]
+fn ai_discovery_controls_have_even_spacing() {
+    for (width, mode, count) in [(760.0, Mode::Beginner, 0), (900.0, Mode::Experienced, 0), (1280.0, Mode::Beginner, 12), (1280.0, Mode::Experienced, 12)] {
+        let mut h = harness_sized(egui::vec2(width, 1000.0), move || {
+            let mut a = demo::app(demo::engine(mode, true));
+            a.backends.clear();
+            a.detected = Some(
+                [BackendKind::Openai, BackendKind::AgentCli]
+                    .into_iter()
+                    .flat_map(|kind| {
+                        (0..count).map(move |i| craft_anything_ai::Detected {
+                            suggestion: BackendConfig {
+                                name: format!("Fixture {kind:?} {i}"),
+                                kind,
+                                model: "fixture".into(),
+                                base_url: None,
+                                ssh_host: None,
+                                enabled: true,
+                            },
+                            reason: "Controlled discovery result".into(),
+                            needs_key: false,
+                        })
+                    })
+                    .collect(),
+            );
+            a.state.settings_open = true;
+            a.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+            a
+        });
+        h.run_steps(4);
+        let providers = h.get_by_label(&format!("Providers ({count})")).rect();
+        let harnesses = h.get_by_label(&format!("Harnesses ({count})")).rect();
+        let detect = h.get_by_label("Detect").rect();
+        assert!(!providers.intersects(detect) && !harnesses.intersects(detect), "controls overlap at {width}: {providers:?}, {harnesses:?}, {detect:?}");
+        let tab_gap = harnesses.left() - providers.right();
+        let action_gap = detect.left() - harnesses.right();
+        assert!(tab_gap > 0.0 && action_gap > 0.0, "controls need a visible gap at {width}");
+        assert!((tab_gap - action_gap).abs() <= 1.0, "spacing differs at {width}: {tab_gap} vs {action_gap}");
+        assert!(providers.top() < detect.bottom() && detect.top() < providers.bottom(), "controls share a row at {width}");
+        h.get_by_label(&format!("Harnesses ({count})")).click();
+        h.run_steps(2);
+        assert_eq!(h.state().state.detect_tab, Some(craft_anything_ui_egui::detect_tabs::DetectTab::Harnesses));
+    }
+}
+
 /// A long reason on a card for an AI found on this computer wraps beside its Add button; it used
 /// to stay on one line and run on under the button.
 #[test]

@@ -1371,6 +1371,9 @@ Gaps found while using the app for real projects.
 - [x] Settings → AI: a card for an AI found on this computer wraps its description beside its Add
       button; the line didn't wrap and ran on under the button
       — claimed: jgt87, branch bugfix/r2.9-detected-cards-wrap — PR #1235
+- [x] Settings → AI: Providers, Harnesses and Detect share consistent spacing below the discovery
+      heading and wrap together, so the Detect action cannot overlap a tab (#1519)
+      — Codex, branch bugfix/ai-detection-spacing
 - [x] The same action reads the same everywhere: a pin's menu said "Show folder" for what the project
       page calls "Open folder" (both `project_open_folder`), and a game's chosen folder was shown as a
       full path in its row, where other chosen folders are shortened, cut to fit and whole on hover
