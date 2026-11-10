@@ -1469,8 +1469,11 @@ Owner: open · Status: in progress
       All 24 combined replay regressions pass locally on the refresh onto `cf414ff4`.
       See this PR's checks for the refreshed revision's complete gate.
       — claimed: Afloat16, branch bugfix/r3.11-standin-sample-metadata-20261103b
-- [ ] `native_publisher_show` hashes the file minus the signature fields, not section by section;
-      a file with unusual gaps between sections can read as different
+- [x] `native_publisher_show` hashes the file minus the signature fields, not section by section;
+      a file with unusual gaps between sections can read as different — the hash now follows
+      Windows' order (headers, each section by its data's file offset, then the bytes after them,
+      which Windows counts without the certificate table), the tool no longer warns that a gap
+      could read as different, and a regression puts a gap between sections
       — claimed: muraa-p, branch bugfix/r3.11-publisher-hash-sections
 - [x] Enforce stand-in per-body and total byte budgets on the text that is actually retained after redaction;
       deduplicate consecutive samples before charging the capture budget.
