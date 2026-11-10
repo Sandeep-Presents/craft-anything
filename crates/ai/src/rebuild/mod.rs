@@ -1074,15 +1074,26 @@ impl Worker {
         let last = ws.manifest.checks.last().cloned();
         // The last round's checks, all of them: the last one alone (say a mechanics sheet) isn't the verdict.
         let last_round: Vec<CheckResult> = last.map(|l| ws.manifest.checks.iter().filter(|c| c.round == l.round).cloned().collect()).unwrap_or_default();
-        let mut summary = if last_round.is_empty() { "Ready.".to_string() } else { format!("Ready: {}.", self_check::summary(&last_round, opts.good_enough)) };
+        // With nothing to compare against, passing says only that it works: never "Ready".
+        let not_compared = last_round.iter().any(|c| c.not_compared);
+        let mut summary = if last_round.is_empty() {
+            "Ready.".to_string()
+        } else if not_compared {
+            format!(
+                "Built, but never compared with the original: add pictures of it, then ask to carry on ({}).",
+                self_check::summary(&last_round, opts.good_enough)
+            )
+        } else {
+            format!("Ready: {}.", self_check::summary(&last_round, opts.good_enough))
+        };
         // What the builder couldn't find out is said, not hidden.
         match self_check::open_questions(ws).len() {
             0 => {}
             1 => summary.push_str(" 1 question about the original is still open."),
             n => summary.push_str(&format!(" {n} questions about the original are still open.")),
         }
-        ws.set_status(Status::Ready, summary.clone())?;
-        self.emit(RunEvent::Step { step: Step::Done, text: summary.clone() });
+        ws.set_status(if not_compared { Status::NeedsYou } else { Status::Ready }, summary.clone())?;
+        self.emit(RunEvent::Step { step: if not_compared { Step::Check } else { Step::Done }, text: summary.clone() });
         Ok(summary)
     }
 

@@ -264,6 +264,11 @@ pub struct CheckResult {
     /// being good enough, however alike the rest looks.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub claims: Vec<Claim>,
+    /// There is an original, but nothing to compare this build with (no picture of it). It doesn't
+    /// stop the check passing, as more rounds couldn't change that; it does stop the run calling
+    /// itself ready, since a pass then says only that the build works.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not_compared: bool,
 }
 
 /// One thing a build must do, checked on its own ("The start page doesn't scroll sideways at
@@ -314,6 +319,7 @@ impl CheckResult {
             pages: Vec::new(),
             unknowns: Vec::new(),
             claims: Vec::new(),
+            not_compared: false,
         }
     }
 
@@ -354,6 +360,8 @@ struct CheckRecord {
     unknowns: Vec<String>,
     #[serde(default)]
     claims: Vec<Claim>,
+    #[serde(default)]
+    not_compared: bool,
 }
 
 impl From<CheckRecord> for CheckResult {
@@ -372,6 +380,7 @@ impl From<CheckRecord> for CheckResult {
             pages: r.pages,
             unknowns: r.unknowns,
             claims: r.claims,
+            not_compared: r.not_compared,
         }
     }
 }

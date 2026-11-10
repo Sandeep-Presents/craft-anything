@@ -988,6 +988,8 @@ Owner: open · Status: in progress
 
 ### R2.4 Runtime study for apps and games (with consent)
 Owner: maintainers · Status: in progress
+- [x] A rebuild of an app with no picture of the original isn't called ready: its check says nothing
+      was compared, and the project waits for the person's pictures
 - [ ] UI tree on Linux (AT-SPI)
 - [x] `native_window_capture` on macOS: no Screen Recording is refused before the program starts
       (it was "didn't show a window", which said to wait longer), and the name fallback matches

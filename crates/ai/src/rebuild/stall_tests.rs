@@ -176,3 +176,84 @@ fn try_again_does_not_restart_a_build_that_never_works() {
     assert!(ws.manifest.checks.len() > total, "a new request runs checks again");
     assert!(ws.manifest.not_working_checks <= NOT_WORKING_CHECK_LIMIT, "{}", ws.manifest.not_working_checks);
 }
+
+/// A kind whose one check passes, with or without having compared the build with an original.
+struct Passes(bool);
+
+struct PassesCheck(bool);
+
+impl Check for PassesCheck {
+    fn id(&self) -> &'static str {
+        "passes"
+    }
+    fn run(&self, cx: &mut CheckCx) -> Result<CheckResult, ToolError> {
+        Ok(CheckResult { not_compared: self.0, ..CheckResult::new(self.id(), cx.round, true, "It starts and draws.") })
+    }
+}
+
+impl TargetKind for Passes {
+    fn id(&self) -> &'static str {
+        "passes"
+    }
+    fn words(&self) -> KindWords {
+        KindWords { button: "Build it", icon: "code", ready: "It's ready", change_hint: "Ask for a change" }
+    }
+    fn detect(&self, _cx: &DetectCx) -> Option<u32> {
+        Some(1000)
+    }
+    fn default_stack(&self, _cx: &DetectCx) -> &'static str {
+        "Scripted stack"
+    }
+    fn goal(&self) -> &'static str {
+        "a scripted app"
+    }
+    fn checks(&self, _ws: &Workspace) -> Vec<Box<dyn Check>> {
+        vec![Box::new(PassesCheck(self.0))]
+    }
+}
+
+/// The run's status and note, and how many times the builder was asked.
+fn run_passing_build(not_compared: bool) -> (Status, String, usize) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(dir.path(), "Passing build", "Build an app", TargetRef::None).unwrap();
+    std::fs::create_dir_all(ws.app_dir()).unwrap();
+    std::fs::write(ws.app_dir().join("main.txt"), "built").unwrap();
+    ws.manifest.stack = "Scripted stack".into();
+    ws.save().unwrap();
+    let mut worker = check_worker(&ws, false);
+    let seen = Arc::default();
+    let turns = (0..20).map(|_| turn(vec![Block::Text { text: "Built it.".into() }], StopReason::EndTurn)).collect();
+    let model = Scripted { turns, seen: Arc::clone(&seen) };
+    let slot = ModelSlot { name: "Scripted".into(), model: Box::new(model), local: true, effort: None, max_turns: 10, context_tokens: 0 };
+    let api = ApiConversation::start(Arc::new(EngineHost(worker.engine.clone())), vec![slot], LoopConfig::default()).unwrap();
+    let entry = crate::BackendEntry {
+        config: crate::BackendConfig {
+            name: "Scripted".into(),
+            kind: BackendKind::OpenaiCompatible,
+            model: "scripted".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        },
+        options: Default::default(),
+    };
+    let mut kinds = KindRegistry::built_in();
+    kinds.register(Arc::new(Passes(not_compared)));
+    let opts = RunOptions { message: Some("Build the app".into()), kinds, max_rounds: 6, ..RunOptions::default() };
+    let summary = worker.run(&mut ws, entry, Some(api), None, &opts).unwrap();
+    let asked = seen.lock().unwrap().len();
+    (ws.manifest.status, summary, asked)
+}
+
+#[test]
+fn a_build_never_compared_with_the_original_waits_for_the_person_instead_of_being_ready() {
+    let (status, summary, asked) = run_passing_build(true);
+    assert_eq!(status, Status::NeedsYou, "{summary}");
+    assert!(summary.contains("never compared with the original") && !summary.starts_with("Ready"), "{summary}");
+    let (_, _, compared_asked) = run_passing_build(false);
+    assert_eq!(asked, compared_asked, "no extra rounds: more of them couldn't change it");
+
+    let (status, summary, _) = run_passing_build(false);
+    assert_eq!(status, Status::Ready, "{summary}");
+    assert!(summary.starts_with("Ready"), "{summary}");
+}

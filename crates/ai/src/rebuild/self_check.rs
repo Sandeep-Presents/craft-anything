@@ -85,6 +85,9 @@ pub fn summary(checks: &[CheckResult], good_enough: f64) -> String {
     }
 }
 
+/// The last line of the builder's report when its checks pass with nothing to compare against.
+const NOT_COMPARED: &str = "These checks pass, but nothing was compared with the original: there's no picture of it in capture/ or reference/. A pass here says only that the build works, not that it's close. This isn't finished: get a picture with native_window_capture, or ask the person for one with core_person_ask, then compare your build with it. If you can't get one, say so plainly; the project will wait for the person.";
+
 /// What the builder is told about its own check: each result with its likeness and the bar,
 /// what's still unknown (the checks' and its own open questions), where its pictures are, and
 /// whether it would pass.
@@ -121,7 +124,7 @@ pub fn report(checks: &[CheckResult], good_enough: f64, open: &[craft_anything_e
         lines.push(format!("Pictures of your build (compare each with the original's in capture/ or reference/): {}", pictures.join(", ")));
     }
     lines.push(if checks.iter().all(|c| c.good(good_enough)) {
-        "This would pass. Finish what you're doing, then reply.".to_string()
+        if checks.iter().any(|c| c.not_compared) { NOT_COMPARED.to_string() } else { "This would pass. Finish what you're doing, then reply.".to_string() }
     } else {
         "Not good enough yet: fix what it lists, build again, and check again with rebuild_check.".to_string()
     });
@@ -179,6 +182,15 @@ impl Worker {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pass_with_nothing_compared_is_not_called_a_pass() {
+        let shot = CheckResult { not_compared: true, ..CheckResult::new("app-screenshot", 0, true, "The program starts and draws.") };
+        assert!(shot.good(90.0), "more rounds couldn't change it, so it doesn't send the builder round again");
+        let said = report(&[shot], 90.0, &[]);
+        assert!(!said.contains("This would pass"), "{said}");
+        assert!(said.contains("nothing was compared with the original"), "{said}");
+    }
 
     #[test]
     fn the_report_says_what_differs_and_whether_it_would_pass() {

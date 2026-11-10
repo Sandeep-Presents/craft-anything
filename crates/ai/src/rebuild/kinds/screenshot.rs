@@ -89,7 +89,9 @@ impl Check for ScreenshotCheck {
         pictures.extend(Some(ws.capture_dir().join("window.png")).filter(|p| p.is_file()));
         let bar = cx.build_settings().picture_good_enough;
         let mut similarity = None;
-        let note = match picture_likeness(&img, &pictures) {
+        let likeness = picture_likeness(&img, &pictures);
+        let not_compared = !matches!(likeness, Likeness::Best { .. }) && ws.manifest.target != TargetRef::None;
+        let note = match likeness {
             Likeness::Best { score, name } => {
                 // With a bar set (`build.picture_good_enough`), the likeness decides when to stop.
                 if bar.is_some() {
@@ -101,12 +103,15 @@ impl Check for ScreenshotCheck {
                 "The program starts and draws ({}×{}). The person's pictures couldn't be read (PNG, JPEG, WebP or GIF), so they weren't compared.",
                 img.width, img.height
             ),
+            Likeness::NoPictures if not_compared => {
+                format!("The program starts and draws ({}×{}). There's no picture of the original, so it wasn't compared.", img.width, img.height)
+            }
             Likeness::NoPictures => format!("The program starts and draws ({}×{}).", img.width, img.height),
         };
         let (running, claims) = running_note(cx, &program, &base_args, &dir);
         let note = note + &running;
         artifacts.extend(dir.join("window.png").strip_prefix(&ws.root).ok().map(Path::to_path_buf).filter(|p| ws.root.join(p).is_file()));
-        Ok(CheckResult { artifacts, similarity, good_enough: bar, claims, ..CheckResult::new(self.id(), round, true, note) })
+        Ok(CheckResult { artifacts, similarity, good_enough: bar, claims, not_compared, ..CheckResult::new(self.id(), round, true, note) })
     }
 }
 

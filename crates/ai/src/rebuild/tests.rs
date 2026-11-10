@@ -2751,6 +2751,20 @@ fn new_python_projects_build_and_save_screenshots_through_their_toolchain() {
     assert_eq!(launch(&app, None).unwrap(), (program, vec!["main.py".into()]), "Play uses the same interpreter/entrypoint");
     let shot = ws.checks_dir().join("round-1/screenshot.png");
     assert!(shot.is_file());
+    assert!(!checks[1].not_compared, "a new project has no original to compare with");
+
+    // With an original and no picture of it, nothing was compared; a picture of it changes that.
+    let mut with_original = Workspace::open(&ws.root).unwrap();
+    with_original.manifest.target = TargetRef::Local { path: app.join("fixture.png") };
+    with_original.save().unwrap();
+    let screenshot = |w: &Workspace| check_worker(w, false).run_checks(w, &AppKind, 2).unwrap().into_iter().find(|c| c.check == "app-screenshot").unwrap();
+    let before = screenshot(&with_original);
+    assert!(before.passed && before.not_compared && before.note.contains("wasn't compared"), "{before:?}");
+    with_original.add_references(&[app.join("fixture.png")]).unwrap();
+    let after = screenshot(&with_original);
+    assert!(!after.not_compared && after.note.contains("like"), "{after:?}");
+    with_original.manifest.target = TargetRef::None;
+    with_original.save().unwrap();
 
     std::fs::write(app.join("fail-shot"), "").unwrap();
     let checks = worker.run_checks(&ws, &AppKind, 1).unwrap();
