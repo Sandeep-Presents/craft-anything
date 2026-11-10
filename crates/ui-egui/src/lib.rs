@@ -456,6 +456,11 @@ pub struct CraftApp {
     pub model_tuning: std::collections::BTreeMap<String, ModelTuningDraft>,
     /// The agent app whose program the file dialog is choosing.
     pub picking_program_for: Option<String>,
+    /// The coding agent chosen in Settings → AI to add by its program (an id from
+    /// `cli_agents::KNOWN`; empty: none chosen yet).
+    pub new_agent: String,
+    /// The agent the file dialog is choosing a program for, to add it (#1060).
+    pub picking_new_agent: Option<String>,
     /// Claude Code folders being typed in Settings → AI, by AI, until they're saved.
     pub folder_inputs: std::collections::BTreeMap<String, String>,
     /// The backend the person chose to build with (Settings → AI), if any.
@@ -585,6 +590,8 @@ impl CraftApp {
             model_request: 0,
             model_tuning: Default::default(),
             picking_program_for: None,
+            new_agent: String::new(),
+            picking_new_agent: None,
             folder_inputs: Default::default(),
             builder: None,
             extractor: None,
@@ -1651,7 +1658,9 @@ impl CraftApp {
                         Pick::GameFolder => game_files::folder_picked(self, path),
                         Pick::SavePicture => game_files::save_to(self, path),
                         Pick::AgentProgram => {
-                            if let Some(name) = self.picking_program_for.take() {
+                            if let Some(agent) = self.picking_new_agent.take() {
+                                self.add_agent_program(agent, path.display().to_string());
+                            } else if let Some(name) = self.picking_program_for.take() {
                                 self.set_agent_program(&name, Some(path.display().to_string()));
                             }
                         } // Several files: these come back as Done::Pictures / Done::ToAttach.

@@ -1468,3 +1468,7 @@ Connecting to {name}… {seconds} s	Connessione a {name}… {seconds} s
 Stopped adding {name}.	Aggiunta di {name} interrotta.
 It isn't there any more, so {program} runs in its place.	Non è più lì, quindi al suo posto si usa {program}.
 Use it	Usalo
+Add an agent by its program	Aggiungi un agente dal suo programma
+For a coding agent installed somewhere we don't look.	Per un agente di programmazione installato dove non cerchiamo.
+Choose an agent	Scegli un agente
+Choose its program…	Scegli il suo programma…

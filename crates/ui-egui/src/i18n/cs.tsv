@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	Připojování k {name}… {seconds} s
 Stopped adding {name}.	Přidávání {name} bylo zastaveno.
 It isn't there any more, so {program} runs in its place.	Už tam není, proto se místo něj spouští {program}.
 Use it	Použít
+Add an agent by its program	Přidat agenta podle jeho programu
+For a coding agent installed somewhere we don't look.	Pro programovacího agenta nainstalovaného tam, kde nehledáme.
+Choose an agent	Vyberte agenta
+Choose its program…	Vybrat jeho program…

@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	{name}에 연결하는 중… {seconds}초
 Stopped adding {name}.	{name} 추가를 멈췄습니다.
 It isn't there any more, so {program} runs in its place.	더 이상 그곳에 없어서 대신 {program}이(가) 실행됩니다.
 Use it	이것 사용
+Add an agent by its program	프로그램으로 에이전트 추가
+For a coding agent installed somewhere we don't look.	찾아보지 않는 곳에 설치된 코딩 에이전트용입니다.
+Choose an agent	에이전트 선택
+Choose its program…	프로그램 선택…

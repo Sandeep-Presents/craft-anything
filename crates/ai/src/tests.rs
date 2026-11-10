@@ -277,6 +277,31 @@ fn a_saved_program_that_is_gone_is_named_by_test_and_doctor() {
     assert!(!replaced.contains_key("Nowhere") && !replaced.contains_key("Kept") && !replaced.contains_key("Unsaved"), "{replaced:?}");
 }
 
+/// #1060: an agent detection can't find is added by its program, numbered when its name is taken;
+/// an unknown agent, a missing file, a folder and a PowerShell script are refused before anything is saved.
+#[test]
+fn an_agent_is_added_by_its_program() {
+    let (h, _d) = hub();
+    let dir = tempfile::tempdir().unwrap();
+    let program = dir.path().join("opencode-cli.exe");
+    std::fs::write(&program, "").unwrap();
+    let program = program.display().to_string();
+
+    assert_eq!(h.add_agent_program("opencode", &program).unwrap(), "OpenCode");
+    assert_eq!(h.add_agent_program("opencode", &format!("  {program} ")).unwrap(), "OpenCode 2");
+    let saved = h.config().backends.into_iter().find(|b| b.config.name == "OpenCode 2").unwrap();
+    assert_eq!((saved.config.kind, saved.config.model.as_str(), saved.options.command.as_deref()), (BackendKind::AgentCli, "opencode", Some(program.as_str())));
+
+    assert!(h.add_agent_program("no-such-agent", &program).is_err());
+    assert!(h.add_agent_program("codex", &dir.path().join("gone").display().to_string()).is_err());
+    assert!(h.add_agent_program("codex", &dir.path().display().to_string()).is_err());
+    let script = dir.path().join("codex.PS1");
+    std::fs::write(&script, "").unwrap();
+    let err = h.add_agent_program("codex", &script.display().to_string()).unwrap_err();
+    assert!(err.message.contains("PowerShell"), "{}", err.message);
+    assert_eq!(h.config().backends.len(), 2);
+}
+
 /// Every known agent with an adapter of its own is offered when adding a coding agent.
 #[test]
 fn every_agent_with_its_own_adapter_is_offered() {

@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	กำลังเชื่อมต่อ�
 Stopped adding {name}.	หยุดเพิ่ม {name} แล้ว
 It isn't there any more, so {program} runs in its place.	ไม่มีอยู่ที่นั่นแล้ว จึงใช้ {program} แทน
 Use it	ใช้อันนี้
+Add an agent by its program	เพิ่มเอเจนต์จากโปรแกรมของมัน
+For a coding agent installed somewhere we don't look.	สำหรับเอเจนต์เขียนโค้ดที่ติดตั้งไว้ในที่ที่เราไม่ได้ค้นหา
+Choose an agent	เลือกเอเจนต์
+Choose its program…	เลือกโปรแกรมของมัน…

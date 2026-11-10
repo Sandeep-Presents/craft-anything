@@ -312,6 +312,18 @@ impl CraftApp {
         self.server_form.connecting = Some((job, shown, std::time::Instant::now()));
     }
 
+    /// Add a coding agent run from the program the person chose, for one Detect can't find (#1060).
+    pub fn add_agent_program(&mut self, agent: String, program: String) {
+        let hub = self.hub.clone();
+        let choices = self.backend_choices;
+        let shown = craft_anything_ai::cli_agents::display_for(&agent);
+        self.jobs.spawn(trf("Connect {name}", &[("name", &shown)]), true, move |_| {
+            let added = hub.add_agent_program(&agent, &program);
+            let name = added.as_ref().map_or(shown, Clone::clone);
+            Ok(crate::Done::BackendAdded { name, result: added.map(|_| ()), choices })
+        });
+    }
+
     /// Run an agent app from this program (`None`: find it by its usual name again).
     pub fn set_agent_program(&mut self, name: &str, program: Option<String>) {
         self.agent_model_picker = None;

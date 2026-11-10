@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	Conectando con {name}… {seconds} s
 Stopped adding {name}.	Se dejó de añadir {name}.
 It isn't there any more, so {program} runs in its place.	Ya no está ahí, así que se usa {program} en su lugar.
 Use it	Usarlo
+Add an agent by its program	Añadir un agente por su programa
+For a coding agent installed somewhere we don't look.	Para un agente de programación instalado donde no buscamos.
+Choose an agent	Elige un agente
+Choose its program…	Elegir su programa…

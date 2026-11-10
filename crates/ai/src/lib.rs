@@ -620,6 +620,33 @@ impl AiHub {
         self.save_config(&cfg)
     }
 
+    /// Add a known coding agent run from `program`, for one kept somewhere detection doesn't look
+    /// (#1060). It gets the agent's name, numbered when that's taken ("OpenCode 2"). Returns the
+    /// name. The program must be a file on this computer: a folder (a Mac app) can't be started.
+    pub fn add_agent_program(&self, agent: &str, program: &str) -> Result<String, ToolError> {
+        let Some((id, _, display)) = cli_agents::KNOWN.iter().find(|(id, _, _)| *id == agent) else {
+            return Err(ToolError::invalid(format!("{agent:?} isn't a coding agent we know.")));
+        };
+        let program = program.trim();
+        if !std::path::Path::new(program).is_file() {
+            return Err(ToolError::invalid(format!("There's no program at {program}."))
+                .with_remediation("Pick the agent's command-line program itself, such as opencode-cli.exe, not its folder or app."));
+        }
+        // npm puts a PowerShell shim beside each .cmd one; programs are never started through PowerShell.
+        if std::path::Path::new(program).extension().is_some_and(|e| e.eq_ignore_ascii_case("ps1")) {
+            return Err(ToolError::invalid(format!("{program} is a PowerShell script, which can't be started as the agent."))
+                .with_remediation("Pick the agent's .exe, or the .cmd beside this script."));
+        }
+        let taken: Vec<String> = self.config().backends.into_iter().map(|b| b.config.name).collect();
+        let name = std::iter::once(display.to_string())
+            .chain((2..100).map(|i| format!("{display} {i}")))
+            .find(|n| !taken.contains(n))
+            .ok_or_else(|| ToolError::invalid(format!("There are too many AIs named {display}.")))?;
+        let config = BackendConfig { name: name.clone(), kind: BackendKind::AgentCli, model: id.to_string(), base_url: None, ssh_host: None, enabled: true };
+        self.add_backend_with(BackendEntry { config, options: BackendOptions { command: Some(program.to_string()), ..Default::default() } }, None)?;
+        Ok(name)
+    }
+
     /// Makes this installation's OpenCode Go session id and saves it, when a Go backend is set up
     /// and has none (#1225). Returns whether it saved one. The app and the CLI call this at startup,
     /// before any session lock is taken: a backend that never went through [`AiHub::add_backend`]

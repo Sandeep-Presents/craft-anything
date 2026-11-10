@@ -816,8 +816,9 @@ Owner: open · Status: in progress
       a restart keeps it (#1225). An OpenCode error without a message shows its name, status and the
       start of its response body. Not run live; the run-5 cause in #1225 still needs its log.
       — claimed: fabox-os, branch bugfix/1225-opencode-go-session
-- [ ] Settings → AI can only add an agent it detected: add one by choosing its program, for a CLI
-      kept somewhere we don't look (#1060)
+- [x] Settings → AI adds an agent Detect can't find: choose it from the known agents, then its program
+      (`AiHub::add_agent_program`; a file, not a folder), for a CLI kept somewhere we don't look (#1060)
+      — claimed: FuryNocturn, branch feature/r2.2-add-agent-by-program
 - [ ] Verify OpenCode model discovery and an explicit thinking selection on a live SSH host,
       and complete a live generation with the selected model and variant (local catalogue verified).
 - [x] A stopped, failed or killed OpenCode turn deletes its session, so OpenCode's shared service

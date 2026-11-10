@@ -644,6 +644,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
         app.check_agent_connection(name);
     }
     if let Some(name) = choose_program {
+        app.picking_new_agent = None;
         app.picking_program_for = Some(name);
         app.pick(Pick::AgentProgram);
     }
@@ -783,7 +784,35 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
         });
         ui.add_space(6.0);
     }
+    agent_by_program(app, ui);
     server_form(app, ui);
+}
+
+/// A coding agent Detect can't find, such as a CLI kept inside its desktop app (#1060): chosen
+/// from the agents we know, then added by its program.
+fn agent_by_program(app: &mut CraftApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    ui.add_space(14.0);
+    widgets::caption(ui, "Add an agent by its program");
+    ui.label(RichText::new(tr("For a coding agent installed somewhere we don't look.")).color(t.text_faint).size(theme::CAPTION));
+    ui.add_space(4.0);
+    let known = craft_anything_ai::cli_agents::KNOWN;
+    let mut choose = false;
+    ui.horizontal(|ui| {
+        let current = known.iter().find(|(id, _, _)| *id == app.new_agent).map_or_else(|| tr("Choose an agent"), |(_, _, d)| d.to_string());
+        egui::ComboBox::from_id_salt("new-agent").icon(widgets::combo_icon).selected_text(current).show_ui(ui, |ui| {
+            for (id, _, display) in known {
+                ui.selectable_value(&mut app.new_agent, id.to_string(), *display);
+            }
+        });
+        let ready = !app.new_agent.is_empty();
+        choose = ui.add_enabled_ui(ready, |ui| widgets::secondary(ui, Some("folder"), "Choose its program…")).inner.clicked() && ready;
+    });
+    if choose {
+        app.picking_program_for = None;
+        app.picking_new_agent = Some(app.new_agent.clone());
+        app.pick(Pick::AgentProgram);
+    }
 }
 
 /// An AI that "Look for AI" can't find: a server on another computer or a hosted service, added by

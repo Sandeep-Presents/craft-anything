@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	{name}-თან დაკავშირე
 Stopped adding {name}.	{name}-ის დამატება შეჩერდა.
 It isn't there any more, so {program} runs in its place.	ის აღარ არის იქ, ამიტომ მის ნაცვლად {program} ეშვება.
 Use it	გამოყენება
+Add an agent by its program	აგენტის დამატება მისი პროგრამით
+For a coding agent installed somewhere we don't look.	პროგრამირების აგენტისთვის, რომელიც დაყენებულია იქ, სადაც არ ვეძებთ.
+Choose an agent	აირჩიეთ აგენტი
+Choose its program…	მისი პროგრამის არჩევა…

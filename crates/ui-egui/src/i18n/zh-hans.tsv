@@ -1466,3 +1466,7 @@ Connecting to {name}… {seconds} s	正在连接 {name}… {seconds} 秒
 Stopped adding {name}.	已停止添加 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那里，因此改用 {program}。
 Use it	使用它
+Add an agent by its program	按程序添加代理
+For a coding agent installed somewhere we don't look.	用于安装在我们不会查找的位置的编程代理。
+Choose an agent	选择一个代理
+Choose its program…	选择它的程序…
