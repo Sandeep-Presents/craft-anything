@@ -1159,6 +1159,11 @@ Gaps found while using the app for real projects.
 - [x] The project page and a slash command change those choices (like `/btw`): the Approvals
       menu under the prompt box and `/approvals <kind> <allow|ask|refuse|default>`
       — claimed: tanish2k09, branch feature/r2.9-approvals-ui
+- [x] The project's open questions were a read-only card on the right that said to answer them "in
+      a message below": answering there didn't answer the question, so it never left the list. Each
+      question now opens its own field in the card, and an answer resolves the unknown
+      (`core_unknown_edit`), so it leaves the list and the builder's next turn finds it in the
+      project's record — claimed: Andee Collard, branch feature/r2.9-open-questions-answer
 - [ ] The new approvals strings in every catalog were written with an AI; not reviewed by native
       speakers yet — pt-BR claimed: marlonferreira1800-hue, branch docs/r2.9-approvals-pt-br-review
 - [x] A prompt that changes nothing in app/ still builds and starts the app again, often twice (the

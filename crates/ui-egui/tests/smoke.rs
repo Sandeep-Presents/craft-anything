@@ -1,7 +1,7 @@
 //! UI smoke tests: every screen draws, the main controls work, and nothing blocks or panics.
 
 use craft_anything_ai::{BackendConfig, BackendKind};
-use craft_anything_engine::{Mode, TargetKind};
+use craft_anything_engine::{Mode, TargetKind, evidence::UnknownStatus};
 use craft_anything_ui_egui::state::{ChatItem, FirstRunStep, RailKind, Screen};
 use craft_anything_ui_egui::{CraftApp, demo};
 use egui_kittest::Harness;
@@ -1373,6 +1373,13 @@ fn a_model_the_list_doesnt_offer_can_be_typed_in() {
     h.get_by_label("Another model").type_text("my-own-model");
     h.run_steps(1);
     h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    eprintln!(
+        "DEBUG toasts={:?} open={:?} unknowns={:?}",
+        h.state().state.toasts,
+        h.state().state.open_answer,
+        h.state().engine.session().unknowns().map(|u| (u.question.clone(), u.status)).collect::<Vec<_>>()
+    );
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Box" && b.model == "my-own-model")));
 }
 
@@ -2332,8 +2339,21 @@ fn the_builders_open_questions_show_beside_the_project() {
     });
     h.run_steps(3);
     h.get_by_label("Open questions");
-    h.get_by_label("May the original's logo and text be reused, or must they be placeholders?");
-    h.get_by_label("Answer any of them in a message below.");
+    h.get_by_label("Does check_for_updates send anything about the user?");
+    // Answered where it's listed, not in a message below: the link opens its field there, and the
+    // answer resolves the question, so it leaves the list.
+    h.get_by_label("Answer").click();
+    h.run_steps(2);
+    let field = h.get_by_role(egui::accesskit::Role::TextInput);
+    field.focus();
+    h.run_steps(1);
+    h.get_by_role(egui::accesskit::Role::TextInput).type_text("Only the version number.");
+    h.key_press(egui::Key::Enter);
+    assert!(
+        wait(&mut h, |a| a.engine.session().unknowns().any(|u| u.question.starts_with("Does check_for_updates") && u.status == UnknownStatus::Resolved)),
+        "the answer resolves the question"
+    );
+    assert!(wait(&mut h, |a| a.facts.open_questions.is_empty()), "an answered question leaves the list");
 }
 
 #[test]

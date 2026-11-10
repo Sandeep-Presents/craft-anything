@@ -7,11 +7,12 @@ use crate::i18n::{tr, trf};
 use crate::make::{self, resolve_target};
 use crate::state::{FeedItem, MakeDraft, Modal, PlanStatus, PlanStep, Screen, UserItem};
 use crate::theme::{self, Tokens};
-use crate::{CraftApp, Done, chat, icons, prompt_box, widgets};
+use crate::{CraftApp, Done, Route, chat, icons, prompt_box, widgets};
 use craft_anything_ai::AgentEvent;
 use craft_anything_ai::rebuild::activity::{Action, ActivityNow, LineKind};
 use craft_anything_ai::rebuild::feed::{self, apply};
 use craft_anything_ai::rebuild::{self, AppKind, KindRegistry, KindWords, Note, RebuildRun, RunEvent, RunOptions, Started, Step, Stopped, TargetKind};
+use craft_anything_engine::Consent;
 use craft_anything_engine::inbox::{Answer, Inbox, Request, RequestKind};
 use craft_anything_engine::workspace::{CheckResult, Status, TargetRef, Workspace, suggest_name};
 use egui::{Color32, Margin, RichText, Ui, Vec2};
@@ -744,8 +745,9 @@ pub struct Facts {
     pub references: usize,
     /// Generated assets: how many, what they cost.
     pub assets: (usize, f64),
-    /// The builder's open questions, most important first.
-    pub open_questions: Vec<String>,
+    /// The builder's open questions, most important first, each with what an answer needs
+    /// (its id and revision).
+    pub open_questions: Vec<craft_anything_engine::evidence::Unknown>,
 }
 
 impl Facts {
@@ -759,7 +761,7 @@ impl Facts {
             references: ws.references().len(),
             // Summed from +0.0: an empty f64 `sum()` is -0.0, shown as "$-0.00".
             assets: (a.len(), a.iter().fold(0.0, |s, x| s + x.cost_usd)),
-            open_questions: craft_anything_ai::rebuild::self_check::open_questions(ws).into_iter().map(|u| u.question).collect(),
+            open_questions: craft_anything_ai::rebuild::self_check::open_questions(ws),
         }
     }
 }
@@ -1029,32 +1031,98 @@ fn open_folder(app: &mut CraftApp, ws: &Workspace) {
     app.act("project_open_folder", serde_json::json!({"project": ws.root}), tr("Open the folder"));
 }
 
-/// What the builder couldn't find out about the original, so the person can answer it in a
-/// follow-up; nothing when it has no open questions.
-fn open_questions(app: &CraftApp, ui: &mut Ui) {
+/// The builder's open questions, answered where they're listed: an answer resolves the unknown
+/// (`core_unknown_edit`), so it leaves the list and the builder's next turn finds it in the
+/// project's record. Nothing when there are none.
+fn open_questions(app: &mut CraftApp, ui: &mut Ui) {
     if app.facts.open_questions.is_empty() {
         return;
     }
     let t = Tokens::get(ui.ctx());
+    const SHOWN: usize = 5;
+    // Taken out of `facts` first: drawing a row changes the app (which question is open), and the
+    // card must not hold a borrow of the list while it does.
+    let shown: Vec<_> = app.facts.open_questions.iter().take(SHOWN).cloned().collect();
+    let more = app.facts.open_questions.len() - shown.len();
+    let (mut submit, mut cancel) = (None, false);
     widgets::card(&t).inner_margin(Margin::symmetric(16, 14)).show(ui, |ui| {
         ui.set_width(ui.available_width());
         widgets::caption(ui, "Open questions");
         ui.add_space(6.0);
-        const SHOWN: usize = 5;
-        for q in app.facts.open_questions.iter().take(SHOWN) {
-            ui.horizontal_wrapped(|ui| {
-                icons::show(ui, "info", 14.0, t.text_dim);
-                ui.add(egui::Label::new(RichText::new(q).size(theme::SMALL).color(t.text)).wrap());
-            });
+        for u in &shown {
+            question_row(app, ui, u, &mut submit, &mut cancel);
+            ui.add_space(6.0);
         }
-        if app.facts.open_questions.len() > SHOWN {
-            let more = trf("and {n} more", &[("n", &(app.facts.open_questions.len() - SHOWN).to_string())]);
+        if more > 0 {
+            let more = trf("and {n} more", &[("n", &more.to_string())]);
             ui.label(RichText::new(more).size(theme::SMALL).color(t.text_dim));
         }
-        ui.add_space(4.0);
-        ui.label(RichText::new(tr("Answer any of them in a message below.")).size(theme::SMALL).color(t.text_dim));
     });
+    if cancel {
+        app.state.open_answer = None;
+    }
+    if let Some((u, answer)) = submit {
+        answer_open_question(app, &u, &answer);
+    }
     ui.add_space(14.0);
+}
+
+/// One open question: its words, then either the link that opens its answer field or the field
+/// the answer goes in.
+fn question_row(
+    app: &mut CraftApp,
+    ui: &mut Ui,
+    u: &craft_anything_engine::evidence::Unknown,
+    submit: &mut Option<(craft_anything_engine::evidence::Unknown, String)>,
+    cancel: &mut bool,
+) {
+    let t = Tokens::get(ui.ctx());
+    ui.horizontal_wrapped(|ui| {
+        icons::show(ui, "info", 14.0, t.text_dim);
+        ui.add(egui::Label::new(RichText::new(&u.question).size(theme::SMALL).color(t.text)).wrap());
+    });
+    let answering = app.state.open_answer.as_ref().is_some_and(|(id, _)| *id == u.id);
+    if !answering {
+        if widgets::link(ui, "Answer").clicked() {
+            app.state.open_answer = Some((u.id.clone(), String::new()));
+        }
+        return;
+    }
+    ui.horizontal(|ui| {
+        let Some((_, text)) = app.state.open_answer.as_mut() else { return };
+        let resp = ui.add(
+            egui::TextEdit::singleline(text)
+                .hint_text(tr("Or type your answer…"))
+                .desired_width((ui.available_width() - 44.0).max(60.0))
+                .frame(widgets::text_field_frame(&t)),
+        );
+        let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let ready = !text.trim().is_empty();
+        if (widgets::primary_icon(ui, Some("send"), "Send", ready).clicked() || enter) && ready {
+            *submit = Some((u.clone(), text.trim().to_string()));
+        }
+    });
+    if widgets::link(ui, "Cancel").clicked() {
+        *cancel = true;
+    }
+}
+
+/// Record the person's answer to an open question and take it off the list: the unknown is
+/// resolved with their words, so the next read of the project doesn't show it again.
+fn answer_open_question(app: &mut CraftApp, u: &craft_anything_engine::evidence::Unknown, answer: &str) {
+    app.state.open_answer = None;
+    app.run_tool("core_unknown_edit", answer_params(u, answer), Route::Silent, Consent::Granted);
+}
+
+/// The call that resolves `u` with `answer`, at the revision the card showed: `core_unknown_edit`
+/// refuses a stale one (`stale_revision`), so a question that changed meanwhile is left alone.
+fn answer_params(u: &craft_anything_engine::evidence::Unknown, answer: &str) -> serde_json::Value {
+    serde_json::json!({
+        "unknown_id": u.id,
+        "based_on_revision": u.revision,
+        "status": "resolved",
+        "resolution": answer,
+    })
 }
 
 fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
@@ -2190,6 +2258,20 @@ impl CraftApp {
 mod tests {
     use super::*;
     use craft_anything_ai::AgentEvent;
+
+    /// An answer to an open question resolves that question, at the revision the card showed:
+    /// `core_unknown_edit` refuses a stale one rather than overwriting someone else's change.
+    #[test]
+    fn an_answer_resolves_the_question_it_was_written_for() {
+        use craft_anything_engine::evidence::{Severity, Unknown};
+        let mut u = Unknown::new("Where does the app save its files?", "storage", Severity::Medium);
+        u.revision = 7;
+        let p = answer_params(&u, "~/Library/Application Support/Plotline");
+        assert_eq!(p["unknown_id"], u.id);
+        assert_eq!(p["based_on_revision"], 7);
+        assert_eq!(p["status"], "resolved");
+        assert_eq!(p["resolution"], "~/Library/Application Support/Plotline");
+    }
 
     #[test]
     fn the_app_starts_with_the_persons_settings_while_the_engine_is_busy() {

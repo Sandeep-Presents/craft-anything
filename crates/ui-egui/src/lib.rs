@@ -1791,6 +1791,14 @@ impl CraftApp {
             Ok(_) => self.log(false, format!("{tool} finished")),
             Err(e) => self.log(true, format!("{tool}: {}", e.message)),
         }
+        // A question's answer is written to the project's record: read it again so the answered
+        // question leaves the open list, and say so when it couldn't be kept.
+        if tool == "core_unknown_edit" {
+            if let Err(e) = &result {
+                self.toast(e.message.clone(), true);
+            }
+            self.refresh_side_panel();
+        }
         match route {
             Route::Rail(k) => {
                 self.state.lists.insert(k, fill);
