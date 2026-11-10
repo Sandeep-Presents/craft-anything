@@ -1481,12 +1481,15 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.11-standin-redacted-budget-20261103b
       Revision `d601bc4e` passed [full Linux CI](https://github.com/storytold/craft-anything/actions/runs/41788735130):
       all four retained-budget regressions and six deduplication regressions passed.
-- [ ] A text source (a script, Markdown) has no tool that reads it as text outside a build (#539):
+- [x] A text source (a script, Markdown) had no tool that reads it as text outside a build (#539):
       `build_file_read` works only while a project is being built, and the native tools stop at
-      "Unknown file magic", although triage points to `native_bytes_show`, whose error points back
-      to triage. Reproduced on `main` (`0c1f7f7`) with a `.md` and a `.ps1`. Add a paged text read
-      with honest coverage and truncation, Deep only, and have triage name it for text
+      "Unknown file magic", while triage pointed to `native_bytes_show`, whose error points back
+      to triage. Reproduced on `main` (`0c1f7f7`) with a `.md` and a `.ps1`. `core_text_read`
+      (Deep only) reads it paged by lines with coverage, counts invalid bytes and cuts long lines;
+      triage names it for a text file it doesn't otherwise recognise
       — claimed: chordpli, branch feature/r3.11-text-source-read
+- [ ] Live-check #539 in an agent chat (Codex, as reported, and Claude Code): the agent reaches
+      `core_text_read` from triage for a script or Markdown target, instead of searching bytes
 
 ### R3.12 Format parser correctness
 Owner: open · Status: in progress

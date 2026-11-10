@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Přečíst metadata IL2CPP hry Unity
 Read a game's files	Přečíst soubory hry
 Read a project file	Přečíst soubor projektu
 Read a setting	Přečíst nastavení
+Read a text file	Přečíst textový soubor
 Read an app's screen	Přečíst obrazovku aplikace
 Read bytes	Přečíst bajty
 Read comment	Přečíst komentář

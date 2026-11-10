@@ -888,6 +888,7 @@ Read a Unity game's IL2CPP metadata	Читать метаданные IL2CPP и�
 Read a game's files	Читать файлы игры
 Read a project file	Читать файл проекта
 Read a setting	Читать настройку
+Read a text file	Читать текстовый файл
 Read an app's screen	Читать экран приложения
 Read bytes	Читать байты
 Read comment	Читать комментарий

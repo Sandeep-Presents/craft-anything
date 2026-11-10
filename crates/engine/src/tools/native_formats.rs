@@ -525,6 +525,12 @@ fn non_native_triage(t: &Target) -> (String, Vec<&'static str>, Vec<(&'static st
         TargetKind::Sqlite => {
             (format!("{n} is a SQLite database (how an app stores its data)."), vec!["core", "database"], vec![("db_sqlite_show", "tables, schema and rows")])
         }
+        // A script, notes or settings: read as text, not as bytes (#539).
+        TargetKind::Unknown if super::text_tools::looks_like_text(&t.bytes) => (
+            format!("{n} is a text file (a script, notes or settings)."),
+            vec!["core"],
+            vec![(super::text_tools::TEXT_READ_TOOL, "read it as text, a page at a time"), ("native_bytes_find", "search it for a word or bytes")],
+        ),
         _ => (
             format!("{n} isn't a format we recognise yet."),
             vec!["core"],
@@ -814,11 +820,18 @@ mod tests {
         assert!(r["summary"].as_str().unwrap().contains("Linux"));
         assert!(r["summary"].as_str().unwrap().contains("x86_64"));
         call(&complete, "native_layout_show", json!({}));
+        // #539: text is sent to the text reader, not to the byte tools that refuse it.
         let text = engine_with("notes.txt", b"plain text");
         let r = call(&text, "core_target_triage", json!({}));
         assert_eq!(r["result"]["kind"], "unknown");
-        assert!(r["summary"].as_str().unwrap().contains("isn't a format we recognise yet"));
+        assert!(r["summary"].as_str().unwrap().contains("is a text file"));
+        assert_eq!(r["result"]["next_steps"][0]["tool"], "core_text_read");
         assert!(!r["limitations"].as_array().unwrap().iter().any(|l| l["code"] == "native_parse_failed"));
+        call(&text, "core_text_read", json!({}));
+        let blob = engine_with("blob.bin", b"\x01\x02\x00\x03unrecognised");
+        let r = call(&blob, "core_target_triage", json!({}));
+        assert!(r["summary"].as_str().unwrap().contains("isn't a format we recognise yet"));
+        assert_eq!(r["result"]["next_steps"][0]["tool"], "native_bytes_show");
     }
 
     #[test]
@@ -967,7 +980,7 @@ mod tests {
         assert!(r["result"]["pseudo_code"].as_str().is_some());
         let e = engine_with("notes.txt", b"plain text");
         let r = call(&e, "core_target_triage", json!({}));
-        assert!(r["result"]["plain_english"].as_str().unwrap().contains("recognise"));
+        assert!(r["result"]["plain_english"].as_str().unwrap().contains("is a text file"));
         assert_eq!(call_err(&e, "native_dos_image_show", json!({})).code, craft_anything_evidence::ErrorCode::NotSupported);
         let e = engine_with("app.asar", b"\x04\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0{\"files\":{}}");
         let r = call(&e, "core_target_triage", json!({}));

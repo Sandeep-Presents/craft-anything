@@ -103,6 +103,8 @@ pub mod wasm_compare_tools;
 pub mod packed_tools;
 pub mod packet_tools;
 pub mod python_tools;
+// Text sources (scripts, Markdown, settings) read as text, a page of lines at a time.
+pub mod text_tools;
 // Thin read-only wrappers over optional objdump and rizin.
 pub mod external_disasm_tools;
 // GDB sessions over the machine interface (optional GDB).
@@ -150,6 +152,7 @@ pub fn all() -> Vec<crate::ToolSpec> {
     v.extend(firmware_tools::specs());
     v.extend(packed_tools::specs());
     v.extend(python_tools::specs());
+    v.extend(text_tools::specs());
     v.extend(game_archive_tools::specs());
     v.extend(il2cpp_tools::specs());
     v.extend(install_tools::specs());

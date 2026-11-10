@@ -912,6 +912,7 @@ Read a Unity game's IL2CPP metadata	Unity თამაშის IL2CPP მეტ
 Read a game's files	თამაშის ფაილების წაკითხვა
 Read a project file	პროექტის ფაილის წაკითხვა
 Read a setting	პარამეტრის წაკითხვა
+Read a text file	ტექსტური ფაილის წაკითხვა
 Read an app's screen	აპის ეკრანის წაკითხვა
 Read bytes	ბაიტების წაკითხვა
 Read comment	კომენტარის წაკითხვა
