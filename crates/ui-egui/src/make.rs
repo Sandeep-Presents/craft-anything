@@ -107,9 +107,11 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     ui.label(theme::heading(tr("What do you want to make?"), theme::TITLE));
     ui.add_space(6.0);
     ui.label(RichText::new(tr("Choose what to recreate, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
-    ui.add_space(16.0);
-    widgets::card(&t).inner_margin(Margin::same(20)).show(ui, |ui| {
-        ui.set_width(w - 50.0);
+    ui.add_space(20.0);
+    // The steps sit on the page, in line with the title: the target tiles and the Clean room /
+    // Deep choice are boxes already, so a card around them only nests a third frame.
+    ui.vertical(|ui| {
+        ui.set_width(w);
         step_title(ui, 1, "What do you want to recreate?");
         ui.add_space(12.0);
         choose_target(app, ui);
@@ -165,9 +167,10 @@ fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     ui.label(theme::heading(tr("Work on a project you already have"), theme::TITLE));
     ui.add_space(6.0);
     ui.label(RichText::new(tr("Pick its folder, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
-    ui.add_space(16.0);
-    widgets::card(&t).inner_margin(Margin::same(20)).show(ui, |ui| {
-        ui.set_width(w - 50.0);
+    ui.add_space(20.0);
+    // On the page like Make's steps: the folder tile and the request box are framed already.
+    ui.vertical(|ui| {
+        ui.set_width(w);
         step_title(ui, 1, "Where is your project?");
         ui.add_space(12.0);
         // A folder picked on Make for another use isn't this project's.
@@ -273,8 +276,9 @@ fn look(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     ui.add_space(6.0);
     ui.label(RichText::new(tr("We only read it; nothing runs. Every answer shows how sure we are.")).size(theme::LEAD).color(t.text_dim));
     ui.add_space(22.0);
-    widgets::card(&t).inner_margin(Margin::same(24)).show(ui, |ui| {
-        ui.set_width(w - 50.0);
+    // On the page like Make's steps: each choice is a tile of its own.
+    ui.vertical(|ui| {
+        ui.set_width(w);
         // Each of these reads the original, which Clean room never does.
         if !app.settings.deep_mode {
             crate::engine_ui::deep_needed(app, ui);
