@@ -132,7 +132,7 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
     let button = widgets::link(ui, "Approvals").on_hover_text(tr("What the builder may do without asking you, in this project."));
     let mut picked = None;
     // A named id, so tests (and anything else) can tell whether it's open.
-    let popup = egui::Popup::from_toggle_button_response(&button).id(egui::Id::new("project-approvals"));
+    let popup = egui::Popup::from_toggle_button_response(&button).id(egui::Id::unique("project-approvals"));
     popup.close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
         egui::Grid::new("approvals").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
             for row in ACTION_KINDS {

@@ -1155,6 +1155,10 @@ Owner: maintainers · Status: in progress
 ### R2.9 Everyday use: typing, projects, settings
 Owner: maintainers · Status: in progress
 Gaps found while using the app for real projects.
+- [x] Prevent the native macOS Touch Bar shutdown crash by adopting the published AccessKit KVO
+      fix through the coordinated GUI stack, preserving accessibility and normal shutdown;
+      add dependency regression coverage and verify native Quit/window close — claimed: dbzx6r,
+      branch bugfix/r2.9-macos-touchbar-upstream
 - [x] Each project chooses, per kind of action, what the builder's approvals get (allow, ask or
       refuse): reading the web, commands, files outside the project, pushing and publishing,
       deleting outside the project, system changes, other tools. Unset kinds follow Auto mode as

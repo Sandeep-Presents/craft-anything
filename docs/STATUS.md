@@ -6,6 +6,23 @@ workspace clippy, layers, fmt and the secret scan of all history were clean. Chi
 
 ## What works, and how it was checked
 
+### Native macOS Touch Bar shutdown (R2.9)
+
+The coordinated eframe/egui/extras/kittest 0.37 stack resolves `accesskit_macos`
+0.27.2, containing the published KVO-observer preservation fix. Accessibility,
+normal settings saving and process cleanup remain enabled; no forced exit or
+vendored adapter is used. Role/ID API renames preserve the previous semantics.
+A lockfile regression rejects old, mixed, missing and prerelease resolutions.
+
+On an M1 Touch Bar Mac, this upstream candidate's isolated native menu Quit and
+red-window-close tests both exited 0, logged normal closure and created no new
+matching crash reports. Reopening retained Advanced mode in temporary settings.
+Desktop/GUI unit, dependency, integration and smoke tests: 238 passed, one existing
+ignored. All-target clippy, fmt, layers, locks, translations and secrets passed;
+the desktop and CLI built with locked dependencies. Windows/Linux live runs,
+VoiceOver and active-build native shutdown were not tested. See
+[diagnosis, verification and limits](macos-touchbar-crash.md).
+
 ### Local Codex discovery and sign-in (R2.2)
 
 macOS Dock launches can find an executable Codex CLI bundled with ChatGPT.app or

@@ -19,7 +19,7 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
     let mut open = true;
     // A modal (dimmed backdrop, Esc or a click outside closes) with a full-size close button;
     // egui's window close box is 14 px.
-    let resp = egui::Modal::new(egui::Id::new("settings-window"))
+    let resp = egui::Modal::new(egui::Id::unique("settings-window"))
         .frame(egui::Frame::new().fill(t.card).corner_radius(t.r_lg()).inner_margin(egui::Margin::same(20)).stroke(egui::Stroke::new(1.0, t.card_border)))
         .show(ctx, |ui| {
             ui.set_width(680.0);
@@ -57,7 +57,7 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
                     ] {
                         let on = app.state.settings_tab == tab;
                         let (rect, r) = ui.allocate_exact_size(Vec2::new(150.0, 34.0), egui::Sense::click());
-                        r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+                        r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, tr(title)));
                         if on {
                             ui.painter().rect_filled(rect, t.radius, t.accent_soft);
                         } else if r.hovered() {
@@ -133,6 +133,7 @@ fn row(ui: &mut Ui, title: &str, sub: &str, add: impl FnOnce(&mut Ui)) {
     ui.add_space(10.0);
 }
 
+/// Render general preferences and route confirmed edits through the app's persistence path.
 fn general(app: &mut CraftApp, ui: &mut Ui) {
     row(ui, "Mode", "Simple: say what you want and it's handled for you. Advanced: every tool, the evidence and the logs.", |ui| {
         let sel = usize::from(app.settings.mode == Mode::Experienced);
@@ -167,14 +168,19 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
     }
     row(ui, "When a folder you pick has files", "Whether they're the app to edit in place, or material the app starts from beside them.", |ui| {
         let current = crate::folders::EXISTING_CHOICES.iter().find(|(_, v)| *v == app.settings.existing_files).map_or("Ask each time", |(l, _)| *l);
-        egui::ComboBox::from_id_salt("existing-files").icon(widgets::combo_icon).selected_text(tr(current)).show_ui(ui, |ui| {
-            for (label, value) in crate::folders::EXISTING_CHOICES {
-                if ui.selectable_label(app.settings.existing_files == value, tr(label)).clicked() {
-                    app.settings.existing_files = value;
-                    app.settings_changed();
+        egui::ComboBox::from_id_salt("existing-files")
+            .icon(widgets::combo_icon)
+            .selected_text(tr(current))
+            .show_ui(ui, |ui| {
+                for (label, value) in crate::folders::EXISTING_CHOICES {
+                    if ui.selectable_label(app.settings.existing_files == value, tr(label)).clicked() {
+                        app.settings.existing_files = value;
+                        app.settings_changed();
+                    }
                 }
-            }
-        });
+            })
+            .response
+            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, tr("When a folder you pick has files")));
     });
     row(ui, "Theme", "", |ui| {
         let sel = usize::from(app.theme_kind() == ThemeKind::StudioLight);
@@ -197,24 +203,30 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
     });
 }
 
+/// Choose the UI language using its native name and persist the selected locale.
 fn language(app: &mut CraftApp, ui: &mut Ui) {
     row(ui, "Language", "", |ui| {
         let selected = (!app.settings.language.trim().is_empty()).then(|| crate::i18n::language_from_tag(&app.settings.language).unwrap_or("en"));
         let current = LANGUAGES.iter().find(|l| Some(l.code) == selected).map(|l| l.name).unwrap_or("System");
-        egui::ComboBox::from_id_salt("lang").icon(widgets::combo_icon).selected_text(tr(current)).show_ui(ui, |ui| {
-            if ui.selectable_label(app.settings.language.trim().is_empty(), tr("System")).clicked() {
-                app.settings.language.clear();
-                crate::i18n::set_language("");
-                app.settings_changed();
-            }
-            for l in LANGUAGES {
-                if ui.selectable_label(selected == Some(l.code), l.name).clicked() {
-                    app.settings.language = l.code.into();
-                    crate::i18n::set_language(l.code);
+        egui::ComboBox::from_id_salt("lang")
+            .icon(widgets::combo_icon)
+            .selected_text(tr(current))
+            .show_ui(ui, |ui| {
+                if ui.selectable_label(app.settings.language.trim().is_empty(), tr("System")).clicked() {
+                    app.settings.language.clear();
+                    crate::i18n::set_language("");
                     app.settings_changed();
                 }
-            }
-        });
+                for l in LANGUAGES {
+                    if ui.selectable_label(selected == Some(l.code), l.name).clicked() {
+                        app.settings.language = l.code.into();
+                        crate::i18n::set_language(l.code);
+                        app.settings_changed();
+                    }
+                }
+            })
+            .response
+            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, tr("Language")));
     });
 }
 
@@ -311,7 +323,8 @@ fn model_options_loading(ui: &mut Ui, backend: &str) {
     ui.add_enabled_ui(false, |ui| {
         ui.horizontal_wrapped(|ui| {
             ui.label(tr("Context window"));
-            egui::ComboBox::from_id_salt(("model-context", backend)).icon(widgets::combo_icon).selected_text(tr("Default")).show_ui(ui, |_| {});
+            let response = egui::ComboBox::from_id_salt(("model-context", backend)).icon(widgets::combo_icon).selected_text(tr("Default")).show_ui(ui, |_| {});
+            widgets::named(response.response, "Context window");
         });
     });
 }
@@ -344,7 +357,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     // A saved API key being replaced or forgotten (the keychain work happens off this frame).
     let (mut save_key, mut forget_key) = (None, None);
     // The AI whose Remove was pressed once: asked again before its key is deleted.
-    let confirm_id = egui::Id::new("remove-ai");
+    let confirm_id = egui::Id::unique("remove-ai");
     let confirming: Option<String> = ui.data(|d| d.get_temp(confirm_id));
     for b in &app.backends {
         widgets::panel(&t).show(ui, |ui| {
@@ -396,7 +409,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                     // account. Saved on Enter or when the field is left; empty is its usual one.
                     if craft_anything_ai::folder_var(b).is_some() {
                         let saved = app.backend_options.get(&b.name).and_then(|o| o.config_dir.clone()).unwrap_or_default();
-                        let id = egui::Id::new(("agent-folder", &b.name));
+                        let id = egui::Id::unique(("agent-folder", &b.name));
                         // What was typed stays until it's saved (or refused, so it can be fixed).
                         if folder_drafts.get(&b.name).is_some_and(|d| d.trim() == saved) && !ui.memory(|m| m.has_focus(id)) {
                             folder_drafts.remove(&b.name);
@@ -429,7 +442,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                     // How hard it thinks: the Claude API and Claude Code take every Claude level.
                     let effort = craft_anything_ai::effort_in_use(b, app.backend_options.get(&b.name));
                     if b.kind == BackendKind::AgentCli && b.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty()) {
-                        let id = egui::Id::new(("remote-agent-program", &b.name));
+                        let id = egui::Id::unique(("remote-agent-program", &b.name));
                         let mut program = ui
                             .data_mut(|d| d.get_temp::<String>(id))
                             .unwrap_or_else(|| app.backend_options.get(&b.name).and_then(|o| o.command.clone()).unwrap_or_default());
@@ -489,16 +502,18 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     ui.label(RichText::new(tr("Asking for its models…")).color(t.text_faint).size(theme::CAPTION));
                                 }
                                 Some((_, Some(models))) => {
-                                    egui::ComboBox::from_id_salt(("model", &b.name)).icon(widgets::combo_icon).selected_text(&current).show_ui(ui, |ui| {
-                                        for m in models {
-                                            if ui.selectable_label(*m == current, m).clicked() && *m != current {
-                                                chosen_model = Some((b.name.clone(), m.clone()));
+                                    let response =
+                                        egui::ComboBox::from_id_salt(("model", &b.name)).icon(widgets::combo_icon).selected_text(&current).show_ui(ui, |ui| {
+                                            for m in models {
+                                                if ui.selectable_label(*m == current, m).clicked() && *m != current {
+                                                    chosen_model = Some((b.name.clone(), m.clone()));
+                                                }
                                             }
-                                        }
-                                    });
+                                        });
+                                    widgets::named(response.response, "Model");
                                     // A model the list doesn't offer: a newer one, a variant such as
                                     // `opusplan`, or one another harness serves (#470).
-                                    let id = egui::Id::new(("other-model", &b.name));
+                                    let id = egui::Id::unique(("other-model", &b.name));
                                     let mut other = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_default();
                                     let label = ui.label(RichText::new(tr("Another model")).color(t.text_faint).size(theme::CAPTION));
                                     let r = ui.add(egui::TextEdit::singleline(&mut other).desired_width(140.0)).labelled_by(label.id);
@@ -515,13 +530,17 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                             }
                             if let Some(current) = effort {
                                 ui.label(RichText::new(tr("Effort:")).color(t.text_faint).size(theme::CAPTION));
-                                egui::ComboBox::from_id_salt(("effort", &b.name)).icon(widgets::combo_icon).selected_text(current.as_str()).show_ui(ui, |ui| {
-                                    for e in craft_anything_ai::Effort::ALL {
-                                        if ui.selectable_label(e == current, e.as_str()).clicked() && e != current {
-                                            chosen_effort = Some((b.name.clone(), e));
+                                let response = egui::ComboBox::from_id_salt(("effort", &b.name))
+                                    .icon(widgets::combo_icon)
+                                    .selected_text(current.as_str())
+                                    .show_ui(ui, |ui| {
+                                        for e in craft_anything_ai::Effort::ALL {
+                                            if ui.selectable_label(e == current, e.as_str()).clicked() && e != current {
+                                                chosen_effort = Some((b.name.clone(), e));
+                                            }
                                         }
-                                    }
-                                });
+                                    });
+                                widgets::named(response.response, "Effort:");
                             }
                         });
                     }
@@ -537,15 +556,16 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                             .and_then(|value| choices.context.iter().find(|choice| choice.value == value))
                                             .map(|choice| tr(&choice.label))
                                             .unwrap_or_else(|| tr("Default"));
-                                        egui::ComboBox::from_id_salt(("model-context", &b.name)).icon(widgets::combo_icon).selected_text(label).show_ui(
-                                            ui,
-                                            |ui| {
+                                        let response = egui::ComboBox::from_id_salt(("model-context", &b.name))
+                                            .icon(widgets::combo_icon)
+                                            .selected_text(label)
+                                            .show_ui(ui, |ui| {
                                                 changed |= ui.selectable_value(&mut draft.context, None, tr("Default")).changed();
                                                 for choice in &choices.context {
                                                     changed |= ui.selectable_value(&mut draft.context, Some(choice.value), tr(&choice.label)).changed();
                                                 }
-                                            },
-                                        );
+                                            });
+                                        widgets::named(response.response, "Context window");
                                     });
                                 });
                                 if changed {
@@ -895,6 +915,7 @@ fn number<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, range: std::ops::
     ui.add(egui::DragValue::new(value).range(range).prefix(prefix).suffix(suffix)).changed()
 }
 
+/// Edit build goals and asset-generation settings, persisting changes after rendering.
 fn builds(app: &mut CraftApp, ui: &mut Ui) {
     let mut changed = false;
     let b = &mut app.settings.build;
@@ -939,7 +960,7 @@ fn builds(app: &mut CraftApp, ui: &mut Ui) {
     let table = craft_anything_engines::assets::Catalogue::built_in();
     row(ui, "Picture model", "What pictures and textures are made with.", |ui| {
         let current = table.image_model(a.image_model.as_deref()).or_else(|_| table.image_model(None)).map(|m| m.name.clone()).unwrap_or_default();
-        egui::ComboBox::from_id_salt("image-model").icon(widgets::combo_icon).selected_text(current).show_ui(ui, |ui| {
+        let response = egui::ComboBox::from_id_salt("image-model").icon(widgets::combo_icon).selected_text(current).show_ui(ui, |ui| {
             for m in table.images() {
                 let price = crate::usage::asset_cost_words(m.cost(craft_anything_engines::assets::Shape::Square));
                 let label = format!("{} · {} {}", m.name, price, tr("a picture"));
@@ -950,6 +971,7 @@ fn builds(app: &mut CraftApp, ui: &mut Ui) {
                 }
             }
         });
+        widgets::named(response.response, "Picture model");
     });
     if changed {
         app.settings_changed();
@@ -1356,6 +1378,7 @@ mod tests {
     }
 
     #[test]
+    /// The shared picker deduplicates model labels without losing the selected model's identity.
     fn identical_model_names_are_shown_once_in_the_shared_picker() {
         use craft_anything_ai::{AgentModel, BackendEntry, ModelContext};
         use egui_kittest::{Harness, kittest::Queryable};
@@ -1383,8 +1406,7 @@ mod tests {
                 AgentModel { id: "provider/model".into(), name: "Friendly name".into(), thinking: Vec::new() },
             ])),
         };
-        let mut harness = Harness::builder().build_ui(move |ui| {
-            theme::install_fonts(ui.ctx());
+        let mut harness = Harness::builder().with_context_setup(crate::CraftApp::setup_context).build_ui(move |ui| {
             crate::builders::agent_model_picker(ui, &mut picker);
         });
         harness.get_by_label("Model").click();
@@ -1395,6 +1417,7 @@ mod tests {
     }
 
     #[test]
+    /// Missing-model warnings identify the configured backend rather than another agent.
     fn shared_picker_warnings_name_the_configured_agent() {
         use craft_anything_ai::{BackendEntry, ModelContext};
         use egui_kittest::{Harness, kittest::Queryable};
@@ -1414,8 +1437,7 @@ mod tests {
                 directory: None,
             };
             let mut picker = AgentModelPicker { request: 1, context, model: Some("missing-model".into()), thinking: None, result: Some(Ok(Vec::new())) };
-            let harness = Harness::builder().build_ui(move |ui| {
-                theme::install_fonts(ui.ctx());
+            let harness = Harness::builder().with_context_setup(crate::CraftApp::setup_context).build_ui(move |ui| {
                 crate::builders::agent_model_picker(ui, &mut picker);
             });
             harness.get_by_label(format!("No chat models are visible in {name}. Check its setup, then reload.").as_str());

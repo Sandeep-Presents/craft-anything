@@ -36,7 +36,7 @@ pub fn proof_card(ui: &mut Ui, e: &Evidence, dense: bool, open: bool) {
         if !e.summary.is_empty() {
             ui.label(RichText::new(&e.summary).size(if dense { theme::SMALL } else { theme::BODY }));
         }
-        let id = ui.id().with(("proof", &e.id));
+        let id = ui.scope_id().with(("proof", &e.id));
         egui::CollapsingHeader::new(RichText::new(tr("Show me the proof")).color(t.accent_ink).font(theme::medium(theme::SMALL)))
             .id_salt(id)
             .default_open(open)
@@ -141,7 +141,7 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
     match v {
         Value::Object(m) => {
             egui::CollapsingHeader::new(key_text.clone().append_text(format!("  {{{}}}", m.len()), &t))
-                .id_salt(ui.id().with((key, depth)))
+                .id_salt(ui.scope_id().with((key, depth)))
                 .default_open(depth < 2)
                 .icon(widgets::disclosure_icon)
                 .show(ui, |ui| {
@@ -155,7 +155,7 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
         }
         Value::Array(a) => {
             egui::CollapsingHeader::new(key_text.append_text(format!("  [{}]", a.len()), &t))
-                .id_salt(ui.id().with((key, depth)))
+                .id_salt(ui.scope_id().with((key, depth)))
                 .default_open(depth < 1 && a.len() <= 20)
                 .icon(widgets::disclosure_icon)
                 .show(ui, |ui| {

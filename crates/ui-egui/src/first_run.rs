@@ -9,6 +9,7 @@ use craft_anything_ai::{BackendKind, Detected};
 use craft_anything_engine::Mode;
 use egui::{Align2, RichText, Ui, Vec2};
 
+/// Render onboarding with a scrollable body and reachable navigation controls.
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let full = ui.max_rect();
@@ -39,12 +40,12 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     ui.painter().rect_filled(egui::Rect::from_min_size(track.min, Vec2::new(track.width() * (step + 1) as f32 / 4.0, 2.0)), 0.0, t.accent);
     if step > 0 && step < 3 {
         let r = egui::Rect::from_min_size(egui::pos2(full.left() + 24.0, y - 14.0), Vec2::new(120.0, 28.0));
-        let resp = ui.interact(r, ui.id().with("fr-back"), egui::Sense::click());
+        let resp = ui.interact(r, ui.scope_id().with("fr-back"), egui::Sense::click());
         let g = widgets::label_galley(ui, &tr("← Back"), 12.0, t.text);
         let col = if resp.hovered() { t.text } else { t.text_dim };
         ui.painter().galley_with_override_text_color(egui::pos2(r.left(), r.center().y - g.size().y / 2.0), g, col);
         widgets::focus_ring(ui, &resp, r);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tr("Back")));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tr("Back")));
         if resp.clicked() {
             app.state.first_run = match app.state.first_run {
                 FirstRunStep::Purpose => FirstRunStep::Brain,
@@ -243,6 +244,7 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
     });
 }
 
+/// Draw a selectable onboarding choice with its accessible label and selection state.
 fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let w = ui.available_width();
@@ -260,7 +262,7 @@ fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui
         icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0)), "check", 18.0, t.accent);
     }
     widgets::focus_ring(ui, &resp, rect);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, tr(title)));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
