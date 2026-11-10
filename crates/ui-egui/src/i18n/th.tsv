@@ -986,6 +986,7 @@ Saved in	บันทึกใน
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	ประหยัดพื้นที่: คัดลอกโปรแกรมและโค้ด และใช้ dependencies กับมีเดียร่วมกับโปรเจกต์ ไฟล์ที่ใช้ร่วมกันและถูกเขียนทับในที่เดิมจะเปลี่ยนที่นี่ด้วย
 Say what you want	บอกสิ่งที่ต้องการ
 Say what you want first.	บอกสิ่งที่ต้องการก่อน
+This applies once you choose something to recreate above.	ตัวเลือกนี้มีผลเมื่อคุณเลือกสิ่งที่จะสร้างใหม่ด้านบน
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	บอกสิ่งที่ต้องการสร้าง หรือลากแอปหรือไฟล์มาวางบนหน้าต่างเพื่อดูข้างใน ทุกอย่างรันในโหมด Clean room เว้นแต่เปิด Deep
 Screenshot	ภาพหน้าจอ
 Screenshot a page	จับภาพหน้าเว็บ

@@ -986,6 +986,7 @@ Saved in	儲存位置
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	節省空間：複製程式和程式碼，與專案共用相依套件和媒體檔案。共用檔案被直接覆寫時，此處的內容也會改變。
 Say what you want	描述你的需求
 Say what you want first.	請先描述你的需求。
+This applies once you choose something to recreate above.	在上方選擇要重現的內容後，此項才會生效。
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	描述你想製作的內容，或將應用程式或檔案拖到視窗中查看其內部。除非開啟深度模式，否則所有操作都在淨室模式下進行。
 Screenshot	螢幕截圖
 Screenshot a page	擷取網頁圖片

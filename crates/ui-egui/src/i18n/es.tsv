@@ -986,6 +986,7 @@ Saved in	Guardado en
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Ahorra espacio: copia el programa y el código, y comparte las dependencias y los medios con el proyecto. Un archivo compartido que se reescriba en el lugar también cambia aquí.
 Say what you want	Di qué quieres
 Say what you want first.	Primero di qué quieres.
+This applies once you choose something to recreate above.	Se aplica cuando eliges arriba algo que recrear.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Di qué quieres hacer, o suelta una app o un archivo en la ventana para mirar dentro. Todo corre en modo Clean room a menos que actives Deep.
 Screenshot	Captura de pantalla
 Screenshot a page	Capturar una página

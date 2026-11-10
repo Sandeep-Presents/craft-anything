@@ -986,6 +986,7 @@ Saved in	Salvestatud asukohta
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Säästab ruumi: kopeerib programmi ja koodi ning jagab projekti sõltuvusi ja meediat. Kohapeal üle kirjutatud jagatud fail muutub ka siin.
 Say what you want	Ütle, mida soovid
 Say what you want first.	Ütle esmalt, mida soovid.
+This applies once you choose something to recreate above.	See kehtib, kui valid ülal, mida uuesti luua.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Ütle, mida soovid luua, või lohista rakendus või fail aknale, et sisse vaadata. Kõik töötab puhta ruumi režiimis, kuni lülitad sisse sügava.
 Screenshot	Ekraanipilt
 Screenshot a page	Tee lehest ekraanipilt

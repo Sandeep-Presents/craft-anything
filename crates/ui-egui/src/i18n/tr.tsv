@@ -986,6 +986,7 @@ Saved in	Kaydedileceği yer
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Yer kazandırır: programı ve kodu kopyalar, bağımlılıkları ve medyayı projeyle paylaşır. Yerinde yeniden yazılan paylaşılan bir dosya burada da değişir.
 Say what you want	Ne istediğinizi yazın
 Say what you want first.	Önce ne istediğinizi yazın.
+This applies once you choose something to recreate above.	Bu, yukarıda yeniden oluşturulacak bir şey seçtiğinizde geçerli olur.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Ne yapmak istediğinizi yazın ya da içine bakmak için pencereye bir uygulama veya dosya bırakın. Derin'i açmazsanız her şey Temiz oda modunda çalışır.
 Screenshot	Ekran görüntüsü
 Screenshot a page	Bir sayfanın ekran görüntüsünü al

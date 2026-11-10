@@ -986,6 +986,7 @@ Saved in	Đã lưu trong
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Tiết kiệm dung lượng: sao chép chương trình và mã, còn các phần phụ thuộc và phương tiện thì dùng chung với dự án. Nếu một tệp dùng chung bị ghi đè trực tiếp, thay đổi cũng áp dụng ở đây.
 Say what you want	Nói bạn muốn gì
 Say what you want first.	Hãy nói bạn muốn gì trước.
+This applies once you choose something to recreate above.	Lựa chọn này áp dụng khi bạn chọn thứ cần tái tạo ở trên.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Hãy nói bạn muốn tạo gì, hoặc thả một ứng dụng hay tệp vào cửa sổ để xem bên trong. Mọi thứ chạy ở chế độ Phòng sạch trừ khi bạn bật Chuyên sâu.
 Screenshot	Ảnh chụp màn hình
 Screenshot a page	Chụp màn hình một trang

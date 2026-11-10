@@ -986,6 +986,7 @@ Saved in	Salvo em
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Economiza espaço: copia o programa e o código, mas compartilha dependências e arquivos de mídia com o projeto. Se um arquivo compartilhado for alterado diretamente, esta cópia também será afetada.
 Say what you want	Descreva o que você deseja
 Say what you want first.	Primeiro, descreva o que você deseja.
+This applies once you choose something to recreate above.	Isto vale assim que você escolher acima o que recriar.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Descreva o que deseja criar ou arraste um aplicativo ou arquivo para a janela para examinar seu conteúdo. Tudo funciona no modo Sala limpa, a menos que você ative o modo Profundo.
 Screenshot	Captura de tela
 Screenshot a page	Capturar uma página

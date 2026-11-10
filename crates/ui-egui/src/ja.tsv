@@ -595,6 +595,7 @@ Saved in	保存先
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	容量を節約します。プログラムとコードはコピーし、依存関係とメディアはプロジェクトと共有します。共有ファイルをその場で書き換えると、こちらにも反映されます。
 Say what you want	欲しいものを伝える
 Say what you want first.	まず欲しいものを伝えてください。
+This applies once you choose something to recreate above.	上で再現するものを選ぶと、この設定が適用されます。
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	作りたいものを伝えるか、アプリやファイルをウィンドウにドロップして中を見られます。中まで解析モードをオンにしない限り、すべて外から観察モードで動きます。
 Screenshots of how it should look. The builder opens each one and matches it.	どう見えるべきかのスクリーンショット。ビルダーが 1 枚ずつ開いて合わせます。
 Sections	セクション

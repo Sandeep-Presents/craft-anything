@@ -986,6 +986,7 @@ Saved in	Gespeichert in
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	Spart Platz: kopiert das Programm und den Code und teilt Abhängigkeiten und Medien mit dem Projekt. Eine geteilte Datei, die an Ort und Stelle überschrieben wird, ändert sich auch hier.
 Say what you want	Sag, was du willst
 Say what you want first.	Sag zuerst, was du willst.
+This applies once you choose something to recreate above.	Das gilt, sobald du oben etwas zum Nachbauen auswählst.
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	Sag, was du machen willst, oder zieh eine App oder Datei auf das Fenster, um hineinzusehen. Alles läuft im Clean-Room-Modus, solange du Deep nicht einschaltest.
 Screenshot	Screenshot
 Screenshot a page	Screenshot einer Seite

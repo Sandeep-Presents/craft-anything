@@ -986,6 +986,7 @@ Saved in	保存位置
 Saves space: copies the program and code, and shares dependencies and media with the project. A shared file rewritten in place changes here too.	节省空间：复制程序和代码，与项目共享依赖和媒体文件。共享文件被原位重写时，此处的内容也会改变。
 Say what you want	描述你的需求
 Say what you want first.	请先描述你的需求。
+This applies once you choose something to recreate above.	在上方选择要重现的内容后，此项才会生效。
 Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.	描述你想制作的内容，或将应用或文件拖到窗口中查看其内部。除非开启深度模式，否则所有操作都在净室模式下进行。
 Screenshot	截图
 Screenshot a page	截取网页图片

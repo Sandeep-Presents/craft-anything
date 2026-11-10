@@ -109,9 +109,14 @@ fn first_run_continue_is_reachable_at_the_smallest_window() {
 fn simple_title_bar_keeps_only_the_essentials() {
     let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, true)));
     h.run_steps(3);
-    assert!(h.query_by_label("Advanced").is_none(), "the mode switch lives in Settings in Simple mode");
+    // The title bar has no mode switch in Simple mode: the only one is on Make, beside the ways in.
+    let door = h.get_by_label("Make my own version").rect().center().y;
+    for n in h.query_all_by_label("Advanced") {
+        assert!((n.rect().center().y - door).abs() < 4.0, "the mode switch lives in Settings and on Make in Simple mode");
+    }
     h.get_by_label("Settings");
-    h.get_by_label("Clean room");
+    // The title bar's Clean room switch stays (Make's tiles have one too, further down).
+    assert!(h.query_all_by_label("Clean room").any(|n| n.rect().bottom() < door), "the Clean room switch is in the title bar");
 }
 
 #[test]
@@ -902,8 +907,51 @@ fn website_choice_stays_picked_while_the_address_is_empty() {
     h.get_by_label("Nothing — start fresh").click();
     h.run_steps(3);
     assert!(!h.state().state.make.editing_url);
-    assert!(h.query_by_label("How closely may Craft Anything look at it?").is_none(), "nothing to look at");
+    // Nothing to look at: the choice stays in view, dimmed, and says when it applies.
+    h.get_by_label("How closely may Craft Anything look at it?");
+    h.get_by_label("This applies once you choose something to recreate above.");
+    let deep = h.state().settings.deep_mode;
+    h.get_by_label("Deep").click();
+    h.run_steps(2);
+    assert_eq!(h.state().settings.deep_mode, deep, "a dimmed tile changes nothing");
     assert!(h.query_by_label("Type the website's address:").is_none());
+}
+
+/// Make's Simple / Advanced switch changes the app's mode and keeps the screen and the draft (#1286).
+#[test]
+fn the_make_card_switches_simple_and_advanced_and_keeps_the_draft() {
+    let mut h = harness(|| {
+        let mut a = demo::app(demo::engine(Mode::Beginner, true));
+        a.state.make.request = "a calculator".into();
+        a
+    });
+    h.run_steps(3);
+    // Simple mode's title bar has no mode switch: Make offers it beside the ways in.
+    h.get_by_label("Mode");
+    h.get_by_label("Advanced").click();
+    h.run_steps(3);
+    assert_eq!(h.state().settings.mode, Mode::Experienced);
+    assert_eq!(h.state().state.make.request, "a calculator", "the draft stays");
+    assert_eq!(h.state().state.screen, Screen::Home, "Make stays in view instead of the workbench");
+    h.get_by_label("What do you want to recreate?");
+    // Back from the card's own switch: the title bar now has one too, higher up.
+    h.query_all_by_label("Simple").max_by(|a, b| a.rect().top().total_cmp(&b.rect().top())).unwrap().click();
+    h.run_steps(3);
+    assert_eq!(h.state().settings.mode, Mode::Beginner);
+    assert_eq!(h.state().state.make.request, "a calculator");
+}
+
+/// At the app's smallest window the Simple / Advanced switch moves under the ways in, inside the
+/// window (#1286).
+#[test]
+fn the_make_mode_switch_stays_inside_the_narrowest_window() {
+    // The app's smallest window (main.rs): the switch moves under the ways in instead of off the edge.
+    let mut h = harness_sized(egui::vec2(760.0, 520.0), || demo::app(demo::engine(Mode::Beginner, true)));
+    h.run_steps(3);
+    let door = h.get_by_label("Just look inside").rect();
+    let advanced = h.get_by_label("Advanced").rect();
+    assert!(advanced.right() <= 760.0, "the switch ends at {} in a 760-point window", advanced.right());
+    assert!(advanced.top() >= door.bottom(), "on its own line below the ways in");
 }
 
 #[test]
@@ -916,7 +964,8 @@ fn mode_switch_and_deep_toggle() {
         a
     });
     h.run_steps(3);
-    // Simple mode: the switch is in Settings.
+    // Simple mode: the switch is in Settings (and on Make, so look from another screen).
+    h.state_mut().state.screen = Screen::Ask;
     h.state_mut().state.settings_open = true;
     h.run_steps(3);
     h.get_by_label("Advanced").click();
