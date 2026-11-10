@@ -696,6 +696,7 @@ Medium	Trung bình
 Memory for Ghidra	Bộ nhớ cho Ghidra
 Minimise	Thu nhỏ
 Mode	Chế độ
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	Phóng to hoặc thu nhỏ chữ: Ctrl/⌘ + và Ctrl/⌘ −. Ctrl/⌘ 0 để đặt lại.
 Model	Mô hình
 Model options	Tùy chọn mô hình
 Model: {model}	Mô hình: {model}

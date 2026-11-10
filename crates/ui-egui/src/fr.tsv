@@ -636,6 +636,7 @@ Builds	Constructions
 Plugins	Plugins
 Safety	Sécurité
 Mode	Mode
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	Texte plus grand ou plus petit : Ctrl/⌘ + et Ctrl/⌘ −. Ctrl/⌘ 0 rétablit la taille.
 Simple: say what you want and it's handled for you. Advanced: every tool, the evidence and the logs.	Simple : dites ce que vous voulez, on s'occupe du reste. Avancé : tous les outils, les preuves et les journaux.
 Simple	Simple
 Advanced	Avancé

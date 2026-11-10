@@ -386,6 +386,7 @@ May I {action}?	{action}してもよいですか?
 Memory for Ghidra	Ghidra 用メモリ
 Minimise	最小化
 Mode	モード
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	文字の拡大・縮小：Ctrl/⌘ + と Ctrl/⌘ −。Ctrl/⌘ 0 で元に戻ります。
 Modules	モジュール
 More detail	詳細を表示
 More makes a big program's first look faster.	メモリが多いほど、大きなプログラムの初回解析が速くなります。

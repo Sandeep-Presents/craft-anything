@@ -906,6 +906,27 @@ fn website_choice_stays_picked_while_the_address_is_empty() {
     assert!(h.query_by_label("Type the website's address:").is_none());
 }
 
+/// Switching modes changes what is shown, not how big it is: both use the type scale's sizes.
+#[test]
+fn simple_and_advanced_use_the_same_text_sizes() {
+    let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, true)));
+    h.run_steps(3);
+    let sizes = |h: &Harness<'static, CraftApp>| {
+        let style = h.ctx.global_style();
+        let size = |s: egui::TextStyle| style.text_styles.get(&s).map(|f| f.size);
+        (size(egui::TextStyle::Body), size(egui::TextStyle::Small), size(egui::TextStyle::Heading), style.spacing.interact_size.y)
+    };
+    let simple = sizes(&h);
+    assert_eq!(simple.0, Some(craft_anything_ui_egui::theme::BODY), "body text is the scale's BODY");
+    h.state_mut().set_mode(Mode::Experienced);
+    h.run_steps(3);
+    assert_eq!(sizes(&h), simple, "Advanced draws text and controls at the same sizes");
+    // Larger text is zoom's job now, and the Mode row says how.
+    h.state_mut().state.settings_open = true;
+    h.run_steps(3);
+    h.get_by_label("Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.");
+}
+
 #[test]
 fn mode_switch_and_deep_toggle() {
     let store = tempfile::tempdir().unwrap();
@@ -1391,6 +1412,11 @@ fn an_ai_server_is_added_by_its_address() {
     h.get_by_label("Add an AI by its address");
     h.state_mut().server_form = craft_anything_ui_egui::ServerForm { name: "Studio box".into(), address: url.clone(), ..Default::default() };
     h.run_steps(1);
+    // The form ends below the fold of Settings' scroll area: scroll down to it, as a person would.
+    for _ in 0..4 {
+        h.get_by_label("AI name").scroll_down();
+        h.run_steps(1);
+    }
     h.get_by_label("Add").click();
     assert!(wait(&mut h, |a| a.backends.iter().any(|b| b.name == "Studio box" && b.model == "qwen3:8b")), "added with a model that can chat");
     assert!(h.state().server_form.name.is_empty(), "the form empties once it's added");

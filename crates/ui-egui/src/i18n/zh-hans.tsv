@@ -696,6 +696,7 @@ Medium	中
 Memory for Ghidra	Ghidra 内存用量
 Minimise	最小化
 Mode	模式
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	放大或缩小文字：Ctrl/⌘ + 和 Ctrl/⌘ −。Ctrl/⌘ 0 恢复默认。
 Model	模型
 Model options	模型选项
 Model: {model}	模型：{model}

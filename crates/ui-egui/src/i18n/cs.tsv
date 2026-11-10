@@ -696,6 +696,7 @@ Medium	Střední
 Memory for Ghidra	Paměť pro Ghidra
 Minimise	Minimalizovat
 Mode	Režim
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	Větší nebo menší text: Ctrl/⌘ + a Ctrl/⌘ −. Ctrl/⌘ 0 velikost obnoví.
 Model	Model AI
 Model options	Možnosti modelu
 Model: {model}	Model AI: {model}

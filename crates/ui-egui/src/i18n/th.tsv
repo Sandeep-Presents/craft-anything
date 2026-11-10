@@ -696,6 +696,7 @@ Medium	ปานกลาง
 Memory for Ghidra	หน่วยความจำสำหรับ Ghidra
 Minimise	ย่อหน้าต่าง
 Mode	โหมด
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	ปรับขนาดตัวอักษร: Ctrl/⌘ + และ Ctrl/⌘ − กด Ctrl/⌘ 0 เพื่อคืนค่าเดิม
 Model	โมเดล
 Model options	ตัวเลือกโมเดล
 Model: {model}	โมเดล: {model}

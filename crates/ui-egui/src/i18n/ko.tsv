@@ -696,6 +696,7 @@ Medium	보통
 Memory for Ghidra	Ghidra 메모리
 Minimise	최소화
 Mode	모드
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	글자 크게 또는 작게: Ctrl/⌘ + 및 Ctrl/⌘ −. Ctrl/⌘ 0으로 원래대로 돌아갑니다.
 Model	모델
 Model options	모델 옵션
 Model: {model}	모델: {model}

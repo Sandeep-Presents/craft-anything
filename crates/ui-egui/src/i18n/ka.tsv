@@ -716,6 +716,7 @@ Medium	საშუალო
 Memory for Ghidra	მეხსიერება Ghidra-სთვის
 Minimise	ჩაკეცვა
 Mode	რეჟიმი
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	ტექსტის გადიდება ან დაპატარავება: Ctrl/⌘ + და Ctrl/⌘ −. Ctrl/⌘ 0 აღადგენს ზომას.
 Model	მოდელი
 Model: {model}	მოდელი: {model}
 Modules	მოდულები

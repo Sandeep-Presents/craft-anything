@@ -135,10 +135,15 @@ fn row(ui: &mut Ui, title: &str, sub: &str, add: impl FnOnce(&mut Ui)) {
 
 fn general(app: &mut CraftApp, ui: &mut Ui) {
     row(ui, "Mode", "Simple: say what you want and it's handled for you. Advanced: every tool, the evidence and the logs.", |ui| {
-        let sel = usize::from(app.settings.mode == Mode::Experienced);
-        if let Some(i) = widgets::segmented(ui, &["Simple", "Advanced"], sel, 30.0) {
-            app.set_mode(if i == 0 { Mode::Beginner } else { Mode::Experienced });
-        }
+        ui.vertical(|ui| {
+            let sel = usize::from(app.settings.mode == Mode::Experienced);
+            if let Some(i) = widgets::segmented(ui, &["Simple", "Advanced"], sel, 30.0) {
+                app.set_mode(if i == 0 { Mode::Beginner } else { Mode::Experienced });
+            }
+            // Both modes draw text at one size: zoom is the way to make it bigger.
+            let t = Tokens::get(ui.ctx());
+            ui.label(RichText::new(tr("Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.")).color(t.text_faint).size(theme::CAPTION));
+        });
     });
     let dir = app.settings.projects_dir();
     row(ui, "New projects go in", &dir.display().to_string(), |ui| {

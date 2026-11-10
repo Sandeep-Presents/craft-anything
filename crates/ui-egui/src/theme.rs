@@ -361,8 +361,8 @@ pub fn scroll_style() -> egui::style::ScrollStyle {
 /// How opaque a scroll bar's thumb is at rest (over the text colour).
 const SCROLL_THUMB_AT_REST: f32 = 0.5;
 
-/// Apply a theme. `roomy` = Beginner mode (bigger type, more air).
-pub fn apply(ctx: &egui::Context, kind: ThemeKind, roomy: bool) {
+/// Apply a theme: its colours, and the one set of text sizes and spacing both modes use.
+pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     let t = Tokens::for_kind(kind);
     ctx.data_mut(|d| d.insert_temp(tokens_id(), t));
     ctx.set_theme(if t.dark() { egui::Theme::Dark } else { egui::Theme::Light });
@@ -409,20 +409,21 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind, roomy: bool) {
         wv.expansion = 0.0;
     }
     ctx.set_visuals(v);
-    // Simple mode is for anyone, including people who find small text hard to read.
-    let body = if roomy { 16.0 } else { 13.0 };
+    // One set of sizes for both modes, from the type scale: the mode decides what is shown, not
+    // how big it is (zoom, Cmd/Ctrl + / −, makes everything bigger). Controls are as tall as
+    // the app's own buttons and switches (30).
     ctx.global_style_mut(|s| {
         s.text_styles = [
-            (TextStyle::Small, FontId::proportional(if roomy { 13.5 } else { 11.0 })),
-            (TextStyle::Body, FontId::proportional(body)),
-            (TextStyle::Button, FontId::proportional(body)),
-            (TextStyle::Heading, semibold(if roomy { SECTION } else { CARD })),
-            (TextStyle::Monospace, FontId::monospace(if roomy { 13.5 } else { 12.5 })),
+            (TextStyle::Small, FontId::proportional(CAPTION)),
+            (TextStyle::Body, FontId::proportional(BODY)),
+            (TextStyle::Button, FontId::proportional(BODY)),
+            (TextStyle::Heading, semibold(SECTION)),
+            (TextStyle::Monospace, FontId::monospace(CAPTION)),
         ]
         .into();
-        s.spacing.item_spacing = if roomy { egui::vec2(10.0, 8.0) } else { egui::vec2(8.0, 5.0) };
-        s.spacing.button_padding = if roomy { egui::vec2(12.0, 6.0) } else { egui::vec2(9.0, 4.0) };
-        s.spacing.interact_size = egui::vec2(24.0, if roomy { 28.0 } else { 24.0 });
+        s.spacing.item_spacing = egui::vec2(8.0, 5.0);
+        s.spacing.button_padding = egui::vec2(9.0, 4.0);
+        s.spacing.interact_size = egui::vec2(24.0, 30.0);
         s.spacing.menu_margin = egui::Margin::same(6);
         s.spacing.window_margin = egui::Margin::same(18);
         s.spacing.icon_width = 14.0;

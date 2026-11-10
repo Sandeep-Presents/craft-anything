@@ -696,6 +696,7 @@ Medium	Mittel
 Memory for Ghidra	Speicher für Ghidra
 Minimise	Minimieren
 Mode	Modus
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	Text größer oder kleiner: Strg/⌘ + und Strg/⌘ −. Strg/⌘ 0 setzt ihn zurück.
 Model	Modell
 Model options	Modelloptionen
 Model: {model}	Modell: {model}

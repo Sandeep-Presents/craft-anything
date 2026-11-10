@@ -696,6 +696,7 @@ Medium	Orta
 Memory for Ghidra	Ghidra için bellek
 Minimise	Simge durumuna küçült
 Mode	Mod
+Text bigger or smaller: Ctrl/⌘ + and Ctrl/⌘ −. Ctrl/⌘ 0 resets it.	Metni büyütmek veya küçültmek için: Ctrl/⌘ + ve Ctrl/⌘ −. Ctrl/⌘ 0 sıfırlar.
 Model	Model
 Model options	Model seçenekleri
 Model: {model}	Model: {model}
