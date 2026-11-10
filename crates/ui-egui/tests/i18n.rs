@@ -113,9 +113,13 @@ fn chinese_startup_language_menu_and_saved_selection() {
 
         restored.get_by_value("English").click();
         restored.run();
-        restored.get_by_label("System").scroll_to_me();
+        // Theme has a System choice too, on Studio's line: take the language menu's.
+        let off_theme_line = |y: f32, line: f32| (y - line).abs() >= 4.0;
+        let line = restored.get_by_label("Studio").rect().center().y;
+        restored.query_all_by_label("System").find(|n| off_theme_line(n.rect().center().y, line)).expect("the language menu's System").scroll_to_me();
         restored.run();
-        restored.get_by_label("System").click();
+        let line = restored.get_by_label("Studio").rect().center().y;
+        restored.query_all_by_label("System").find(|n| off_theme_line(n.rect().center().y, line)).expect("the language menu's System").click();
         restored.run_steps(3);
         assert!(restored.state().settings.language.is_empty());
         let expected = sys_locale::get_locales().find_map(|tag| i18n::language_from_tag(&tag)).unwrap_or("en");

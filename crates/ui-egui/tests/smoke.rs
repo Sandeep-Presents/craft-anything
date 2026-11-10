@@ -1628,9 +1628,17 @@ fn settings_window_tabs_draw() {
         h.run_steps(2);
         assert_eq!(edge(&h), right, "the Settings window changed width on {tab}");
     }
+    // System is the default; picking a theme keeps it, and System can be picked again.
+    assert_eq!(h.state().settings.theme, "system");
     h.get_by_label("Studio Light").click();
     h.run_steps(3);
     assert_eq!(h.state().settings.theme, "studio-light");
+    assert_eq!(h.state().theme_kind(), craft_anything_ui_egui::theme::ThemeKind::StudioLight);
+    // Language says "System" too when none is chosen: take the one on Studio's line.
+    let line = h.get_by_label("Studio").rect().center().y;
+    h.query_all_by_label("System").find(|n| (n.rect().center().y - line).abs() < 4.0).expect("System beside Studio").click();
+    h.run_steps(3);
+    assert_eq!(h.state().settings.theme, "system");
 
     // At the same window size, the same tab keeps its content bounds with and without scrolling.
     let content_bounds = |overflow: bool| {

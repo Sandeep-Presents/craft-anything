@@ -251,16 +251,28 @@ pub fn segmented_scaled(ui: &mut Ui, options: &[&str], selected: usize, height: 
     let total: f32 = widths.iter().sum::<f32>() + 2.0 * pad;
     let (rect, _) = ui.allocate_exact_size(Vec2::new(total, height), Sense::hover());
     ui.painter().rect(rect, t.radius, t.raised, Stroke::new(scale, t.card_border), egui::StrokeKind::Inside);
+    let mut segs = Vec::with_capacity(widths.len());
     let mut x = rect.left() + pad;
+    for w in &widths {
+        segs.push(egui::Rect::from_min_size(egui::pos2(x, rect.top() + pad), Vec2::new(*w, height - 2.0 * pad)));
+        x += w;
+    }
+    // The raised card slides to a new choice instead of jumping there. Its place and width are
+    // animated (egui asks for frames only while it moves); none is drawn when nothing is selected.
+    if let Some(target) = segs.get(selected) {
+        let key = ui.id().with(("seg-card", options.first().copied().unwrap_or_default(), options.len()));
+        let time = SEGMENT_SLIDE_SECONDS;
+        let left = ui.ctx().animate_value_with_time(key.with("left"), target.left(), time);
+        let width = ui.ctx().animate_value_with_time(key.with("width"), target.width(), time);
+        let card = egui::Rect::from_min_size(egui::pos2(left, target.top()), Vec2::new(width, target.height()));
+        ui.painter().rect(card, t.radius_sm, t.card, Stroke::new(scale, t.card_border), egui::StrokeKind::Inside);
+    }
     let mut picked = None;
-    for (i, (g, w)) in galleys.into_iter().zip(widths).enumerate() {
-        let seg = egui::Rect::from_min_size(egui::pos2(x, rect.top() + pad), Vec2::new(w, height - 2.0 * pad));
+    for (i, (g, seg)) in galleys.into_iter().zip(segs).enumerate() {
         let resp = ui.interact(seg, ui.id().with(("seg", options.get(i).copied().unwrap_or_default())), Sense::click());
         let on = i == selected;
         resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(options.get(i).copied().unwrap_or_default())));
-        if on {
-            ui.painter().rect(seg, t.radius_sm, t.card, Stroke::new(scale, t.card_border), egui::StrokeKind::Inside);
-        } else {
+        if !on {
             ui.painter().rect_filled(seg, t.radius_sm, theme::mix(Color32::TRANSPARENT, t.hover, hover_t(ui, &resp)));
         }
         let color = if on { t.text } else { t.text_dim };
@@ -270,10 +282,12 @@ pub fn segmented_scaled(ui: &mut Ui, options: &[&str], selected: usize, height: 
         if resp.clicked() && !on {
             picked = Some(i);
         }
-        x += w;
     }
     picked
 }
+
+/// How long [`segmented`]'s raised card takes to slide to a new choice.
+const SEGMENT_SLIDE_SECONDS: f32 = 0.15;
 
 fn segment_width(label: f32, text: f32) -> f32 {
     label + text * 2.0 + 2.0

@@ -1373,6 +1373,10 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
+- [x] Two-way switches (Mode, Theme and the others) slide their selection to the new choice instead
+      of jumping, and Theme gets a System choice, the new default, that follows the system's light
+      or dark appearance and changes with it
+      — claimed: jgt87, branch feature/r2.9-sliding-switch-system-theme — PR #1234
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress
