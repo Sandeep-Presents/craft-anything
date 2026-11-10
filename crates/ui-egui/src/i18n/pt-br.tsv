@@ -1467,3 +1467,8 @@ Connecting to {name}… {seconds} s	Conectando a {name}… {seconds} s
 Stopped adding {name}.	A adição de {name} foi interrompida.
 It isn't there any more, so {program} runs in its place.	Ele não está mais lá, então {program} é usado no lugar.
 Use it	Usar este
+Capture a screen state	Capturar um estado da tela
+Crashes of an app	Falhas de um aplicativo
+Press keys	Pressionar teclas
+Read the screen's controls	Ler os controles da tela
+Type text	Digitar texto

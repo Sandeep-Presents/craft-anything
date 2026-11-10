@@ -129,6 +129,12 @@ pub const TOOLS: &[&str] = &[
     "adb_app_remove",
     "adb_app_launch",
     "adb_app_force_stop",
+    // The screen as a person sees and drives it: keys, typed text, its controls, a state, crashes.
+    "adb_keys_press",
+    "adb_text_type",
+    "adb_ui_read",
+    "adb_screen_state_capture",
+    "adb_crash_log_read",
 ];
 
 /// Whether `id` runs in Clean room.

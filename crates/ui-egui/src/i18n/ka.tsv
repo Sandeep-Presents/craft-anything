@@ -1467,3 +1467,8 @@ Connecting to {name}… {seconds} s	{name}-თან დაკავშირე
 Stopped adding {name}.	{name}-ის დამატება შეჩერდა.
 It isn't there any more, so {program} runs in its place.	ის აღარ არის იქ, ამიტომ მის ნაცვლად {program} ეშვება.
 Use it	გამოყენება
+Capture a screen state	ეკრანის მდგომარეობის გადაღება
+Crashes of an app	აპის ავარიები
+Press keys	კლავიშების დაჭერა
+Read the screen's controls	ეკრანის მართვის ელემენტების წაკითხვა
+Type text	ტექსტის აკრეფა

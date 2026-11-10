@@ -1,7 +1,11 @@
 # de: original German UI translations (informal "du"). Licensed MIT OR Apache-2.0.
 # UTF-8: English source<TAB>translation. Keep placeholders and escapes intact.
+Capture a screen state	Einen Bildschirmzustand erfassen
+Crashes of an app	Abstürze einer App
 OpenCode default	OpenCode-Standard
 Model default	Modellstandard
+Press keys	Tasten drücken
+Read the screen's controls	Die Bedienelemente des Bildschirms lesen
 Thinking depth	Denktiefe
 OpenCode model	OpenCode-Modell
 Remote program	Entferntes Programm
@@ -588,6 +592,7 @@ Jobs ({n})	Aufgaben ({n})
 Just a question: nothing was changed. Answered by	Nur eine Frage: Nichts wurde geändert. Beantwortet von
 Just ask	Einfach fragen
 Just look inside	Einfach hineinsehen
+Type text	Text eingeben
 Work on my project	An meinem Projekt arbeiten
 Work on a project you already have	An einem Projekt arbeiten, das du schon hast
 Pick its folder, say what you want, then press Start.	Wähle seinen Ordner, sag, was du willst, und drücke dann Start.

@@ -1467,3 +1467,8 @@ Connecting to {name}… {seconds} s	กำลังเชื่อมต่อ�
 Stopped adding {name}.	หยุดเพิ่ม {name} แล้ว
 It isn't there any more, so {program} runs in its place.	ไม่มีอยู่ที่นั่นแล้ว จึงใช้ {program} แทน
 Use it	ใช้อันนี้
+Capture a screen state	บันทึกสถานะหน้าจอ
+Crashes of an app	การแครชของแอป
+Press keys	กดปุ่ม
+Read the screen's controls	อ่านตัวควบคุมบนหน้าจอ
+Type text	พิมพ์ข้อความ

@@ -1,7 +1,11 @@
 # ko: Korean UI translations. Licensed MIT OR Apache-2.0.
 # UTF-8: English source<TAB>Korean text. Keep placeholders and escapes intact.
+Capture a screen state	화면 상태 캡처
+Crashes of an app	앱의 충돌
 OpenCode default	OpenCode 기본값
 Model default	모델 기본값
+Press keys	키 누르기
+Read the screen's controls	화면의 컨트롤 읽기
 Thinking depth	생각 깊이
 OpenCode model	OpenCode 모델
 Remote program	원격 프로그램
@@ -588,6 +592,7 @@ Jobs ({n})	작업 ({n})
 Just a question: nothing was changed. Answered by	질문에만 답했고 바뀐 것은 없습니다. 답변:
 Just ask	질문만 하기
 Just look inside	살펴보기만
+Type text	텍스트 입력
 Work on my project	내 프로젝트 작업하기
 Work on a project you already have	이미 있는 프로젝트 작업하기
 Pick its folder, say what you want, then press Start.	폴더를 고르고 원하는 내용을 적은 뒤 시작을 누릅니다.

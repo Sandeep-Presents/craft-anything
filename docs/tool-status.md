@@ -21,7 +21,7 @@ we don't have); source reviewed · **New** = added since the audit, unit-tested 
 | Managed (.NET) | 7 | 0 | 0 | 0 | no C# decompiler (IL + structure only) |
 | Java | 6 | 0 | 0 | 0 | `java_vineflower_decompile` verified on a real JAR (Commons IO 2.16.1, OpenJDK 21.0.12.1, Linux) |
 | Android (static) | 9 | 0 | 0 | 4 | JADX/Apktool/JEB paths unverified |
-| Android device (adb) | 2 | 0 | 0 | 23 | no device attached |
+| Android device (adb) | 2 | 0 | 0 | 28 | no device attached; the 5 screen tools of R2.12 (`adb_keys_press`, `adb_text_type`, `adb_ui_read`, `adb_screen_state_capture`, `adb_crash_log_read`) are **New**: unit-tested, not yet run against a device |
 | Apple | 8 | 0 | 0 | 6 | synthetic Mach-O/plist only; runtime tools macOS-only, except `runtime_ui_read` and `runtime_ui_walkthrough_record`, which also read and drive Windows apps (UI Automation; tested against a WinForms window) |
 | Formats, firmware, database | 11 | 0 | 0 | 1 | |
 | Runtime (process capture, native calls/UI) | 0 | 0 | 0 | 5 | run foreign code; not executed in the audit |

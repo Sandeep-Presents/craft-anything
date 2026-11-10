@@ -1,7 +1,11 @@
 # cs: original Czech UI translations. Licensed MIT OR Apache-2.0.
 # UTF-8: English source<TAB>translation. Keep placeholders and escapes intact.
+Capture a screen state	Zachytit stav obrazovky
+Crashes of an app	Pády aplikace
 OpenCode default	Výchozí v OpenCode
 Model default	Výchozí pro model
+Press keys	Stisknout klávesy
+Read the screen's controls	Přečíst ovládací prvky obrazovky
 Thinking depth	Hloubka uvažování
 OpenCode model	Model v OpenCode
 Remote program	Vzdálený program
@@ -588,6 +592,7 @@ Jobs ({n})	Úlohy ({n})
 Just a question: nothing was changed. Answered by	Pouze otázka: nic se nezměnilo. Odpověď od
 Just ask	Jen se zeptat
 Just look inside	Jen nahlédnout dovnitř
+Type text	Zadat text
 Work on my project	Pracovat na svém projektu
 Work on a project you already have	Pracovat na projektu, který už máte
 Pick its folder, say what you want, then press Start.	Vyberte jeho složku, popište své přání a stiskněte Spustit.
