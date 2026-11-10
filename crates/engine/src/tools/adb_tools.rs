@@ -1912,6 +1912,32 @@ mod tests {
         craft_anything_engines::locate("adb", &s.settings.engines.tools, &s.settings.engine_store_dir()).is_some()
     }
 
+    /// An engine whose adb is a stand-in file that nothing starts, for what a tool refuses before
+    /// it runs adb. The engine looks for a tool's program before the tool reads its input, so
+    /// without a stand-in a bad-input test passes only on a machine that has adb (docs/pitfalls.md).
+    fn engine_with_stand_in_adb() -> (Engine, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let adb = dir.path().join("adb");
+        std::fs::write(&adb, b"").unwrap();
+        let mut session = crate::testing::session();
+        session.settings.engines.tools.adb = Some(adb);
+        (Engine::new(session), dir)
+    }
+
+    /// An engine that finds no adb on any machine: none configured, and this computer isn't searched.
+    fn engine_that_finds_no_adb() -> Engine {
+        Engine::new(crate::testing::session())
+    }
+
+    /// The error of a call that must fail, made with consent given: the device-changing tools are
+    /// consent-gated, and what they refuse with consent is what they refuse first.
+    fn refused(e: &Engine, id: &str, params: Value) -> ToolError {
+        match e.call(id, params, CallOptions { consent: crate::Consent::Granted, ..CallOptions::new(Caller::Mcp) }) {
+            Ok(v) => panic!("{id} should fail, got {v:?}"),
+            Err(err) => err,
+        }
+    }
+
     #[test]
     fn missing_adb_is_provider_unavailable() {
         let (e, _d) = engine_without_adb();
@@ -1926,11 +1952,11 @@ mod tests {
         }
     }
 
-    /// The screen tools (R2.12) refuse bad input before adb is looked for, run in Clean room,
-    /// and without adb say so.
+    /// The screen tools (R2.12) refuse bad input before adb is run, run in Clean room, and
+    /// without adb say so, on a machine with adb and on one without.
     #[test]
     fn screen_tools_check_their_input_first_and_run_in_clean_room() {
-        let (e, _d) = engine_without_adb();
+        let (e, _d) = engine_with_stand_in_adb();
         for id in ["adb_keys_press", "adb_text_type", "adb_ui_read", "adb_screen_state_capture", "adb_crash_log_read", "adb_app_launch", "adb_device_show"] {
             assert!(crate::clean_room::allows(id), "{id} watches from outside, so Clean room runs it");
         }
@@ -1944,21 +1970,13 @@ mod tests {
             ("adb_crash_log_read", json!({"serial": "emulator-5554", "package": "not a package", "count": 10})),
             ("adb_app_launch", json!({"serial": "emulator-5554", "package": "com.example.app", "category": "sideways"})),
         ];
-        // The device-changing ones are consent-gated; with consent, bad input is still refused first.
-        let with_consent = |id: &str, params: Value| match e.call(id, params, CallOptions { consent: crate::Consent::Granted, ..CallOptions::new(Caller::Mcp) })
-        {
-            Ok(v) => panic!("{id} should fail, got {v:?}"),
-            Err(err) => err,
-        };
         for (id, params) in bad {
-            let err = with_consent(id, params);
+            let err = refused(&e, id, params);
             assert_eq!(err.code, ErrorCode::BadInput, "{id} gave {:?}: {}", err.code, err.message);
         }
-        if adb_locatable(&e) {
-            return;
-        }
+        let e = engine_that_finds_no_adb();
         for id in ["adb_keys_press", "adb_text_type", "adb_ui_read", "adb_crash_log_read"] {
-            let err = with_consent(id, json!({"serial": "emulator-5554", "keys": ["OK"], "text": "hi", "package": "com.example.app"}));
+            let err = refused(&e, id, json!({"serial": "emulator-5554", "keys": ["OK"], "text": "hi", "package": "com.example.app"}));
             assert_eq!(err.code, ErrorCode::EngineMissing, "{id} gave {:?}", err.code);
         }
     }

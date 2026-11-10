@@ -135,6 +135,11 @@ It happened a third time with Ghidra: the test session's engine store was empty,
 still searched PATH, `~/.local/bin` and `/opt/ghidra`, so two Deep-mode tests got Ghidra's answer
 on a machine that had it. `testing::session()` now sets `engines.only_configured`, so it finds only
 the engines its settings or store name.
+And a fourth time with the adb screen tools: the test returned early "when adb is here" only before
+its missing-adb half, and its bad-input half, above that, needed adb found to get as far as the
+tool. It passed on every machine it was written on. No half of a test may lean on the machine:
+build one session with a stand-in and one that finds nothing, and before pushing run the tests
+with the program's folders covered (`bwrap --dev-bind / / --tmpfs <its folder> cargo test …`).
 
 **A failing crate hid the next crate's tests.** `cargo test -p a -p b` stopped after a failure in
 `a`, so `b`'s tests never ran; the rerun was filtered to the failing test, and a broken engine id
