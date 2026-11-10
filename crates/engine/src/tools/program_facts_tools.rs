@@ -615,10 +615,6 @@ fn native_publisher_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
             "trust_not_checked",
             "Certificates were read from the file. They weren't checked against any trust store, for revocation, or against the current date, so a matching signature can still come from an untrusted or expired certificate.",
         ));
-        lims.push(Limitation::new(
-            "hash_method",
-            "The file hash covers everything except the header checksum, the security directory entry and the certificate table. Windows hashes sections in order, so a file with unusual gaps between them could read as different here though Windows accepts it.",
-        ));
     }
     if signature.is_some_and(|s| !s.unsigned_attributes.is_empty()) {
         lims.push(Limitation::new("attachments_not_read", "Timestamps and nested signatures attached to the signature are listed, not read or checked."));
@@ -1246,6 +1242,7 @@ mod tests {
         assert!(v["result"]["signer"]["not_after"].is_string());
         assert!(limitation(&v, "trust_not_checked").is_some());
         assert!(limitation(&v, "attachments_not_read").is_some());
+        assert!(limitation(&v, "hash_method").is_none(), "sections are hashed in file order now");
         assert_eq!(v["result"]["table"]["entries"][0]["signature"]["digest_algorithm"], "sha256");
 
         // Changed after signing.

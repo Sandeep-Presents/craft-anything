@@ -1440,8 +1440,11 @@ Owner: open · Status: in progress
       All 24 combined replay regressions pass locally on the refresh onto `cf414ff4`.
       See this PR's checks for the refreshed revision's complete gate.
       — claimed: Afloat16, branch bugfix/r3.11-standin-sample-metadata-20261103b
-- [ ] `native_publisher_show` hashes the file minus the signature fields, not section by section;
+- [x] `native_publisher_show` hashes the file minus the signature fields, not section by section;
       a file with unusual gaps between sections can read as different
+      — claimed: scks1, branch bugfix/r3.11-authenticode-section-hash
+      Sections are hashed in file order and bytes between them are skipped, as Microsoft's
+      Authenticode format describes; 69 real signed files still match (STATUS).
 - [x] Enforce stand-in per-body and total byte budgets on the text that is actually retained after redaction;
       deduplicate consecutive samples before charging the capture budget.
       — claimed: Afloat16, branch bugfix/r3.11-standin-redacted-budget-20261103b

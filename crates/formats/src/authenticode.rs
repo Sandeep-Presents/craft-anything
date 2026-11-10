@@ -202,8 +202,12 @@ fn signer_facts(cms: &[u8]) -> (usize, Vec<String>) {
     walk().unwrap_or((0, Vec::new()))
 }
 
-/// The parts of the file an Authenticode hash covers: everything except the header checksum, the
-/// security directory entry and the certificate table.
+/// The parts of the file an Authenticode hash covers, in the order of Microsoft's "Windows
+/// Authenticode Portable Executable Signature Format" ("Calculating the PE Image Hash"): the
+/// headers up to `SizeOfHeaders` less the checksum and the security directory entry, then each
+/// section's raw data in file order, then as many bytes as the file holds beyond those and the
+/// certificate table, read from where the headers and sections would end if nothing lay between
+/// them. Bytes between sections are not hashed.
 fn hashed_ranges<'a>(data: &'a [u8], h: &PeHeaders) -> Result<Vec<&'a [u8]>, String> {
     let (cert_off, cert_size) = h.dir(SECURITY_DIR).ok_or("there is no certificate table")?;
     let opt = h.pe_offset.checked_add(24).ok_or("the headers are out of range")?;
@@ -211,16 +215,42 @@ fn hashed_ranges<'a>(data: &'a [u8], h: &PeHeaders) -> Result<Vec<&'a [u8]>, Str
     let dirs = opt.checked_add(if h.pe32_plus { 112 } else { 96 }).ok_or("the headers are out of range")?;
     let entry = dirs.checked_add(SECURITY_DIR * 8).ok_or("the headers are out of range")?;
     let cert_start = usize::try_from(cert_off).map_err(|_| "the table is out of range")?;
-    let cert_end = cert_start.checked_add(usize::try_from(cert_size).map_err(|_| "the table is out of range")?).ok_or("the table is out of range")?;
+    let cert_len = usize::try_from(cert_size).map_err(|_| "the table is out of range")?;
+    let cert_end = cert_start.checked_add(cert_len).ok_or("the table is out of range")?;
     if cert_end > data.len() {
         return Err("the certificate table runs past the end of the file".into());
     }
-    let ordered = checksum.checked_add(4).is_some_and(|c| c <= entry) && entry.checked_add(8).is_some_and(|e| e <= cert_start);
-    if !ordered {
+    let headers_end =
+        opt.checked_add(60).and_then(|o| read_u32(data, o)).and_then(|s| usize::try_from(s).ok()).ok_or("the file is too short for its headers")?;
+    if entry.checked_add(8).is_none_or(|e| e > headers_end) {
+        return Err("the headers' stated size is too small to hold them".into());
+    }
+    if headers_end > cert_start {
         return Err("the certificate table overlaps the headers".into());
     }
+    let declared = h.pe_offset.checked_add(6).and_then(|o| read_u16(data, o)).map_or(0, usize::from);
+    if declared > h.sections.len() {
+        return Err(format!("the file declares {declared} sections, but only {} were read", h.sections.len()));
+    }
     let part = |from: usize, to: usize| data.get(from..to).ok_or_else(|| "the file is too short for its headers".to_string());
-    Ok(vec![part(0, checksum)?, part(checksum + 4, entry)?, part(entry + 8, cert_start)?, part(cert_end, data.len())?])
+    let mut ranges = vec![part(0, checksum)?, part(checksum + 4, entry)?, part(entry + 8, headers_end)?];
+    let mut sections: Vec<_> = h.sections.iter().filter(|s| s.raw_size > 0).collect();
+    sections.sort_by_key(|s| s.raw_offset);
+    let mut hashed = headers_end;
+    for s in sections {
+        let size = usize::try_from(s.raw_size).map_err(|_| "a section is out of range")?;
+        let bytes = usize::try_from(s.raw_offset).ok().and_then(|start| data.get(start..start.checked_add(size)?));
+        ranges.push(bytes.ok_or_else(|| format!("section \"{}\" runs past the end of the file", s.name))?);
+        hashed = hashed.checked_add(size).ok_or("the sections are out of range")?;
+    }
+    // The rest of the file less the table's size, such as debug data after the last section. The
+    // procedure reads it from the offset the count of hashed bytes reaches, which is where the
+    // last section ends when nothing lies between sections.
+    if data.len() > hashed {
+        let extra = (data.len() - hashed).checked_sub(cert_len).ok_or("the sections and the certificate table add up to more than the file")?;
+        ranges.push(data.get(hashed..hashed + extra).ok_or("the sections are out of range")?);
+    }
+    Ok(ranges)
 }
 
 /// Compute the Authenticode hash of a PE file with `digest`.

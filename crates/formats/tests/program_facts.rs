@@ -293,6 +293,66 @@ fn a_table_overlapping_the_headers_is_not_hashed() {
     assert!(authenticode::file_hash(&d, &h, craft_anything_formats::verify::Digest::Sha256).is_err());
 }
 
+fn file_hash_status(d: &[u8]) -> HashStatus {
+    let t = authenticode::certificate_table(d, &pe::headers(d).unwrap()).unwrap();
+    t.entries[0].signature.as_ref().unwrap().file_hash
+}
+
+#[test]
+fn bytes_between_sections_are_not_hashed() {
+    let d = pf::sign_pe(pf::pe_facts_with_gap(0x200, 0xcc));
+    let facts = pe::headers(&d).unwrap().sections.iter().find(|s| s.name == ".facts").unwrap().raw_offset as usize;
+    assert_eq!(file_hash_status(&d), HashStatus::Matches);
+    let mut changed = d.clone();
+    changed[facts - 1] ^= 0xff;
+    assert_eq!(file_hash_status(&changed), HashStatus::Matches, "nothing in the gap is hashed");
+    let mut changed = d.clone();
+    changed[facts] ^= 0xff;
+    assert_eq!(file_hash_status(&changed), HashStatus::Differs);
+}
+
+#[test]
+fn data_after_the_last_section_is_hashed() {
+    let mut plain = pf::pe_facts();
+    let end = plain.len();
+    plain.extend_from_slice(&[0xd0; 0x40]);
+    let d = pf::sign_pe(plain);
+    assert_eq!(file_hash_status(&d), HashStatus::Matches);
+    let mut changed = d.clone();
+    changed[end] ^= 0xff;
+    assert_eq!(file_hash_status(&changed), HashStatus::Differs, "data after the last section is signed too");
+}
+
+#[test]
+fn sections_are_hashed_in_file_order() {
+    // The section table lists `.rdata` before `.text`; the hash still starts with `.text`.
+    let mut plain = pf::pe_facts();
+    let sh = OPT + 240;
+    let text = plain[sh..sh + 40].to_vec();
+    plain.copy_within(sh + 40..sh + 80, sh);
+    plain[sh + 40..sh + 80].copy_from_slice(&text);
+    assert_eq!(file_hash_status(&pf::sign_pe(plain)), HashStatus::Matches);
+}
+
+#[test]
+fn sections_the_file_cannot_hold_are_not_hashed() {
+    let digest = craft_anything_formats::verify::Digest::Sha256;
+    let facts_size = OPT + 240 + 4 * 40 + 16;
+    let mut d = pf::signed_pe();
+    d[facts_size..facts_size + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+    let why = authenticode::file_hash(&d, &pe::headers(&d).unwrap(), digest).unwrap_err();
+    assert!(why.contains(".facts"), "{why}");
+    // More sections declared than are read.
+    let mut d = pf::signed_pe();
+    d[0x86..0x88].copy_from_slice(&200u16.to_le_bytes());
+    assert!(authenticode::file_hash(&d, &pe::headers(&d).unwrap(), digest).is_err());
+    // An empty section adds nothing, wherever it points.
+    let mut d = pf::signed_pe();
+    let data = OPT + 240 + 2 * 40;
+    d[data + 16..data + 24].copy_from_slice(&[0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff]);
+    assert!(authenticode::file_hash(&d, &pe::headers(&d).unwrap(), digest).is_ok());
+}
+
 #[test]
 fn elf_dynamic_symbols_with_versions() {
     let d = pf::elf_versioned_library();
