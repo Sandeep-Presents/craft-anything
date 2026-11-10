@@ -712,7 +712,7 @@ Owner: open · Status: in progress
       discovery, MCP-only tool restrictions, model selection and fresh read-only questions;
       unit tests and CLI 1.0.105 with an isolated home and loopback model, all five access modes
       — claimed: qu-gg, branch `feature/r2.2-copilot-integration` (recorded during PR preparation)
-- [ ] Pi as a coding agent (`pi -p --mode json`, message on stdin): discovery, model and thinking
+- [x] Pi as a coding agent (`pi -p --mode json`, message on stdin): discovery, model and thinking
       effort, session resume, and our MCP server per run as an extension with direct exposure —
       the only way in, since pi has no `--mcp-config`. pi has no `--permission-prompt-tool` either,
       so the same generated extension holds the approval bridge: its `tool_call` handler asks
@@ -723,7 +723,12 @@ Owner: open · Status: in progress
       and is put back in the folder pi names (the linked `/tmp` resolved first). See [Pi](pi.md).
       Four live builds on macOS reached Ready (one Deep with the bridge); one carried to another
       folder continued from the restored session.
-      — claimed: jiahao, branch feature/r2.2-pi-agent
+
+- [ ] Live-check a Clean room Pi build (the tool list and the approval bridge are unit-tested,
+      and a Deep build was run live)
+- [ ] Pi over SSH: a builder there needs our tool server written on the host, as OpenCode's does
+- [ ] Pi's model list in Settings (its `--list-models` prints a table) and a sign-in check
+      (`pi auth check` needs a provider or model the adapter isn't given)
 - [x] Grok Build as a coding agent over ACP (`grok agent stdio`): discovery in `~/.grok/bin`,
       the person's own `grok login` (a missing `auth.json` is unknown, so an API key still
       starts), model and reasoning effort, and our MCP server on the session with `"type": "stdio"`
