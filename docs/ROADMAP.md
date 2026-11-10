@@ -360,10 +360,15 @@ Every round spends the person's money or quota. One that can't do anything shoul
       exit. A wall or idle deadline that fires during that grace period (the result was already
       parsed) counts as completion, not a failure; a deadline with no parsed result still stops the
       turn as before — claimed: mytrade2909-design, branch bugfix/builder-stuck-after-turn-completes, PR #1426
-- [ ] A program that's stopped (time limit, pause, or leftovers after it exits) is waited for
-      only for a moment: stopping it used a wait with no limit, the one step of a run that neither
-      its time limit nor Pause could reach (#1438, #981: a check that sits for hours with Pause dead)
+- [x] A program that's stopped (time limit, pause, or leftovers after it exits) is waited for
+      only 5 s: stopping it used a wait with no limit, the one step of a run that neither its time
+      limit nor Pause could reach (#1438, #981: a check that sits for hours with Pause dead). Found
+      by reading the code; the reporters' hangs are not reproduced here
       — claimed: justinjohn0306, branch bugfix/r5.3-stopped-program-wait
+- [ ] Confirm on a reporter's Windows machine that #1438 / #981 no longer sit at a check (their
+      `build-activity.log` after the stall, and whether "still there 5 s after it was stopped" is
+      in the app's log). `Launched::stop` (Play) and the console capture still use the same
+      unlimited `kill()`
 
 ### R5.4 Local models can build
 Owner: open · Status: todo

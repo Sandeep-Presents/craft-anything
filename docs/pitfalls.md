@@ -251,6 +251,13 @@ no error to find. Once the stream's own terminal event is parsed, stop waiting o
 itself: fold a `result_seen` flag into `cancel_when` with a short grace period (`RESULT_GRACE`),
 and don't report that as "Stopped." A terminal stream event, not the OS exit, is what ends a turn.
 
+**A deadline that ended in a wait with none.** Every `Process` run has a time limit and a cancel,
+but when either fired the supervisor called the library's `kill()`, which stops the program and
+then waits for it with no limit (on Windows also for a job message the system doesn't promise).
+A program that outlives its stop held the run, and Pause, for good (#1438, #981). A deadline covers
+its own cleanup too: after a stop, poll for a moment and move on (`process::end`), and when a
+library call says "kill", read whether it also waits. Not reproduced on the reporters' machines.
+
 **A console held open by a program started next door.** On Windows Server 2022 opening a
 pseudoconsole briefly makes inheritable handles (a Unix terminal too, until it's made close-on-exec),
 so a program another thread started at that moment kept the console open until it ended, and closing

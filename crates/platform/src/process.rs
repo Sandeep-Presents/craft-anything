@@ -59,6 +59,8 @@ pub const DEFAULT_STDERR_CAP: usize = 1024 * 1024;
 /// How long to wait for the output threads after the child exits (an escaped grandchild may hold
 /// the pipe open; we stop waiting rather than hang).
 const DRAIN_GRACE: Duration = Duration::from_secs(2);
+/// How long a program we stopped gets to be gone before we stop waiting for it.
+const REAP_GRACE: Duration = Duration::from_secs(5);
 /// Longest partial line kept before it is delivered anyway. MCP servers answer `tools/list` as
 /// one JSON-RPC line that can be megabytes (a plugin with many richly described tools), so this
 /// must cover such a whole line: a fragment is not JSON, and the answer would never parse.
@@ -777,13 +779,9 @@ enum Stop {
 impl Supervisor {
     fn run(mut self) -> Result<Output, ToolError> {
         let stop = self.watch();
-        if !matches!(stop, Stop::Exited(_)) {
-            let _ = self.child.start_kill();
-            let _ = self.child.kill();
-        } else {
-            // The leader exited; take any leftover group members with it so they can't hold the pipes.
-            let _ = self.child.kill();
-        }
+        // Stopped, or the leader exited: take any leftover group members with it so they can't
+        // hold the pipes.
+        end(self.child.as_mut(), &self.name);
         self.drain();
         let duration = self.start.elapsed();
         let (stdout, stdout_truncated) = take(&self.out_buf);
@@ -855,6 +853,23 @@ impl Supervisor {
                 log::warn!("{}: output pipe still held open after exit; not waiting for it", self.name);
             }
         }
+    }
+}
+
+/// Stop a program and whatever it started, waiting only [`REAP_GRACE`] for it to be gone. The
+/// library's own `kill()` waits with no limit: for the process, which can outlive its stop for
+/// as long as a driver holds one of its threads, and on Windows then for a job message the
+/// system doesn't promise to send. That was the one step of a run that neither its time limit
+/// nor a cancel could reach (#1438).
+fn end(child: &mut dyn ChildWrapper, name: &str) {
+    let _ = child.start_kill();
+    let deadline = Instant::now() + REAP_GRACE;
+    while let Ok(None) = child.try_wait() {
+        if Instant::now() >= deadline {
+            log::warn!("{name}: still there {} s after it was stopped; not waiting for it", REAP_GRACE.as_secs());
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -1506,6 +1521,48 @@ mod launch_tests {
 #[cfg(test)]
 mod error_tests {
     use super::*;
+
+    /// A program that is still there after it was stopped, and whose `wait` never returns.
+    #[derive(Debug)]
+    struct Undying {
+        stopped: bool,
+    }
+
+    impl ChildWrapper for Undying {
+        fn inner(&self) -> &dyn ChildWrapper {
+            self
+        }
+        fn inner_mut(&mut self) -> &mut dyn ChildWrapper {
+            self
+        }
+        fn into_inner(self: Box<Self>) -> Box<dyn ChildWrapper> {
+            self
+        }
+        fn start_kill(&mut self) -> std::io::Result<()> {
+            self.stopped = true;
+            Ok(())
+        }
+        fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+            Ok(None)
+        }
+        fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+            loop {
+                std::thread::sleep(Duration::from_secs(60));
+            }
+        }
+    }
+
+    /// #1438: a check sat for hours with Pause dead. Stopping a program waited for it with no
+    /// limit, so one that outlived its stop held the run past every deadline.
+    #[test]
+    fn a_program_that_outlives_its_stop_is_not_waited_for() {
+        let mut child = Undying { stopped: false };
+        let started = Instant::now();
+        end(&mut child, "the program");
+        assert!(child.stopped, "it is still told to stop");
+        let took = started.elapsed();
+        assert!(took >= REAP_GRACE && took < REAP_GRACE + Duration::from_secs(5), "{took:?}");
+    }
 
     /// An npm shim whose Node is missing is a missing program, named, with what to do about it.
     #[test]
