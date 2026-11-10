@@ -1373,9 +1373,10 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
-- [ ] Make screen: fewer nested frames around what to recreate and the request, and Start stays
+- [x] Make screen: fewer nested frames around what to recreate and the request, and Start stays
       in view in a narrow window (960 px); every entry flow, the draft and the Clean room/Deep
-      choice stay on the screen (#1471)
+      choice stay on the screen (#1471). The three doors' steps sit on the page in line with
+      the title instead of inside a card around tiles that are boxes already — PR #1475
       — claimed: yuhoyuho, branch refactor/r2.9-make-layout
 
 ### R2.10 Pinned builds

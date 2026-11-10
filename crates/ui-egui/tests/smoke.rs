@@ -2838,6 +2838,21 @@ fn start_is_in_view_at_a_common_window_height() {
 }
 
 #[test]
+fn start_is_in_view_in_a_narrow_window_with_a_website_to_recreate() {
+    // At 960 wide the target tiles wrap onto two rows and the Clean room / Deep blurbs onto more
+    // lines; Start must still end above the window's bottom edge.
+    let mut h = harness_sized(egui::vec2(960.0, 1000.0), || {
+        let mut a = demo::app(demo::engine(Mode::Beginner, true));
+        a.state.make.url = "https://example.com".into();
+        a.state.make.request = "Recreate this website".into();
+        a
+    });
+    h.run_steps(3);
+    let bottom = h.get_by_label("Start").rect().max.y;
+    assert!(bottom <= 1000.0 - 16.0, "Start ends at {bottom} px in a 960 × 1000 window");
+}
+
+#[test]
 fn typed_drafts_come_back_after_a_restart_and_stay_with_their_project() {
     use craft_anything_engine::workspace::{TargetRef, Workspace};
     struct Mem(std::collections::HashMap<String, String>);
