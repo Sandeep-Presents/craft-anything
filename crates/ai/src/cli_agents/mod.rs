@@ -1148,7 +1148,13 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
         // It said why already, and there's nothing more in its output to keep.
         Ok(_) if p.session_missing => {}
         Ok(out) if !out.success && !p.saw_result => {
-            let _ = tx.send(shown.exit_event(&agent, &out));
+            // What this agent's own words say, when the adapter can tell (an install too old to
+            // take the task, #1005's Harness before 0.2.2-rc.1): a failure to fix, not to retry.
+            let explained = adapter.explain_exit(&out);
+            if let Some(e) = &explained {
+                *failure.lock().unwrap_or_else(PoisonError::into_inner) = Some(e.failure);
+            }
+            let _ = tx.send(shown.exit_event(&agent, &out, explained.as_ref()));
         }
         Ok(out) if !out.success => {
             // The agent already said what went wrong; keep the rest for anyone looking into it.
@@ -1278,7 +1284,9 @@ impl FailureContext {
         }
     }
 
-    fn exit_event(&self, agent: &str, out: &craft_anything_platform::Output) -> AgentEvent {
+    /// The failure event for a run that exited non-zero: the adapter's own explanation when it has
+    /// one, else the general one. Either way the log is kept and named.
+    fn exit_event(&self, agent: &str, out: &craft_anything_platform::Output, explained: Option<&adapters::ExitExplanation>) -> AgentEvent {
         let name = display_for(agent);
         let plain = craft_anything_platform::process::nonzero_error_with(&name, out, Some(&self.command));
         let excerpt = craft_anything_platform::process::output_excerpt(&String::from_utf8_lossy(if out.stderr.is_empty() { &out.stdout } else { &out.stderr }));
@@ -1288,7 +1296,10 @@ impl FailureContext {
                 let said = if excerpt.is_empty() { String::new() } else { format!("\n\nssh printed:\n{excerpt}") };
                 (format!("Couldn't run {name} on {host}: {}.", f.what), format!("{}{said}\n\nTo test it yourself, run:\n{}", f.fix, self.check))
             }
-            None => (plain.message, plain.remediation.unwrap_or_default()),
+            None => match explained {
+                Some(e) => (e.message.clone(), e.remediation.clone().unwrap_or_default()),
+                None => (plain.message, plain.remediation.unwrap_or_default()),
+            },
         };
         let (log, unsaved) = self.save(agent, Some(out), Some(&message));
         if let Some(u) = unsaved {
@@ -2076,7 +2087,8 @@ mod tests {
     #[test]
     fn a_failed_ssh_run_says_what_happened_and_saves_a_log() {
         let dir = tempfile::tempdir().unwrap();
-        let ev = context(Some("github.com"), Some(dir.path().to_path_buf())).exit_event("claude-code", &failed(255, "exec request failed on channel 0\n"));
+        let ev =
+            context(Some("github.com"), Some(dir.path().to_path_buf())).exit_event("claude-code", &failed(255, "exec request failed on channel 0\n"), None);
         let AgentEvent::Error { message, remediation, log } = ev else { panic!("not an error") };
         let help = remediation.unwrap();
         assert!(message.contains("Couldn't run Claude Code on github.com: github.com is a git server"), "{message}");
@@ -2092,7 +2104,7 @@ mod tests {
     #[test]
     fn a_failed_local_run_shows_its_output_and_command() {
         let dir = tempfile::tempdir().unwrap();
-        let ev = context(None, Some(dir.path().to_path_buf())).exit_event("claude-code", &failed(3, "first\nreal reason\n"));
+        let ev = context(None, Some(dir.path().to_path_buf())).exit_event("claude-code", &failed(3, "first\nreal reason\n"), None);
         let AgentEvent::Error { message, remediation, log } = ev else { panic!("not an error") };
         let help = remediation.unwrap();
         assert!(message.contains("exit code 3: real reason"), "{message}");
@@ -2102,12 +2114,14 @@ mod tests {
 
     #[test]
     fn without_a_log_folder_nothing_is_written_and_a_failed_write_is_reported() {
-        let ev = context(None, None).exit_event("claude-code", &failed(1, "x"));
+        let ev = context(None, None).exit_event("claude-code", &failed(1, "x"), None);
         assert!(matches!(ev, AgentEvent::Error { log: None, .. }));
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("a-file");
         std::fs::write(&file, "").unwrap();
-        let AgentEvent::Error { remediation, log, .. } = context(None, Some(file)).exit_event("claude-code", &failed(1, "x")) else { panic!("not an error") };
+        let AgentEvent::Error { remediation, log, .. } = context(None, Some(file)).exit_event("claude-code", &failed(1, "x"), None) else {
+            panic!("not an error")
+        };
         assert!(log.is_none());
         assert!(remediation.unwrap().contains("The details couldn't be saved"));
     }
@@ -2718,6 +2732,47 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
             assert!(!argv.trim_end().ends_with(" -"), "old Harness versions would run a literal dash: {argv}");
             assert!(!argv.contains(&prompt), "task text must not appear in argv");
         }
+    }
+
+    /// A Harness older than 0.2.2-rc.1 never reads the task on stdin: it exits with only
+    /// `dsh: a task is required`, which must say the install is too old and how to update it —
+    /// the way Claude Code too old for a model does (#165).
+    #[cfg(unix)]
+    #[test]
+    fn an_old_harness_says_it_must_be_updated() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("dsh");
+        std::fs::write(
+            &program,
+            "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then echo \"--profile\"; exit 0; fi\n\
+             echo 'dsh: a task is required, for example: dsh --profile headless \"run the tests\"' >&2\n\
+             exit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = BackendConfig { name: "DSH".into(), kind: BackendKind::AgentCli, model: "dsh".into(), base_url: None, ssh_host: None, enabled: true };
+        let options = BackendOptions { command: Some(program.display().to_string()), timeout_secs: Some(10), ..Default::default() };
+        let mut c = CliConversation::new(CliSpec::new(config, options, false, None));
+        c.send("build it");
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        let mut events = Vec::new();
+        while std::time::Instant::now() < deadline && !events.iter().any(|e| matches!(e, AgentEvent::TurnDone { .. })) {
+            events.extend(c.poll());
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let error = events.iter().find_map(|e| match e {
+            AgentEvent::Error { message, remediation, .. } => Some((message, remediation)),
+            _ => None,
+        });
+        let (message, remediation) = error.expect("the old install was explained");
+        assert!(message.starts_with("DeepSeek Harness is too old to build"), "{message}");
+        let fix = remediation.as_deref().unwrap_or_default();
+        assert!(fix.contains("npm install -g @deepseek-ai/dsh@latest") && fix.contains("0.2.2-rc.1"), "{fix}");
+        // Not worth retrying as it is: the install has to change first.
+        let failure = c.last_failure().expect("a typed failure");
+        assert_eq!(failure.kind, crate::FailureKind::Configuration, "{failure:?}");
+        assert!(!failure.retryable());
     }
 
     const STDIN_ECHO_ENV: &str = "CRAFT_ANYTHING_TEST_STDIN_ECHO";

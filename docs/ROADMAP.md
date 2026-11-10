@@ -1018,6 +1018,10 @@ Owner: open · Status: in progress
 - [x] DeepSeek Harness: send tasks on stdin so multiline and long messages can start through the
       Windows desktop launcher (see the argv note above)
       — claimed: gtxy27, branch `bugfix/r2.2-dsh-stdin`
+- [x] DeepSeek Harness: an install too old to read the task on stdin (before 0.2.2-rc.1) exits
+      with only `dsh: a task is required`, so the adapter turns that into the update that fixes it,
+      as Claude Code too old for a model does (#165), and marks it a configuration failure rather
+      than retrying it — claimed: Andee Collard, branch `bugfix/r2.2-dsh-too-old-guidance`
 - [ ] DeepSeek Harness: no resume (its headless profile keeps no session), and a build on the harness's
       desktop profile is untried
 - [ ] `setup` writes the plain `mcp` command, so it drops an `--all-tools` an entry already has, and

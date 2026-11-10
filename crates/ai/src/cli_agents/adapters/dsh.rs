@@ -21,6 +21,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// own profile by hand, so the two never replace each other.
 const OVERLAY_ID: &str = "mcp-craft-anything-run";
 
+/// What a Harness too old to read the task on stdin says instead, word for word.
+pub const TASK_REQUIRED: &str = "a task is required";
+
 /// The run's server name: not `craft-anything`, which the person's own registration uses, as the
 /// harness refuses to start two clients with one name.
 const OVERLAY_SERVER: &str = "craft-anything-run";
@@ -68,6 +71,24 @@ impl AgentAdapter for DeepSeekHarness {
     /// failed flag check keeps this adapter rather than falling back to the plain one.
     fn plain_fallback(&self) -> bool {
         false
+    }
+
+    /// A Harness older than 0.2.2-rc.1 never reads the task on stdin, and says only
+    /// `dsh: a task is required` — which sounds like our mistake, not an install to update.
+    fn explain_exit(&self, out: &craft_anything_platform::Output) -> Option<ExitExplanation> {
+        let said = format!("{}{}", out.stderr_text(), out.stdout_text()).to_ascii_lowercase();
+        if !said.contains(TASK_REQUIRED) {
+            return None;
+        }
+        Some(ExitExplanation {
+            failure: crate::TurnFailure::new(crate::FailureKind::Configuration),
+            message: "DeepSeek Harness is too old to build: it can't take the task on stdin (0.2.2-rc.1 or newer is needed)."
+                .into(),
+            remediation: Some(
+                "Update DeepSeek Harness, then start the build again: with npm, run `npm install -g @deepseek-ai/dsh@latest`; with the DeepSeek Harness app, update the app and check `dsh --version` says 0.2.2-rc.1 or newer."
+                    .into(),
+            ),
+        })
     }
 
     fn check_tool_server(&self, stop: &CancelToken) -> Result<(), ToolError> {
@@ -281,5 +302,27 @@ mod tests {
         let y = overlay_yaml(&mcp);
         assert!(y.contains("command: 'cli''s.exe'"), "{y}");
         assert!(y.contains("- 'C:\\it''s here'"), "{y}");
+    }
+
+    /// The words a Harness too old to read stdin prints, as it prints them, are turned into the
+    /// update that fixes the build rather than being shown as a missing task.
+    #[test]
+    fn an_old_harness_is_told_to_update() {
+        let mut old = craft_anything_platform::Output {
+            code: Some(1),
+            success: false,
+            stdout: Vec::new(),
+            stderr: b"dsh: a task is required, for example: dsh --profile headless \"run the tests\"\n".to_vec(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+            duration: std::time::Duration::from_millis(40),
+        };
+        let e = DeepSeekHarness.explain_exit(&old).expect("the old install is explained");
+        assert_eq!(e.failure, crate::TurnFailure::new(crate::FailureKind::Configuration), "{e:?}");
+        assert!(e.message.contains("too old to build") && e.message.contains("0.2.2-rc.1"), "{}", e.message);
+        assert!(e.remediation.as_ref().is_some_and(|r| r.contains("npm install -g @deepseek-ai/dsh@latest")), "{e:?}");
+        // Any other way a run can fail keeps the general exit message.
+        old.stderr = b"error: could not read profile\n".to_vec();
+        assert!(DeepSeekHarness.explain_exit(&old).is_none());
     }
 }
