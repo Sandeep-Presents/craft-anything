@@ -616,14 +616,16 @@ fn core_target_triage(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, To
 // Analysis view
 
 /// Find a value by key anywhere in the first levels of `v`.
-fn find_key<'a>(v: &'a Value, key: &str, depth: usize) -> Option<&'a Value> {
-    if depth > 4 {
-        return None;
-    }
-    match v {
-        Value::Object(m) => m.get(key).or_else(|| m.values().find_map(|x| find_key(x, key, depth + 1))),
-        _ => None,
-    }
+fn find_key<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
+    craft_anything_evidence::find_result_key(v, key)
+}
+
+/// Where to go when a name isn't a list: the lists the record has, with their lengths.
+fn lists_hint(r: &Value) -> (String, Value) {
+    let lists = craft_anything_evidence::result_lists(r);
+    let names: Vec<String> = lists.iter().map(|(k, n)| format!("{k} ({n})")).collect();
+    let hint = if names.is_empty() { "This record has no lists to page.".to_string() } else { format!("Its lists: {}.", names.join(", ")) };
+    (hint, json!(lists))
 }
 
 /// Page text by UTF-16 code units without splitting a surrogate pair.
@@ -668,13 +670,14 @@ fn core_evidence_browse(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
         Show::Summary => (parent.summary_view(), Coverage::complete(1)),
         Show::Part { name } => {
             let v =
-                find_key(r, name, 0).ok_or_else(|| ToolError::invalid(format!("no part {name} in this record")).with_details(json!({"available": keys(r)})))?;
+                find_key(r, name).ok_or_else(|| ToolError::invalid(format!("no part {name} in this record")).with_details(json!({"available": keys(r)})))?;
             (json!({"part": name, "value": v}), Coverage::complete(1))
         }
         Show::Row { list, pick } => {
-            let arr = find_key(r, list, 0)
-                .and_then(Value::as_array)
-                .ok_or_else(|| ToolError::invalid(format!("no list {list} in this record")).with_details(json!({"available": keys(r)})))?;
+            let arr = find_key(r, list).and_then(Value::as_array).ok_or_else(|| {
+                let (hint, lists) = lists_hint(r);
+                ToolError::invalid(format!("no list {list} in this record")).with_remediation(hint).with_details(json!({"available": keys(r), "lists": lists}))
+            })?;
             let row = pick.parse::<usize>().ok().and_then(|i| arr.get(i)).or_else(|| {
                 arr.iter().find(|x| ["name", "address", "id", "text", "type"].iter().any(|k| x.get(*k).and_then(Value::as_str) == Some(pick.as_str())))
             });
@@ -736,7 +739,10 @@ fn page_of(
     field_names: bool,
 ) -> Result<(Value, Coverage), ToolError> {
     let limit = limit.clamp(1, 5000);
-    let v = find_key(r, list, 0).ok_or_else(|| ToolError::invalid(format!("no {list} in this record")).with_details(json!({"available": keys(r)})))?;
+    let v = find_key(r, list).ok_or_else(|| {
+        let (hint, lists) = lists_hint(r);
+        ToolError::invalid(format!("no {list} in this record")).with_remediation(hint).with_details(json!({"available": keys(r), "lists": lists}))
+    })?;
     let narrowed = !matching.is_empty() || !fields.is_empty() || field_names;
     Ok(match v {
         Value::Array(a) => {
@@ -764,8 +770,15 @@ fn page_of(
             (out, cov)
         }
         _ if narrowed => {
+            let (hint, lists) = lists_hint(r);
+            let as_is = format!("leave matching, fields and field_names out to see {list} as it is");
+            let remediation = match lists.as_object() {
+                Some(m) if !m.is_empty() => format!("{hint} Page one of those, or {as_is}."),
+                _ => format!("{hint} Or {as_is}."),
+            };
             return Err(ToolError::invalid(format!("{list} isn't a list of records, so matching, fields and field_names don't apply"))
-                .with_remediation("Leave them out to page it as it is."));
+                .with_remediation(remediation)
+                .with_details(json!({"lists": lists})));
         }
         Value::String(s) => {
             let (text, total, next) = page_text(s, offset, limit.saturating_mul(64));

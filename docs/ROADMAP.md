@@ -645,12 +645,17 @@ yet, and the quick start is how every new person begins.
       79.5 KB page (`limit: 15`) reached Claude Code whole as 37.7 KB of text, about 17k of its
       25k-token tool limit, and it quoted the page's last row correctly
       — claimed: chordpli, branch test/r5.7-evidence-browse-live
-- [ ] Neither the line-up's summary nor `core_evidence_browse`'s error names the lists it can
+- [x] Neither the line-up's summary nor `core_evidence_browse`'s error names the lists it can
       page: Claude Code asked for `list: "changed"` (a `show` value), got "changed isn't a list of
       records… Leave them out to page it as it is", and ran the 20 s line-up again with
       `show: changed` before finding `list: "pairs"` with `matching`. Name the lists (`pairs`,
-      `ambiguous`, `only_left`, `only_right`) in both
+      `ambiguous`, `only_left`, `only_right`) in both. Every record's summary view (a
+      `detail: summary` answer, the summary-first answer over a connection's budget, browse's
+      `kind: summary`) now has `lists`, name → length, for the names browse reaches a list with;
+      browse's errors for a name that isn't a list name them too
       — claimed: chordpli, branch bugfix/r5.7-browse-list-names
+- [ ] Live-check the named lists in a Claude Code chat: the same two `cargo` builds, and the
+      agent pages `pairs` straight from the summary, without a wrong list or a second line-up
 - [ ] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
       v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
       pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with

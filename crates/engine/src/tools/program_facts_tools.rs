@@ -1430,6 +1430,23 @@ mod tests {
         let v = call(&e, "app_builds_line_up", json!({"left": lp, "right": rp, "detail": "summary"}));
         assert!(v["result"]["saved_evidence"]["evidence_id"].is_string());
         assert_eq!(v["result"]["counts"]["ambiguous_groups"], 1);
+
+        // The summary names the lists it can page, with their lengths: a live Claude Code run
+        // asked for `list: "changed"` (a count, and a `show` value) and ran the line-up again.
+        let lists = &v["result"]["record"]["lists"];
+        for list in ["pairs", "ambiguous", "only_left", "only_right"] {
+            assert!(lists[list].is_u64(), "{list} in {lists}");
+        }
+        assert!(lists.get("changed").is_none(), "{lists}");
+        let src = json!({"kind": "saved", "evidence_id": v["result"]["saved_evidence"]["evidence_id"]});
+        let err = call_err(&e, "core_evidence_browse", json!({"source": src, "show": {"kind": "rows", "list": "changed", "matching": {"body": "changed"}}}));
+        let remedy = err.remediation.clone().unwrap_or_default();
+        assert!(remedy.contains(&format!("pairs ({})", lists["pairs"])) && remedy.contains("only_right ("), "{remedy}");
+        assert_eq!(err.details.as_ref().and_then(|d| d.get("lists")), Some(lists));
+        let err = call_err(&e, "core_evidence_browse", json!({"source": src, "show": {"kind": "rows", "list": "no_such_list"}}));
+        assert!(err.remediation.unwrap_or_default().contains("ambiguous ("));
+        let page = call(&e, "core_evidence_browse", json!({"source": src, "show": {"kind": "rows", "list": "pairs", "matching": {"body": "changed"}}}));
+        assert_eq!(page["result"]["shown"]["total"], 1);
     }
 
     #[test]
