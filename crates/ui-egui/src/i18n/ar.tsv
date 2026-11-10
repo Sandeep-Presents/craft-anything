@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	قراءة بيانات IL2CPP الوصفي�
 Read a game's files	قراءة ملفات لعبة
 Read a project file	قراءة ملف مشروع
 Read a setting	قراءة إعداد
+Read a text file	قراءة ملف نصي
 Read an app's screen	قراءة شاشة تطبيق
 Read bytes	قراءة البايتات
 Read comment	قراءة التعليق
