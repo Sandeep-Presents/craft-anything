@@ -664,6 +664,7 @@ yet, and the quick start is how every new person begins.
       v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
       pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with
       the crate hash left out
+      — claimed: chordpli, branch bugfix/r5.7-rust-hash-free-names
 - [ ] Live check on Windows: rebuild a project while its frozen pin runs, and the build isn't
       blocked
 
