@@ -1494,6 +1494,7 @@ Owner: open · Status: in progress
       — claimed: chordpli, branch feature/r3.11-text-source-read
 - [ ] Live-check #539 in an agent chat (Codex, as reported, and Claude Code): the agent reaches
       `core_text_read` from triage for a script or Markdown target, instead of searching bytes
+      — claimed: chordpli, branch test/r3.11-text-read-live-chat
 
 ### R3.12 Format parser correctness
 Owner: open · Status: in progress
