@@ -637,6 +637,7 @@ yet, and the quick start is how every new person begins.
       Pause acts between checks and stops a running build step, and a caught bug leaves "Needs you"
 - [ ] A live chat run with a big comparison result, to see Claude Code page it with
       `core_evidence_browse` (and whether 80 KB is the right size)
+      — claimed: chordpli, branch test/r5.7-evidence-browse-live
 - [ ] Live check on Windows: rebuild a project while its frozen pin runs, and the build isn't
       blocked
 
