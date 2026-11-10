@@ -1467,3 +1467,10 @@ Connecting to {name}… {seconds} s	Conectando con {name}… {seconds} s
 Stopped adding {name}.	Se dejó de añadir {name}.
 It isn't there any more, so {program} runs in its place.	Ya no está ahí, así que se usa {program} en su lugar.
 Use it	Usarlo
+Capture a screen state	Capturar un estado de pantalla
+Crashes of an app	Fallos de una app
+Press keys	Presionar teclas
+Read the screen's controls	Leer los controles de la pantalla
+Type text	Escribir texto
+Map an app's screens	Mapear las pantallas de una app
+Walk through an app's screens	Recorrer las pantallas de una app

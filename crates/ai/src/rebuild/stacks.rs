@@ -287,6 +287,12 @@ mod tests {
         assert_eq!(asked_for(&words("A tool in Python.")).map(|s| s.name.as_str()), Some("Python"));
         assert_eq!(asked_for(&words("a page with react")).map(|s| s.name.as_str()), Some("React + TypeScript (Vite)"));
         assert_eq!(asked_for(&words("a notes app")), None);
+        assert_eq!(asked_for(&words("Recreate it with a Rust core and a Kotlin shim")).map(|s| s.name.as_str()), Some("Rust core + Kotlin/Compose (Android)"));
+        assert_eq!(
+            asked_for(&words("the same app in Kotlin")).map(|s| s.name.as_str()),
+            Some("Kotlin + Jetpack Compose (Android)"),
+            "plain Kotlin stays the Kotlin row"
+        );
         assert_eq!(resolve("godot").map(|s| s.name.as_str()), Some("Godot"));
         assert_eq!(resolve(" unreal ").map(|s| s.name.as_str()), Some("Unreal Engine"));
         assert_eq!(resolve("rust + EGUI (eframe)").map(|s| s.name.as_str()), Some("Rust + egui (eframe)"));

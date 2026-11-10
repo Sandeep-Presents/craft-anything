@@ -869,7 +869,8 @@ impl NoiseMask {
 }
 
 /// The mean colour of tile (`tx`, `ty`) of `img`.
-fn tile_mean(img: &Image, block: u32, bx: u32, by: u32) -> [f64; 3] {
+/// The mean colour of the `block`×`block` tile at (`bx`, `by`) in tiles.
+pub fn tile_mean(img: &Image, block: u32, bx: u32, by: u32) -> [f64; 3] {
     let mut sum = [0u64; 3];
     let mut n = 0u64;
     for y in by * block..((by + 1) * block).min(img.height) {
