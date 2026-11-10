@@ -2338,6 +2338,8 @@ mod picking_up_a_build {
         std::fs::create_dir_all(ws.reference_dir()).unwrap();
         std::fs::write(ws.reference_dir().join("picture-1.png"), PNG).unwrap();
         ws.manifest.awaiting_check = true;
+        // The check runs in Clean room, so the capture is Clean room's (one from Deep is studied again).
+        ws.manifest.capture_deep = Some(false);
         ws.save().unwrap();
         let seen = Arc::default();
         // The fix changes app/, so the check after it looks again.
