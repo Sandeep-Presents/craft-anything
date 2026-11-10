@@ -1165,6 +1165,13 @@ mod tests {
         let versions: Vec<String> = inventory(&p).engines.into_iter().map(|i| i.version).collect();
         assert_eq!(versions, ["6000.0.23f1", "2019.4.1f1"], "newest first; an editor that's gone isn't offered");
 
+        // The Hub lists the editors it installed itself too: found both ways, offered once.
+        touch(d.path(), "pf/Unity/Hub/Editor/2022.3.10f1/Editor/Unity.exe", b"");
+        let own = serde_json::json!([{"version": "2022.3.10f1", "location": [at("pf/Unity/Hub/Editor/2022.3.10f1/Editor/Unity.exe")]}]);
+        touch(d.path(), "roaming/UnityHub/editors-v2.json", own.to_string().as_bytes());
+        let both = Places { program_files: vec![d.path().join("pf")], ..p.clone() };
+        assert_eq!(inventory(&both).engines.iter().filter(|i| i.version == "2022.3.10f1").count(), 1);
+
         touch(d.path(), "roaming/UnityHub/editors-v2.json", b"{\"data\": [");
         touch(d.path(), "roaming/UnityHub/editors.json", b"[[[[[[{\"version\": 1, \"location\": {}}]]]]]]");
         assert!(inventory(&p).engines.is_empty(), "a list that can't be read finds nothing");
