@@ -714,12 +714,15 @@ Owner: open · Status: in progress
       — claimed: qu-gg, branch `feature/r2.2-copilot-integration` (recorded during PR preparation)
 - [ ] Pi as a coding agent (`pi -p --mode json`, message on stdin): discovery, model and thinking
       effort, session resume, and our MCP server per run as an extension with direct exposure —
-      the only way in, since pi has no `--mcp-config`. A builder keeps reading and our tools only:
-      no `edit`, `write`, `bash` or `codemode` of its own, so every change goes through the tools
-      whose effects and consent we record. pi's own approval prompt has no equivalent flag; a
-      permission bridge is still owed. A project's session travels with it and is put back in the
-      folder pi names (the linked `/tmp` resolved first). See [Pi](pi.md). Three live builds on
-      macOS reached Ready; one carried to another folder continued from the restored session.
+      the only way in, since pi has no `--mcp-config`. pi has no `--permission-prompt-tool` either,
+      so the same generated extension holds the approval bridge: its `tool_call` handler asks
+      `core_action_approve` about pi's own `bash`, `powershell`, `write` and `edit`, and blocks the
+      call with the policy's words when it refuses — nothing is installed into pi's configuration.
+      A Deep build therefore edits and runs with pi's tools, and a Clean room build keeps this
+      run's tools only; `codemode` and `tool_search` stay out. A project's session travels with it
+      and is put back in the folder pi names (the linked `/tmp` resolved first). See [Pi](pi.md).
+      Four live builds on macOS reached Ready (one Deep with the bridge); one carried to another
+      folder continued from the restored session.
       — claimed: jiahao, branch feature/r2.2-pi-agent
 - [x] Grok Build as a coding agent over ACP (`grok agent stdio`): discovery in `~/.grok/bin`,
       the person's own `grok login` (a missing `auth.json` is unknown, so an API key still

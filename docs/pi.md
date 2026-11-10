@@ -83,23 +83,27 @@ export default function (pi) {
 
 | Access | Tools |
 |---|---|
-| Build (Deep) | `read`, `grep`, `find`, `ls`, and this run's `mcp__craft_anything_run__*` |
+| Build (Deep) | `read`, `grep`, `find`, `ls`, `edit`, `write`, `bash`, `powershell` — each change and command approved by the bridge below — and this run's `mcp__craft_anything_run__*` |
 | Build (Clean room) | this run's tools only: no file tools of the agent's own |
 | Question (Deep) | `read`, `grep`, `find`, `ls`; no tool server |
 | Question (Clean room) | `--no-tools` |
 
-`edit`, `write`, `bash`, `powershell`, `codemode` and `tool_search` are left out on purpose.
-Without its own editor or shell, every change and command goes through the tools whose effects,
-evidence and consent Craft Anything records. `codemode` matters most: it calls a server's tools by
-name whatever the active tool set says, so leaving it in would reach the servers this run isn't
-meant to use (a person's other `mcp.json` servers still connect, and only stay out of reach
-because nothing here can name their tools).
+`codemode` and `tool_search` are left out on purpose: `codemode` calls a server's tools by name
+whatever the active tool set says, so leaving it in would reach the servers this run isn't meant
+to use (a person's other `mcp.json` servers still connect, and only stay out of reach because
+nothing here can name their tools).
 
-What is **not** covered yet: pi's own approval prompt. Claude Code is handed
-`--permission-prompt-tool` so every write, command and fetch comes to Craft Anything's approval
-tool; pi has no equivalent flag, and a permission bridge would be a pi extension of its own
-(R2.2). Until then the table above is the boundary: a pi builder can only act through Craft
-Anything's tools, which carry the same approvals.
+## Approvals
+
+pi has no `--permission-prompt-tool`, so the same generated extension carries the bridge itself:
+its `tool_call` handler maps pi's changing tools (`bash`, `powershell`, `write`, `edit`) into
+Claude Code's shape (`Bash {command}`, `Write {file_path, content}`, `Edit {file_path, …}`) and runs
+`craft-anything-cli core-action-approve` with this run's project and mode. `allow` lets the call
+go on; `deny` blocks it and hands the policy's own words back to the model, so it knows what to do
+instead. Reads and ours tools pass straight through — ours carry their own consent.
+
+Nothing is installed into pi's own configuration: the bridge lives in the per-run extension file
+described above and is deleted with it. A run that cannot write that file stops before it starts.
 
 ## What was verified
 
@@ -114,5 +118,8 @@ Anything's tools, which carry the same approvals.
 - A session that travels: a build, its project copied to another folder, every local pi session for
   it deleted, then `--continue-in <copy>` — pi continued the restored file (the follow-up prompt is
   the file's second user message) and the change reached `app/index.html`.
+- The approval bridge, in a Deep build: five `bash` calls and two `write` calls ran after the policy
+  allowed them (`cargo --version` reached the page's footer as its exact output), and one action the
+  policy refused ("Run a scripted web session") was blocked and reported to the builder.
 - Not verified: a Clean room build, a build over SSH, a model chosen in Settings, and pi versions
   other than 1.5.0.

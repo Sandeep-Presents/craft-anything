@@ -19,6 +19,12 @@
 //! `codemode` calls a server's tools by name whatever the active tool set says, so leaving it in
 //! would reach the servers this run isn't meant to use.
 //!
+//! pi has no `--permission-prompt-tool`, so the same extension holds the bridge: its `tool_call`
+//! handler asks Craft Anything's own `core_action_approve` about every tool that changes something
+//! (pi's `bash`, `powershell`, `write`, `edit`) and blocks the call when the policy refuses or the
+//! person says no. Reads and our own tools pass straight through: ours carry their own consent.
+//! With that in place a Deep build may use pi's own editor and shell, as a Claude Code build does.
+//!
 //! `sh`-style quoting is not involved anywhere: the extension is JSON, and the message never
 //! enters argv (Windows refuses long command lines, and its limit is far below a build's brief).
 
@@ -35,8 +41,10 @@ const SERVER: &str = "craft-anything-run";
 /// and `_` into `_`, so `craft-anything-run` becomes `craft_anything_run`.
 const TOOL_PREFIX: &str = "mcp__craft_anything_run__";
 
-/// The built-in tools a builder keeps beside ours: reading only. pi has no `TodoWrite`.
+/// The built-in tools a builder keeps beside ours: reading, and in Deep mode the editor and shell
+/// the extension's approval bridge gates. pi has no `TodoWrite`.
 const READ_TOOLS: &[&str] = &["read", "grep", "find", "ls"];
+const CHANGING_TOOLS: &[&str] = &["edit", "write", "bash", "powershell"];
 
 /// The extension's file name inside a run's folder.
 const EXTENSION_FILE: &str = "craft-anything-tools.js";
@@ -137,9 +145,12 @@ impl AgentAdapter for PiCli {
         a.extend(["-e".into(), extension_file(&builder_server(cx.mcp))]);
         let mut tools: Vec<String> = Vec::new();
         // In Clean room the original may only be read through our tools, so no file tools of the
-        // agent's own: the same rule its other adapters hold it to.
+        // agent's own: the same rule its other adapters hold it to. In Deep mode a builder edits
+        // and runs with pi's own tools, and the extension's `tool_call` bridge asks Craft Anything
+        // about each of those calls.
         if !cx.reads_checked {
             tools.extend(READ_TOOLS.iter().map(|t| (*t).to_string()));
+            tools.extend(CHANGING_TOOLS.iter().map(|t| (*t).to_string()));
         }
         tools.push(format!("{TOOL_PREFIX}*"));
         a.extend(["--tools".into(), tools.join(",")]);
@@ -456,8 +467,30 @@ fn extension_dir() -> Result<std::path::PathBuf, ToolError> {
     Ok(dir)
 }
 
-/// Our tool server as the extension this run loads: one registration, declared directly so its
-/// tools are in the model's list, under JSON quoting rather than shell quoting.
+/// The arguments that ask Craft Anything about one action: `core-action-approve` with the run's
+/// project and mode. `--inbox`, `--all-tools` and `--target` aren't options of that tool, and the
+/// inbox is read from the project.
+fn approve_args(mcp: &McpCommand) -> Vec<String> {
+    let mut args = vec!["core-action-approve".to_string()];
+    let mut rest = mcp.args.iter();
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--project" => {
+                args.push(arg.clone());
+                if let Some(value) = rest.next() {
+                    args.push(value.clone());
+                }
+            }
+            "--deep" | "--clean-room" => args.push(arg.clone()),
+            _ => {}
+        }
+    }
+    args
+}
+
+/// Our tool server as the extension this run loads: the registration, declared directly so its
+/// tools are in the model's list, and the approval bridge for pi's own changing tools. Under JSON
+/// quoting rather than shell quoting.
 fn extension_js(mcp: &McpCommand) -> String {
     let server = serde_json::Value::String(SERVER.to_string());
     let config = serde_json::json!({
@@ -466,10 +499,41 @@ fn extension_js(mcp: &McpCommand) -> String {
         "exposure": "direct",
         "description": "Craft Anything's tools for this run",
     });
+    let cli = serde_json::Value::String(mcp.command.clone());
+    let approve = serde_json::Value::Array(approve_args(mcp).iter().map(|a| serde_json::Value::String(a.clone())).collect());
     format!(
-        "// Craft Anything's tool server for this run. Generated; safe to delete.\n\
+        "// Craft Anything's tool server and approval bridge for this run. Generated; safe to delete.\n\
+         import {{ execFile }} from \"node:child_process\";\n\
+         import {{ promisify }} from \"node:util\";\n\
+         const craft = promisify(execFile);\n\
+         const CLI = {cli};\n\
+         const APPROVE = {approve};\n\
+         // pi's own changing tools, in the shape Craft Anything's policy reads (Claude Code's).\n\
+         const SHAPE = {{\n  \
+           bash: (i) => [\"Bash\", {{ command: i.command }}],\n  \
+           powershell: (i) => [\"PowerShell\", {{ command: i.command }}],\n  \
+           write: (i) => [\"Write\", {{ file_path: i.path, content: i.content }}],\n  \
+           edit: (i) => [\"Edit\", {{ file_path: i.path, old_string: i.oldText, new_string: i.newText }}],\n\
+         }};\n\
          export default function (pi) {{\n  \
-           pi.registerMcpServer({server}, {config});\n\
+           pi.registerMcpServer({server}, {config});\n  \
+           // Nothing changes without asking Craft Anything first. Readings and our own tools pass.\n  \
+           pi.on(\"tool_call\", async (event) => {{\n    \
+             const name = String(event.toolName ?? \"\");\n    \
+             if (name.startsWith(\"mcp__\")) return;\n    \
+             const shape = SHAPE[name];\n    \
+             if (!shape) return;\n    \
+             const [tool, input] = shape(event.input ?? {{}});\n    \
+             let verdict;\n    \
+             try {{\n      \
+               const {{ stdout }} = await craft(CLI, [...APPROVE, \"--tool-name\", tool, \"--input\", JSON.stringify(input)], {{ maxBuffer: 1 << 20 }});\n      \
+               verdict = JSON.parse(stdout)?.result;\n    \
+             }} catch (e) {{\n      \
+               return {{ block: true, reason: \"Craft Anything couldn't check this action, so it wasn't done: \" + (e?.message ?? e) }};\n    \
+             }}\n    \
+             if (verdict?.behavior === \"allow\") return;\n    \
+             return {{ block: true, reason: String(verdict?.message ?? \"Craft Anything refused this action.\") }};\n  \
+           }});\n\
          }}\n"
     )
 }
@@ -563,19 +627,40 @@ mod tests {
         }
     }
 
-    /// A builder edits and runs through our tools: it has no shell or editor of its own, and
-    /// `codemode` is out because it could call another server's tools by name.
+    /// A Deep builder edits and runs with pi's own tools (the bridge gates them), and `codemode` is
+    /// out because it could call another server's tools by name.
     #[test]
-    fn a_builder_keeps_reading_and_our_tools_only() {
+    fn a_deep_builder_may_edit_and_run_but_not_reach_other_servers() {
         let (a, _) = args(&BackendOptions::default(), true, false, false, None);
         let tools: Vec<&str> = after(&a, "--tools").split(',').collect();
-        for own in ["edit", "write", "bash", "powershell", "codemode", "tool_search"] {
+        for own in ["codemode", "tool_search"] {
             assert!(!tools.contains(&own), "{own} must not be there: {tools:?}");
         }
-        for read in READ_TOOLS {
-            assert!(tools.contains(read), "{read} is a builder's reading tool: {tools:?}");
+        for kept in READ_TOOLS.iter().chain(CHANGING_TOOLS) {
+            assert!(tools.contains(kept), "{kept} belongs to a Deep builder: {tools:?}");
         }
         assert!(tools.iter().any(|t| t.starts_with(TOOL_PREFIX)), "our tools: {tools:?}");
+    }
+
+    /// Every changing tool pi offers goes through Craft Anything's own approval first, from the
+    /// same generated file, so nothing outside the repository is installed into pi.
+    #[test]
+    fn the_extension_holds_the_approval_bridge() {
+        let (a, mcp) = args(&BackendOptions::default(), true, false, false, None);
+        let path = std::path::PathBuf::from(after(&a, "-e"));
+        let written = std::fs::read_to_string(&path).expect("read the extension");
+        for shape in ["bash:", "powershell:", "write:", "edit:"] {
+            assert!(written.contains(shape), "{shape} is gated: {written}");
+        }
+        assert!(written.contains("pi.on(\"tool_call\""), "{written}");
+        assert!(written.contains("\"core-action-approve\""), "{written}");
+        assert!(written.contains(&format!("\"{}\"", mcp.args[2])), "the run's project is passed: {written}");
+        let bridge = written.lines().find(|l| l.trim_start().starts_with("const APPROVE")).expect("the approval command");
+        assert!(bridge.contains("\"core-action-approve\""), "{bridge}");
+        assert!(!bridge.contains("--all-tools") && !bridge.contains("--inbox"), "only the approval tool's own options: {bridge}");
+        assert!(bridge.contains("--deep") || bridge.contains("--clean-room"), "the run's mode: {bridge}");
+        let folder = path.parent().expect("a folder").to_path_buf();
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     /// A builder has no editor of its own, so its tool server lists the build tools.
@@ -771,5 +856,8 @@ mod tests {
         assert!(js.contains(r#""C:\\it's \"here\"\\craft-anything-cli.exe""#), "{js}");
         assert!(js.contains(r#""C:\\it's here""#), "{js}");
         assert!(js.contains(&format!("registerMcpServer(\"{SERVER}\"")), "{js}");
+        // The bridge's own command survives the quoting too.
+        assert!(js.contains(r#""core-action-approve""#), "{js}");
+        assert!(js.contains(r#""C:\\it's here""#), "the project argument is quoted: {js}");
     }
 }
