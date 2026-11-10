@@ -82,6 +82,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 2 Proof | R5.7 Live checks owed | — | Built but never run for real; each can reopen work above. Lines run when the machine or key they need is at hand, Clean room and the quick start first |
 | 3 Depth | The rest of R2.2 | — | Detection waits for reports from 0.3.0 or later; ACP after the adapters work |
 | 3 | R2.4 Runtime study, R2.5 Behaviour checks | scripted input (R2.4) before R2.5's sheet check | Makes "ready" mean more for apps and games |
+| 3 | R2.12 An app on a phone or TV as a target | R2.4 *(soft)* | Phones and TVs are where many apps people want to recreate live; today a device is a list of apps and a screenshot |
 | 3 | R2.7, R2.8 | — | Small gaps left in finished work |
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
 | 3 | R1.5 | — | Small leftovers |
@@ -1081,6 +1082,32 @@ Owner: open · Status: in progress
 - [ ] Hold the self-test to what the check can see too: picture the game after its scripted
       input and require it to differ from the `--screenshot` picture (a report alone is the
       build's own word)
+
+### R2.12 An app on a phone or TV as a target
+Owner: open · Status: in progress
+Study an app installed on an Android phone or TV the way a person uses it (the remote's keys, the
+screen, its controls), build an Android app from that, and judge each build on a device. Clean
+room throughout: nothing is pulled off the device or decoded.
+- [x] Screen tools over adb, all Clean room: `adb_app_launch` starts a TV app (`category`:
+      leanback), `adb_device_show` says whether the device is a TV and its density,
+      `adb_keys_press` (allowlisted keys, repeats, gaps), `adb_text_type`, `adb_ui_read`
+      (`uiautomator dump` in the node shape `runtime_ui_read` gives, bounds in px and dp),
+      `adb_screen_state_capture` (keys, wait, dump and screenshot in one shell call, with a lead so
+      the dump reads the screen right after the last key), `adb_crash_log_read` — claimed: rock-meister, branch feature/r2.12-adb-screen-tools
+- [x] `adb_ui_walkthrough_record` (scripted steps, a state per step) and `adb_app_map` (a bounded
+      breadth-first map of an app's screens from its keys: screens.json and a dump and picture per
+      state; a screen whose text matches a skip list is a row with no details) — claimed: rock-meister, branch feature/r2.12-app-map
+- [ ] `TargetRef::Device { serial, package }` (`adb:<serial>/<package>`): the Make screen's third
+      choice, the CLI's `rebuild` argument, the brief's wording
+- [ ] Study for a device target: device facts, a question before the first key, the map into
+      capture/, a README with the geometry rule (px ÷ density = dp, ±1 dp), and an optional pause
+      so the person reviews capture/ before the builder reads it
+- [ ] An `android-app` kind: a Kotlin + Jetpack Compose stack (TV: `androidx.tv`, a leanback
+      launcher, no touchscreen required), a Gradle arm in `build_check`, JDK and Android SDK as
+      engines `engines_list` reports
+- [ ] A device check: install the debug APK on the build device, replay each mapped state's keys,
+      claims per state (focused text, the original's focusable controls, paired bounds within the
+      tolerance, no crash), likeness from the claims
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
