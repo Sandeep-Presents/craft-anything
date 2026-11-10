@@ -67,7 +67,8 @@ impl TargetKind for AndroidAppKind {
     }
 
     /// After a device check: the weakest screens first, with where their dumps and pictures are.
-    fn refine(&self, check: &CheckResult) -> String {
+    /// The dumps are text, so the same words serve a builder that can't look at pictures.
+    fn refine(&self, check: &CheckResult, _sees_pictures: bool) -> String {
         if check.check != super::android_check::DEVICE {
             return format!(
                 "Check {}: {}\n\nFix this in app/, build again until it succeeds, and reply with 1-2 plain sentences on what you changed.",
