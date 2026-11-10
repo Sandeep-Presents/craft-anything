@@ -278,6 +278,10 @@ pub fn parse(data: &[u8], limits: Limits) -> Result<Table, FormatError> {
         match ct {
             crate::axml::RES_STRING_POOL => match StringPool::parse(data, pos) {
                 Ok(p) => {
+                    if p.strings.len() < p.declared {
+                        table.truncated = true;
+                        table.warnings.push(format!("global string pool was capped at {} of {} strings", p.strings.len(), p.declared));
+                    }
                     table.global_strings = p.declared;
                     global = p;
                 }
@@ -325,7 +329,13 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
             return StringPool::default();
         };
         match StringPool::parse(data, start) {
-            Ok(pool) => pool,
+            Ok(pool) => {
+                if pool.strings.len() < pool.declared {
+                    table.truncated = true;
+                    table.warnings.push(format!("package {name}: {label} string pool was capped at {} of {} strings", pool.strings.len(), pool.declared));
+                }
+                pool
+            }
             Err(error) => {
                 table.warnings.push(format!("package {name}: {label} string pool: {error}"));
                 StringPool::default()

@@ -639,6 +639,30 @@ mod tests {
         assert_eq!(st["result"]["open"], false);
     }
 
+    #[test]
+    fn text_targets_are_named_in_open_list_and_triage() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("notes.md");
+        std::fs::write(&path, b"# Project notes\n").unwrap();
+        let e = Engine::new(crate::testing::session());
+        let call = |id: &str, params: serde_json::Value| e.call(id, params, CallOptions::new(Caller::Cli)).unwrap().to_json();
+
+        let opened = call("core_target_open", json!({"path": path}));
+        assert_eq!(opened["result"]["kind"], "text");
+        assert_eq!(opened["result"]["description"], "A text file (notes, source code or settings)");
+        let listed = call("core_targets_list", json!({}));
+        assert_eq!(listed["result"]["targets"][0]["kind"], "text");
+        assert_eq!(listed["result"]["targets"][0]["description"], "A text file (notes, source code or settings)");
+        let triage = call("core_target_triage", json!({}));
+        assert_eq!(triage["result"]["kind"], "text");
+        assert_eq!(triage["result"]["description"], "A text file (notes, source code or settings)");
+        assert_eq!(triage["result"]["next_steps"][0]["tool"], "core_text_read");
+
+        let binary = dir.path().join("opaque.bin");
+        std::fs::write(&binary, b"\0\xFF\x01opaque").unwrap();
+        assert_eq!(call("core_target_open", json!({"path": binary}))["result"]["kind"], "unknown");
+    }
+
     /// #305: reopening the same raw bytes with another architecture or address kept the first.
     #[test]
     fn reopening_raw_bytes_with_new_settings_uses_them() {

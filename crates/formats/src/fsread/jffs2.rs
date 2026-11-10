@@ -6,7 +6,7 @@
 
 use super::{FsEntry, FsImage, FsKind, Limits, join};
 use crate::bytes::Reader;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const DIRENT: u16 = 0xe001;
 const INODE: u16 = 0xe002;
@@ -117,7 +117,7 @@ pub fn read(data: &[u8], limits: &Limits) -> FsImage {
             children.entry(*pino).or_default().push(d);
         }
     }
-    let mut seen = Vec::new();
+    let mut seen = BTreeSet::new();
     build(&children, &inodes, 1, "", limits, &mut img, 0, &mut seen);
     img
 }
@@ -156,15 +156,14 @@ fn build(
     limits: &Limits,
     img: &mut FsImage,
     depth: usize,
-    seen: &mut Vec<u32>,
+    seen: &mut BTreeSet<u32>,
 ) {
-    if depth > limits.max_depth || img.entries.len() >= limits.max_entries || seen.contains(&dir_ino) {
+    if depth > limits.max_depth || img.entries.len() >= limits.max_entries || !seen.insert(dir_ino) {
         if depth > limits.max_depth {
             img.complete = false;
         }
         return;
     }
-    seen.push(dir_ino);
     let Some(kids) = children.get(&dir_ino) else { return };
     for d in kids {
         if img.entries.len() >= limits.max_entries {

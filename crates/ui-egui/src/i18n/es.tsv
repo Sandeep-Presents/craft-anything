@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Leer los metadatos IL2CPP de un juego de Uni
 Read a game's files	Leer los archivos de un juego
 Read a project file	Leer un archivo del proyecto
 Read a setting	Leer un ajuste
+Read a text file	Leer un archivo de texto
 Read an app's screen	Leer la pantalla de una app
 Read bytes	Leer bytes
 Read comment	Leer comentario
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	Conectando con {name}… {seconds} s
 Forget a website sign-in	Olvidar el inicio de sesión de un sitio web
 Sign in to a website	Iniciar sesión en un sitio web
+Stopped adding {name}.	Se dejó de añadir {name}.
+It isn't there any more, so {program} runs in its place.	Ya no está ahí, así que se usa {program} en su lugar.
+Use it	Usarlo

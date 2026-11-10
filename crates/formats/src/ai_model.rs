@@ -39,7 +39,7 @@ pub struct ModelTensor {
     pub parameters: u64,
     /// Where its data starts, relative to the start of the data section.
     pub data_offset: u64,
-    /// Size of its data, when the type has a fixed element size.
+    /// Size of its data, when the type's storage layout and shape are known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_bytes: Option<u64>,
 }
@@ -372,15 +372,49 @@ fn ggml_type_name(t: u32) -> String {
     known.to_string()
 }
 
-/// Bytes per element of the types stored one element at a time.
-fn ggml_element_bytes(t: u32) -> Option<u64> {
-    match t {
-        0 | 26 => Some(4),
-        1 | 25 | 30 => Some(2),
-        24 => Some(1),
-        27 | 28 => Some(8),
-        _ => None,
+/// Type id, weights per on-disk block, and bytes per block (including scales).
+const GGML_BLOCK_LAYOUTS: &[(u32, u64, u64)] = &[
+    (0, 1, 4),
+    (1, 1, 2),
+    (2, 32, 18),
+    (3, 32, 20),
+    (6, 32, 22),
+    (7, 32, 24),
+    (8, 32, 34),
+    (9, 32, 36),
+    (10, 256, 84),
+    (11, 256, 110),
+    (12, 256, 144),
+    (13, 256, 176),
+    (14, 256, 210),
+    (15, 256, 292),
+    (16, 256, 66),
+    (17, 256, 74),
+    (18, 256, 98),
+    (19, 256, 50),
+    (20, 32, 18),
+    (21, 256, 110),
+    (22, 256, 82),
+    (23, 256, 136),
+    (24, 1, 1),
+    (25, 1, 2),
+    (26, 1, 4),
+    (27, 1, 8),
+    (28, 1, 8),
+    (29, 256, 56),
+    (30, 1, 2),
+];
+
+fn ggml_tensor_bytes(t: u32, shape: &[u64], parameters: u64) -> Result<Option<u64>, String> {
+    let Some(&(_, block, bytes)) = GGML_BLOCK_LAYOUTS.iter().find(|&&(id, _, _)| id == t) else {
+        return Ok(None);
+    };
+    // Blocks belong to rows. Multiplying all dimensions first would accept, for
+    // example, two half-block rows as one complete block.
+    if block > 1 && shape.first().is_none_or(|width| !width.is_multiple_of(block)) {
+        return Err(format!("its row width is not a multiple of the {block}-weight block"));
     }
+    (parameters / block).checked_mul(bytes).map(Some).ok_or_else(|| "its tensor byte size overflows".into())
 }
 
 fn is_plain_numeric(name: &str) -> bool {
@@ -466,7 +500,7 @@ fn parse_gguf(prefix: &[u8], file_size: u64) -> Result<ModelReport, FormatError>
         i += 1;
     }
 
-    let mut last_data_end = 0u64;
+    let mut last_data_end = 0u128;
     if !ended_early {
         let mut i = 0u64;
         while i < tensor_count {
@@ -492,8 +526,18 @@ fn parse_gguf(prefix: &[u8], file_size: u64) -> Result<ModelReport, FormatError>
             if overflow {
                 r.warn(format!("{name}: its shape multiplies past what a number can hold"));
             }
-            let data_bytes = ggml_element_bytes(ty).and_then(|b| parameters.checked_mul(b));
-            last_data_end = last_data_end.max(data_offset.saturating_add(data_bytes.unwrap_or(0)));
+            let data_bytes = if overflow {
+                None
+            } else {
+                match ggml_tensor_bytes(ty, &shape, parameters) {
+                    Ok(bytes) => bytes,
+                    Err(reason) => {
+                        r.warn(format!("{name}: {reason}"));
+                        None
+                    }
+                }
+            };
+            last_data_end = last_data_end.max(u128::from(data_offset) + u128::from(data_bytes.unwrap_or(0)));
             let (name, _) = shorten(name);
             r.add_tensor(ModelTensor { name, dtype: ggml_type_name(ty), shape, parameters, data_offset, data_bytes });
             i += 1;
@@ -516,9 +560,11 @@ fn parse_gguf(prefix: &[u8], file_size: u64) -> Result<ModelReport, FormatError>
                 r.tensors_past_end = r
                     .tensors
                     .iter()
-                    .filter(|t| t.parameters > 0 && start.saturating_add(t.data_offset).saturating_add(t.data_bytes.unwrap_or(0)) > file_size)
+                    .filter(|t| {
+                        t.parameters > 0 && u128::from(start) + u128::from(t.data_offset) + u128::from(t.data_bytes.unwrap_or(0)) > u128::from(file_size)
+                    })
                     .count() as u64;
-                if start.saturating_add(last_data_end) > file_size {
+                if u128::from(start) + last_data_end > u128::from(file_size) {
                     r.warn("The tensor table describes more data than the file holds: it is cut short, or the table is false.".into());
                 }
             }

@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Loe Unity mängu IL2CPP metaandmeid
 Read a game's files	Loe mängu faile
 Read a project file	Loe projektifaili
 Read a setting	Loe seadet
+Read a text file	Loe tekstifaili
 Read an app's screen	Loe rakenduse ekraani
 Read bytes	Loe baite
 Read comment	Loe kommentaari
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
 Forget a website sign-in	Unusta veebisaidi sisselogimine
 Sign in to a website	Logi veebisaidile sisse
+Stopped adding {name}.	{name} lisamine peatati.
+It isn't there any more, so {program} runs in its place.	Seda pole enam seal, nii et selle asemel käivitub {program}.
+Use it	Kasuta seda

@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Unity 게임의 IL2CPP 메타데이터 읽�
 Read a game's files	게임 파일 읽기
 Read a project file	프로젝트 파일 읽기
 Read a setting	설정 읽기
+Read a text file	텍스트 파일 읽기
 Read an app's screen	앱 화면 읽기
 Read bytes	바이트 읽기
 Read comment	주석 읽기
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	{name}에 연결하는 중… {seconds}초
 Forget a website sign-in	웹사이트 로그인 정보 지우기
 Sign in to a website	웹사이트에 로그인
+Stopped adding {name}.	{name} 추가를 멈췄습니다.
+It isn't there any more, so {program} runs in its place.	더 이상 그곳에 없어서 대신 {program}이(가) 실행됩니다.
+Use it	이것 사용

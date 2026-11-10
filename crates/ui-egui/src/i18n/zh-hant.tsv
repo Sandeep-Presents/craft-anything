@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	讀取 Unity 遊戲的 IL2CPP 中繼資料
 Read a game's files	讀取遊戲檔案
 Read a project file	讀取專案檔案
 Read a setting	讀取設定
+Read a text file	讀取文字檔案
 Read an app's screen	讀取應用程式畫面
 Read bytes	讀取位元組
 Read comment	讀取註解
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
 Forget a website sign-in	忘記網站登入
 Sign in to a website	登入網站
+Stopped adding {name}.	已停止新增 {name}。
+It isn't there any more, so {program} runs in its place.	它已不在那裡，因此改用 {program}。
+Use it	使用它

@@ -888,6 +888,7 @@ Read a Unity game's IL2CPP metadata	Читать метаданные IL2CPP и�
 Read a game's files	Читать файлы игры
 Read a project file	Читать файл проекта
 Read a setting	Читать настройку
+Read a text file	Читать текстовый файл
 Read an app's screen	Читать экран приложения
 Read bytes	Читать байты
 Read comment	Читать комментарий
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	Подключение к {name}… {seconds} с
 Forget a website sign-in	Забыть вход на сайт
 Sign in to a website	Войти на сайт
+Stopped adding {name}.	Добавление {name} остановлено.
+It isn't there any more, so {program} runs in its place.	Его там больше нет, поэтому вместо него запускается {program}.
+Use it	Использовать

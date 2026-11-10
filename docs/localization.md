@@ -148,6 +148,16 @@ widget labels and registered engine tool titles and groups; it also runs in
 `cargo xtask ci`. It does not prove coverage of arbitrary runtime text or labels
 held in tables, so review those when adding or changing UI code.
 
+A UI change can land with its new strings in English while native speakers review the
+translations in a PR of their own. List each new string in `crates/ui-egui/src/i18n/awaiting.txt`
+(one per line, as in a catalog's first column). The coverage command lets the strings listed
+there be missing, and the app shows them in English until a catalog has them. The command fails
+once a listed string is in every catalog, or is no longer shown, so the translation PR takes it
+out of the list. The catalog tests require every catalog to have the same keys, so that PR adds
+each string to all of them at once. Only strings the command finds can be listed: a literal in
+`tr`, `trf` or a widget's label, not one passed through a constant (`tr(LABEL)`), which the
+command can't see and would report as not shown.
+
 The existing snapshot example accepts any catalog code with `--lang`, such as
 `--lang zh-hant` or `--lang ko`, for example:
 

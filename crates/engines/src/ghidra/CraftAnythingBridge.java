@@ -128,7 +128,6 @@ public class CraftAnythingBridge extends GhidraScript {
 
     private String dispatch(String method, String line) throws NotFound {
         if ("ping".equals(method)) {
-            String version = currentProgram != null ? "" : "";
             return "{\"name\":\"CraftAnything bridge\",\"provider\":{\"id\":\"ghidra\",\"version\":\""
                 + jsonEscape(ghidra.framework.Application.getApplicationVersion())
                 + "\"},\"read_only\":true,\"analysed\":true,\"analysis_cut_short\":false,\"target\":{\"name\":\""

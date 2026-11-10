@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Đọc siêu dữ liệu IL2CPP của một 
 Read a game's files	Đọc các tệp của một trò chơi
 Read a project file	Đọc một tệp dự án
 Read a setting	Đọc một cài đặt
+Read a text file	Đọc một tệp văn bản
 Read an app's screen	Đọc màn hình của một ứng dụng
 Read bytes	Đọc byte
 Read comment	Đọc chú thích
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	Đang kết nối với {name}… {seconds} giây
 Forget a website sign-in	Quên thông tin đăng nhập của một trang web
 Sign in to a website	Đăng nhập vào một trang web
+Stopped adding {name}.	Đã dừng thêm {name}.
+It isn't there any more, so {program} runs in its place.	Nó không còn ở đó nữa, nên {program} chạy thay thế.
+Use it	Dùng nó

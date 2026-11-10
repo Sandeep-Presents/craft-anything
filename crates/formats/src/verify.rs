@@ -142,9 +142,25 @@ pub fn verify_signature(spki: &[u8], scheme: SigScheme, msg: &[u8], sig: &[u8]) 
             if alg_oid != EC_PUBLIC_KEY {
                 return Verified::unsupported(format!("ECDSA signature but key is {alg_oid}"));
             }
-            ecdsa(key, d, msg, sig)
+            let Some(curve) = ec_named_curve(spki) else {
+                return Verified::unsupported("EC public key has no complete named-curve parameter");
+            };
+            ecdsa(&curve, key, d, msg, sig)
         }
     }
+}
+
+fn ec_named_curve(spki: &[u8]) -> Option<String> {
+    let root = der::read(spki, 0)?;
+    let algorithm = der::read(spki.get(..root.end())?, root.content)?;
+    let bounded = spki.get(..algorithm.end())?;
+    let oid = der::read(bounded, algorithm.content)?;
+    let curve = der::read(bounded, oid.end())?;
+    if curve.tag != 0x06 || curve.end() != algorithm.end() {
+        return None;
+    }
+    let name = der::oid(curve.bytes(spki)?);
+    (name != "invalid").then_some(name)
 }
 
 fn rsa_key(pkcs1_der: &[u8]) -> Option<rsa::RsaPublicKey> {
@@ -176,12 +192,12 @@ fn rsa_pss(pkcs1_der: &[u8], d: Digest, msg: &[u8], sig: &[u8]) -> Verified {
     if ok { Verified::Valid } else { Verified::Invalid }
 }
 
-/// ECDSA over a SEC1 public-key point. The curve is chosen by point length (P-256 vs P-384); the
+/// ECDSA over a SEC1 public-key point using the declared named curve. The
 /// digest used is the curve's standard one, so non-standard curve/hash pairings are reported
 /// unsupported rather than guessed.
-fn ecdsa(sec1: &[u8], d: Digest, msg: &[u8], der_sig: &[u8]) -> Verified {
-    match sec1.len() {
-        33 | 65 => {
+fn ecdsa(curve: &str, sec1: &[u8], d: Digest, msg: &[u8], der_sig: &[u8]) -> Verified {
+    match curve {
+        "1.2.840.10045.3.1.7" => {
             if d != Digest::Sha256 {
                 return Verified::unsupported(format!("ECDSA P-256 with {} is not checked", d.name()));
             }
@@ -190,7 +206,7 @@ fn ecdsa(sec1: &[u8], d: Digest, msg: &[u8], der_sig: &[u8]) -> Verified {
             let Ok(s) = Signature::from_der(der_sig) else { return Verified::Invalid };
             if vk.verify(msg, &s).is_ok() { Verified::Valid } else { Verified::Invalid }
         }
-        49 | 97 => {
+        "1.3.132.0.34" => {
             if d != Digest::Sha384 {
                 return Verified::unsupported(format!("ECDSA P-384 with {} is not checked", d.name()));
             }
@@ -199,7 +215,7 @@ fn ecdsa(sec1: &[u8], d: Digest, msg: &[u8], der_sig: &[u8]) -> Verified {
             let Ok(s) = Signature::from_der(der_sig) else { return Verified::Invalid };
             if vk.verify(msg, &s).is_ok() { Verified::Valid } else { Verified::Invalid }
         }
-        n => Verified::unsupported(format!("unsupported EC public-key point length {n} (only P-256/P-384)")),
+        _ => Verified::unsupported(format!("EC named curve {curve} is not checked (only P-256/P-384)")),
     }
 }
 
@@ -224,6 +240,7 @@ pub struct ChainLink {
     pub sha256: String,
     /// Whether this certificate's signature was verified against its issuer in the set.
     pub signature_verified: Verified,
+    /// The subject equals the issuer and the certificate's own key verified its signature.
     pub self_signed: bool,
 }
 
@@ -231,7 +248,7 @@ pub struct ChainLink {
 #[derive(Debug, Clone, Serialize)]
 pub struct ChainResult {
     pub links: Vec<ChainLink>,
-    /// Every non-root link verified against its issuer.
+    /// Every link verified and the walk reached a verified self-signed top certificate.
     pub fully_linked: bool,
     pub root_subject: Option<String>,
     pub root_sha256: Option<String>,
@@ -256,16 +273,19 @@ fn verify_cert_by(child: &[u8], issuer: &[u8]) -> Verified {
 pub fn verify_chain(certs: &[&[u8]]) -> ChainResult {
     let mut links: Vec<ChainLink> = Vec::new();
     let mut notes = Vec::new();
-    let mut fully_linked = true;
+    let mut fully_linked = false;
     let mut seen: Vec<String> = Vec::new();
     let Some(&first) = certs.first() else {
         return ChainResult { links, fully_linked: false, root_subject: None, root_sha256: None, trusted_root: None, notes: vec!["no certificates".into()] };
     };
     let mut current = first;
-    for _ in 0..certs.len().min(16) {
+    if certs.len() > 64 {
+        notes.push("issuer search is limited to the first 64 certificates".into());
+    }
+    // Inspect the next identity at the boundary without adding or verifying a 17th link.
+    for depth in 0..=16 {
         let Some(parts) = der::certificate_parts(current) else {
             notes.push("a certificate in the chain could not be parsed".into());
-            fully_linked = false;
             break;
         };
         let sha = sha256_hex(current);
@@ -273,30 +293,50 @@ pub fn verify_chain(certs: &[&[u8]]) -> ChainResult {
             notes.push("certificate chain loops; stopped".into());
             break;
         }
+        if depth == 16 {
+            notes.push("certificate chain walk limit reached; stopped".into());
+            break;
+        }
         seen.push(sha.clone());
-        let self_signed = parts.subject == parts.issuer;
         let info = der::certificate(current);
         let subject = info.as_ref().map(|c| c.subject.clone()).unwrap_or_default();
         let issuer = info.as_ref().map(|c| c.issuer.clone()).unwrap_or_default();
-        // Find the issuer certificate in the set (by matching DN), else self for a root.
-        let issuer_cert =
-            if self_signed { Some(current) } else { certs.iter().copied().find(|c| der::certificate_parts(c).is_some_and(|p| p.subject == parts.issuer)) };
-        let signature_verified = match issuer_cert {
-            Some(ic) => verify_cert_by(current, ic),
-            None => {
-                fully_linked = false;
-                Verified::unsupported("issuer certificate not present in the signature")
+        let mut issuer_cert = None;
+        let mut signature_verified = Verified::unsupported("issuer certificate not present in the signature");
+        if parts.subject == parts.issuer {
+            signature_verified = verify_cert_by(current, current);
+            if signature_verified.is_valid() {
+                issuer_cert = Some(current);
             }
-        };
-        if !signature_verified.is_valid() && issuer_cert.is_some() {
-            fully_linked = false;
         }
+        // Equal names do not establish which key signed the certificate. A self-issued
+        // rollover can also need a different certificate with the same name.
+        if issuer_cert.is_none() {
+            for candidate in certs.iter().copied().take(64) {
+                if candidate == current || !der::certificate_parts(candidate).is_some_and(|p| p.subject == parts.issuer) {
+                    continue;
+                }
+                let verified = verify_cert_by(current, candidate);
+                if verified.is_valid() {
+                    issuer_cert = Some(candidate);
+                    signature_verified = verified;
+                    break;
+                }
+                if verified == Verified::Invalid || !matches!(signature_verified, Verified::Invalid) {
+                    signature_verified = verified;
+                }
+            }
+        }
+        let self_signed = issuer_cert == Some(current);
         links.push(ChainLink { subject, issuer, sha256: sha, signature_verified, self_signed });
         if self_signed {
+            fully_linked = true;
             break;
         }
         match issuer_cert {
-            Some(ic) if ic != current => current = ic,
+            Some(ic) => {
+                current = ic;
+            }
             _ => break,
         }
     }
@@ -341,7 +381,7 @@ pub struct MachoCms {
 /// Verify a detached CMS `SignedData` (the Mach-O CMS blob) against the primary CodeDirectory.
 pub fn verify_macho_cms(cms_der: &[u8], code_directory: &[u8]) -> Option<MachoCms> {
     let sd = pkcs7::parse_signed_data(cms_der)?;
-    let mut notes = Vec::new();
+    let mut notes = sd.signer_identity_notes.clone();
     let signer = sd.signer_cert().map(<[u8]>::to_vec);
     let info = signer.as_deref().and_then(der::certificate);
     // Does the signed messageDigest attribute cover this CodeDirectory?
@@ -383,13 +423,10 @@ pub fn verify_macho_cms(cms_der: &[u8], code_directory: &[u8]) -> Option<MachoCm
 /// Order a CMS certificate set so the signer's certificate is first (chain verification starts
 /// from the leaf).
 fn ordered_certs(sd: &pkcs7::SignedData) -> Vec<&[u8]> {
-    let signer = sd.signer_cert();
-    let mut out: Vec<&[u8]> = Vec::new();
-    if let Some(s) = signer {
-        out.push(s);
-    }
+    let Some(signer) = sd.signer_cert() else { return Vec::new() };
+    let mut out: Vec<&[u8]> = vec![signer];
     for c in &sd.certificates {
-        if Some(c.as_slice()) != signer {
+        if c.as_slice() != signer {
             out.push(c);
         }
     }
@@ -409,7 +446,8 @@ pub struct ApkSigner {
     pub digest_matches: bool,
     /// The signer's first certificate's public key matched the signing public key.
     pub public_key_matches_certificate: bool,
-    /// Overall: signature valid AND content digest matches AND key matches the certificate.
+    /// Overall: required signer fields agree, signature valid, content digest matches and
+    /// the signing key matches the certificate.
     pub verified: bool,
     pub algorithm: Option<String>,
     /// SHA-256 of the signer's first certificate: the fingerprint users compare.
@@ -439,6 +477,9 @@ fn apk_algorithm(id: u32) -> Option<(SigScheme, Digest, bool)> {
 /// Verify one APK v2/v3 signer against the full APK bytes.
 pub fn verify_apk_signer(apk: &[u8], block_offset: u64, signer: &crate::apk_sign::Signer) -> ApkSigner {
     let mut notes = Vec::new();
+    if let Some(reason) = signer.verification_error {
+        notes.push(reason.into());
+    }
     let certificate_sha256 = signer.certificates.first().map(|c| sha256_hex(c));
     let public_key_matches_certificate = match (signer.certificates.first(), der::spki_parts(&signer.public_key)) {
         (Some(c), Some((_, _))) => der::certificate_spki(c) == Some(signer.public_key.as_slice()),
@@ -488,7 +529,7 @@ pub fn verify_apk_signer(apk: &[u8], block_offset: u64, signer: &crate::apk_sign
             }
         }
     };
-    let verified = signature_valid.is_valid() && digest_matches && public_key_matches_certificate;
+    let verified = signer.verification_error.is_none() && signature_valid.is_valid() && digest_matches && public_key_matches_certificate;
     ApkSigner {
         scheme: signer.scheme,
         signature_valid,
@@ -571,7 +612,7 @@ pub struct Pkcs7Signature {
 /// Verify a detached PKCS#7/CMS signature over `content` (for JAR signing, the `.SF` file bytes).
 pub fn verify_pkcs7_detached(content: &[u8], pkcs7_der: &[u8]) -> Option<Pkcs7Signature> {
     let sd = pkcs7::parse_signed_data(pkcs7_der)?;
-    let mut notes = Vec::new();
+    let mut notes = sd.signer_identity_notes.clone();
     let signer = sd.signer_cert().map(<[u8]>::to_vec);
     let cert_sha = signer.as_deref().map(sha256_hex);
     let subject = signer.as_deref().and_then(der::certificate).map(|c| c.subject);
@@ -624,19 +665,22 @@ pub struct JarSection {
 }
 
 /// Parse a JAR `MANIFEST.MF` or `.SF` file into its main section and per-entry sections.
-/// Handles the 72-byte line-folding (continuation lines begin with a single space).
+/// Unfolds physical byte lines before decoding UTF-8 and accepts CR, LF or CRLF terminators.
 pub fn parse_jar_sections(data: &[u8]) -> Vec<JarSection> {
-    let text = String::from_utf8_lossy(data);
-    let mut logical: Vec<String> = Vec::new();
-    for raw in text.split('\n') {
-        let line = raw.strip_suffix('\r').unwrap_or(raw);
-        if let Some(rest) = line.strip_prefix(' ')
-            && let Some(last) = logical.last_mut()
-        {
-            last.push_str(rest);
+    let mut logical: Vec<Vec<u8>> = Vec::new();
+    let mut remaining = data;
+    while !remaining.is_empty() {
+        let end = remaining.iter().position(|byte| matches!(byte, b'\r' | b'\n')).unwrap_or(remaining.len());
+        let line = remaining.get(..end).unwrap_or_default();
+        let tail = remaining.get(end..).unwrap_or_default();
+        remaining = tail.strip_prefix(b"\r\n").or_else(|| tail.get(1..)).unwrap_or_default();
+        if let Some(rest) = line.strip_prefix(b" ") {
+            if let Some(last) = logical.last_mut().filter(|line| !line.is_empty()) {
+                last.extend_from_slice(rest);
+            }
             continue;
         }
-        logical.push(line.to_string());
+        logical.push(line.to_vec());
     }
     let mut sections = Vec::new();
     let mut attrs: Vec<(String, String)> = Vec::new();
@@ -651,9 +695,10 @@ pub fn parse_jar_sections(data: &[u8]) -> Vec<JarSection> {
             flush(&mut attrs, &mut name, &mut sections);
             continue;
         }
+        let line = String::from_utf8_lossy(&line);
         if let Some((k, v)) = line.split_once(':') {
             let k = k.trim().to_string();
-            let v = v.trim().to_string();
+            let v = v.strip_prefix(' ').unwrap_or(v).to_string();
             if k.eq_ignore_ascii_case("Name") {
                 name = Some(v);
             } else {
@@ -750,6 +795,198 @@ pub fn verify_jar_integrity(manifest_mf: &[u8], sf: &[u8], mut read_entry: impl 
 mod tests {
     use super::*;
 
+    fn der_fields(data: &[u8]) -> Vec<Vec<u8>> {
+        der::children(data, &der::read(data, 0).unwrap()).iter().map(|field| field.whole(data).unwrap().to_vec()).collect()
+    }
+
+    fn cert_with_key_id(name: &str, key_id: &[u8], value_tag: u8, duplicate: bool, critical: Option<&[u8]>) -> Vec<u8> {
+        use craft_anything_testkit::{android as a, crypto};
+        let original = crypto::self_signed_rsa(name, "Org");
+        let mut cert = der_fields(&original);
+        let mut tbs = der_fields(&cert[0]);
+        let mut fields = vec![a::der_oid("2.5.29.14")];
+        if let Some(critical) = critical {
+            fields.push(a::der(0x01, critical));
+        }
+        fields.push(a::der(0x04, &a::der(value_tag, key_id)));
+        let extension = a::der(0x30, &fields.concat());
+        let extensions = if duplicate { [extension.clone(), extension].concat() } else { extension };
+        tbs.push(a::der(0xa3, &a::der(0x30, &extensions)));
+        cert[0] = a::der(0x30, &tbs.concat());
+        cert[2] = a::der(0x03, &[vec![0], crypto::rsa_sign_sha256(&cert[0])].concat());
+        a::der(0x30, &cert.concat())
+    }
+
+    fn issuer_serial(cert: &[u8]) -> Vec<u8> {
+        use craft_anything_testkit::android as a;
+        let parts = der::certificate_parts(cert).unwrap();
+        a::der(0x30, &[parts.issuer.to_vec(), a::der(0x02, parts.serial)].concat())
+    }
+
+    fn cms_with_identity(content: &[u8], certs: &[Vec<u8>], sid: Vec<u8>, version: u8) -> Vec<u8> {
+        use craft_anything_testkit::{android as a, crypto};
+        let original = crypto::cms_detached_rsa(content, "Signer", "Org");
+        let mut ci = der_fields(&original);
+        let mut sd = der_fields(&der_fields(&ci[1])[0]);
+        let mut signer = der_fields(&der_fields(&sd[4])[0]);
+        signer[0] = a::der(0x02, &[version]);
+        signer[1] = sid;
+        sd[0] = a::der(0x02, &[version]);
+        sd[3] = a::der(0xa0, &certs.concat());
+        sd[4] = a::der(0x31, &a::der(0x30, &signer.concat()));
+        ci[1] = a::der(0xa0, &a::der(0x30, &sd.concat()));
+        a::der(0x30, &ci.concat())
+    }
+
+    fn assert_unknown_cms_signer(cms: &[u8], content: &[u8]) {
+        let parsed = pkcs7::parse_signed_data(cms).unwrap();
+        assert!(parsed.signer_cert().is_none());
+        assert!(ordered_certs(&parsed).is_empty());
+        let macho = verify_macho_cms(cms, content).unwrap();
+        assert!(!macho.authenticated);
+        assert!(macho.signer_subject.is_none());
+        assert!(macho.chain.links.is_empty());
+        let jar = verify_pkcs7_detached(content, cms).unwrap();
+        assert!(!jar.signature_valid.is_valid());
+        assert!(jar.signer_subject.is_none());
+        assert!(jar.certificate_sha256.is_none());
+        assert!(jar.chain.links.is_empty());
+    }
+
+    #[test]
+    fn cms_unmatched_issuer_or_serial_keeps_the_signer_unknown() {
+        use craft_anything_testkit::{android as a, crypto};
+        let content = b"signed identity fixture";
+        let cert = crypto::self_signed_rsa("Signer", "Org");
+        let fields = der_fields(&issuer_serial(&cert));
+        for sid in [a::der(0x30, &[fields[0].clone(), a::der(0x02, &[9])].concat()), issuer_serial(&crypto::self_signed_rsa("Other", "Org"))] {
+            let cms = cms_with_identity(content, std::slice::from_ref(&cert), sid, 1);
+            assert_unknown_cms_signer(&cms, content);
+        }
+    }
+
+    #[test]
+    fn cms_key_identifier_selects_the_matching_certificate() {
+        use craft_anything_testkit::android as a;
+        let content = b"signed key identifier fixture";
+        let key_id = [7; 20];
+        let signer = cert_with_key_id("Signer", &key_id, 0x04, false, None);
+        let unrelated = cert_with_key_id("Unrelated", &[8; 20], 0x04, false, None);
+        let cms = cms_with_identity(content, &[unrelated, signer.clone()], a::der(0x80, &key_id), 3);
+        let parsed = pkcs7::parse_signed_data(&cms).unwrap();
+        assert_eq!(parsed.signer_cert(), Some(signer.as_slice()));
+        let result = verify_macho_cms(&cms, content).unwrap();
+        assert!(result.authenticated);
+        assert_eq!(result.signer_subject.as_deref(), Some("CN=Signer, O=Org"));
+        assert!(result.chain.fully_linked);
+        assert!(verify_pkcs7_detached(content, &cms).unwrap().signature_valid.is_valid());
+    }
+
+    #[test]
+    fn cms_missing_key_identifier_does_not_fall_back_to_a_certificate() {
+        use craft_anything_testkit::{android as a, crypto};
+        let content = b"missing key identifier fixture";
+        for cert in [crypto::self_signed_rsa("Signer", "Org"), cert_with_key_id("Signer", &[8; 20], 0x04, false, None)] {
+            let cms = cms_with_identity(content, &[cert], a::der(0x80, &[7; 20]), 3);
+            assert_unknown_cms_signer(&cms, content);
+        }
+    }
+
+    #[test]
+    fn cms_key_identifier_requires_one_well_formed_extension() {
+        use craft_anything_testkit::android as a;
+        let content = b"malformed key identifier extension fixture";
+        for (tag, duplicate) in [(0x02, false), (0x04, true)] {
+            let cert = cert_with_key_id("Signer", &[7; 20], tag, duplicate, None);
+            let cms = cms_with_identity(content, &[cert], a::der(0x80, &[7; 20]), 3);
+            assert_unknown_cms_signer(&cms, content);
+        }
+    }
+
+    #[test]
+    fn cms_issuer_serial_finds_a_later_certificate() {
+        use craft_anything_testkit::crypto;
+        let content = b"later certificate fixture";
+        let cert = crypto::self_signed_rsa("Signer", "Org");
+        let cms = cms_with_identity(content, &[crypto::self_signed_rsa("Other", "Org"), cert.clone()], issuer_serial(&cert), 1);
+        assert_eq!(pkcs7::parse_signed_data(&cms).unwrap().signer_cert(), Some(cert.as_slice()));
+        assert!(verify_macho_cms(&cms, content).unwrap().authenticated);
+    }
+
+    #[test]
+    fn cms_key_identifier_checks_critical_flag_encoding() {
+        use craft_anything_testkit::android as a;
+        let content = b"key identifier critical flag fixture";
+        for flag in [&[0xff][..], &[0], &[], &[1], &[0xff, 0]] {
+            let cert = cert_with_key_id("Signer", &[7; 20], 0x04, false, Some(flag));
+            let cms = cms_with_identity(content, std::slice::from_ref(&cert), a::der(0x80, &[7; 20]), 3);
+            if matches!(flag, [0] | [0xff]) {
+                assert_eq!(pkcs7::parse_signed_data(&cms).unwrap().signer_cert(), Some(cert.as_slice()));
+                assert!(verify_macho_cms(&cms, content).unwrap().authenticated);
+            } else {
+                assert_unknown_cms_signer(&cms, content);
+            }
+        }
+    }
+
+    #[test]
+    fn cms_signer_identifier_rejects_unknown_structure() {
+        use craft_anything_testkit::{android as a, crypto};
+        let cert = crypto::self_signed_rsa("Signer", "Org");
+        let fields = der_fields(&issuer_serial(&cert));
+        for (sid, version) in [(a::der(0x31, &fields.concat()), 1), (a::der(0x30, &[fields[0].clone(), a::der(0x04, &[1, 2, 3, 4, 5])].concat()), 1)] {
+            let cms = cms_with_identity(b"identifier structure", std::slice::from_ref(&cert), sid, version);
+            assert!(pkcs7::parse_signed_data(&cms).is_none());
+        }
+    }
+
+    /// A wrong SignerInfo version is a readable fact, not a reason to discard its identity.
+    #[test]
+    fn cms_identifier_version_mismatches_preserve_the_signature_and_report_a_note() {
+        use craft_anything_testkit::android as a;
+        let content = b"readable version mismatch";
+        let key_id = [7; 20];
+        let cert = cert_with_key_id("Signer", &key_id, 0x04, false, None);
+        for (sid, version) in [(issuer_serial(&cert), 3), (issuer_serial(&cert), 0), (a::der(0x80, &key_id), 1), (a::der(0x80, &key_id), 9)] {
+            let cms = cms_with_identity(content, std::slice::from_ref(&cert), sid, version);
+            let parsed = pkcs7::parse_signed_data(&cms).expect("readable SignedData");
+            assert_eq!(parsed.certificates.as_slice(), std::slice::from_ref(&cert));
+            assert_eq!(parsed.digest, Some(Digest::Sha256));
+            assert!(!parsed.signature_algorithm.is_empty());
+            assert_eq!(parsed.signer_cert(), Some(cert.as_slice()));
+            let macho = verify_macho_cms(&cms, content).unwrap();
+            assert!(macho.authenticated);
+            assert_eq!(macho.certificate_count, 1);
+            assert!(macho.notes.iter().any(|note| note.contains("version")));
+            let jar = verify_pkcs7_detached(content, &cms).unwrap();
+            assert!(jar.signature_valid.is_valid());
+            assert!(jar.notes.iter().any(|note| note.contains("version")));
+        }
+    }
+
+    /// An empty serial cannot identify a signer, but its certificates and algorithms remain useful.
+    #[test]
+    fn cms_empty_signer_serial_preserves_metadata_and_leaves_the_signer_unknown() {
+        use craft_anything_testkit::{android as a, crypto};
+        let content = b"readable empty serial";
+        let cert = crypto::self_signed_rsa("Signer", "Org");
+        let fields = der_fields(&issuer_serial(&cert));
+        for version in [1, 3] {
+            let sid = a::der(0x30, &[fields[0].clone(), a::der(0x02, &[])].concat());
+            let cms = cms_with_identity(content, std::slice::from_ref(&cert), sid, version);
+            let parsed = pkcs7::parse_signed_data(&cms).expect("readable SignedData");
+            assert_eq!(parsed.certificates.as_slice(), std::slice::from_ref(&cert));
+            assert_eq!(parsed.digest, Some(Digest::Sha256));
+            assert!(!parsed.signature_algorithm.is_empty());
+            assert_unknown_cms_signer(&cms, content);
+            let macho = verify_macho_cms(&cms, content).unwrap();
+            assert_eq!(macho.certificate_count, 1);
+            assert!(macho.notes.iter().any(|note| note.contains("serial") && note.contains("empty")));
+            let jar = verify_pkcs7_detached(content, &cms).unwrap();
+            assert!(jar.notes.iter().any(|note| note.contains("serial") && note.contains("empty")));
+        }
+    }
+
     #[test]
     fn base64_vectors() {
         assert_eq!(base64(b""), "");
@@ -773,6 +1010,60 @@ mod tests {
         assert_eq!(s.len(), 2);
         assert_eq!(s[1].name.as_deref(), Some("a/b/really-long-name.txt"));
         assert_eq!(attr(&s[1], "SHA-256-Digest"), Some("AAA="));
+    }
+
+    #[test]
+    fn jar_unfolds_utf8_bytes_before_decoding_a_filename() {
+        let name = format!("{}é.txt", "a".repeat(65));
+        let header = format!("Name: {name}");
+        assert_eq!(header.as_bytes()[71], 0xc3);
+        let content = b"the named entry";
+        let mut manifest = b"Manifest-Version: 1.0\r\n\r\n".to_vec();
+        manifest.extend_from_slice(&header.as_bytes()[..72]);
+        manifest.extend_from_slice(b"\r\n ");
+        manifest.extend_from_slice(&header.as_bytes()[72..]);
+        manifest.extend_from_slice(format!("\r\nSHA-256-Digest: {}\r\n\r\n", base64(&Digest::Sha256.hash(content))).as_bytes());
+        let sections = parse_jar_sections(&manifest);
+        assert_eq!(sections[1].name.as_deref(), Some(name.as_str()));
+        let checked = verify_jar_integrity(&manifest, b"", |requested| (requested == name).then(|| content.to_vec()));
+        assert_eq!((checked.files_listed, checked.files_matched, checked.files_mismatched, checked.files_unchecked), (1, 1, 0, 0));
+    }
+
+    #[test]
+    fn jar_values_preserve_spaces_beyond_the_separator() {
+        let name = " leading and trailing.txt  ";
+        let content = b"entry with a whitespace-sensitive name";
+        let manifest = format!("Manifest-Version: 1.0\nCreated-By:  original  \n\nName: {name}\nSHA-256-Digest: {}\n\n", base64(&Digest::Sha256.hash(content)));
+        let sections = parse_jar_sections(manifest.as_bytes());
+        assert_eq!(attr(&sections[0], "Created-By"), Some(" original  "));
+        assert_eq!(sections[1].name.as_deref(), Some(name));
+        let checked = verify_jar_integrity(manifest.as_bytes(), b"", |requested| (requested == name).then(|| content.to_vec()));
+        assert_eq!((checked.files_matched, checked.files_mismatched, checked.files_unchecked), (1, 0, 0));
+    }
+
+    #[test]
+    fn jar_sections_accept_cr_lf_and_crlf_newlines() {
+        for newline in ["\r", "\n", "\r\n"] {
+            let manifest =
+                ["Manifest-Version: 1.0", "", "Name: file", " .txt", "SHA-256-Digest: AAA=", "", "Name: other.txt", "SHA1-Digest: BBB=", ""].join(newline);
+            let sections = parse_jar_sections(manifest.as_bytes());
+            assert_eq!(sections.len(), 3, "newline {newline:?}");
+            assert_eq!(sections[1].name.as_deref(), Some("file.txt"));
+            assert_eq!(attr(&sections[1], "SHA-256-Digest"), Some("AAA="));
+            assert_eq!(sections[2].name.as_deref(), Some("other.txt"));
+        }
+        let mixed = parse_jar_sections(b"Manifest-Version: 1.0\r\n\rName: file\n .txt\rSHA-256-Digest: AAA=\n\r\n");
+        assert_eq!(mixed.len(), 2);
+        assert_eq!(mixed[1].name.as_deref(), Some("file.txt"));
+    }
+
+    #[test]
+    fn jar_orphan_continuations_do_not_join_sections() {
+        let sections = parse_jar_sections(b" orphan at start\nManifest-Version: 1.0\n\n Created-By: orphan\nName: file.txt\nSHA1-Digest: AAA=\n");
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].name, None);
+        assert_eq!(attr(&sections[0], "Created-By"), None);
+        assert_eq!(sections[1].name.as_deref(), Some("file.txt"));
     }
 
     #[test]
@@ -816,6 +1107,78 @@ mod tests {
         assert_eq!(verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha256), &bad, &sig), Verified::Invalid);
     }
 
+    fn ec_spki_with_parameters(parameters: &[u8], point: &[u8]) -> Vec<u8> {
+        use craft_anything_testkit::android::{der, der_oid};
+        let algorithm = der(0x30, &[der_oid(EC_PUBLIC_KEY), parameters.to_vec()].concat());
+        let key = der(0x03, &[&[0], point].concat());
+        der(0x30, &[algorithm, key].concat())
+    }
+
+    #[test]
+    fn ecdsa_never_guesses_a_curve_from_point_length() {
+        use craft_anything_testkit::{android::der_oid, crypto};
+        let original = crypto::p256_spki();
+        let (_, point) = der::spki_parts(&original).unwrap();
+        let message = b"the declared curve must select the verification group";
+        let signature = crypto::p256_sign_sha256(message);
+        assert!(verify_signature(&original, SigScheme::Ecdsa(Digest::Sha256), message, &signature).is_valid());
+        for curve in ["1.3.132.0.10", "1.3.132.0.34", "1.3.132.0.35", "1.2.3.4"] {
+            let spki = ec_spki_with_parameters(&der_oid(curve), point);
+            let result = verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha256), message, &signature);
+            assert!(!result.is_valid(), "curve {curve}: {result:?}");
+        }
+    }
+
+    #[test]
+    fn ecdsa_requires_one_complete_named_curve_parameter() {
+        use craft_anything_testkit::{
+            android::{der, der_oid},
+            crypto,
+        };
+        let original = crypto::p256_spki();
+        let (_, point) = crate::der::spki_parts(&original).unwrap();
+        let message = b"parameters are part of the public key";
+        let signature = crypto::p256_sign_sha256(message);
+        let curve = der_oid("1.2.840.10045.3.1.7");
+        let parameters = [
+            vec![],
+            der(0x05, &[]),
+            der(0x30, &curve),
+            der(0x06, &[0x80, 0x2a]),
+            [curve.clone(), curve.clone()].concat(),
+            [curve.clone(), der(0x05, &[])].concat(),
+            [curve, vec![0x06]].concat(),
+        ];
+        for parameter in parameters {
+            let spki = ec_spki_with_parameters(&parameter, point);
+            let result = verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha256), message, &signature);
+            assert!(!result.is_valid(), "parameter {parameter:?}: {result:?}");
+        }
+    }
+
+    #[test]
+    fn declared_curves_accept_compressed_and_uncompressed_points() {
+        use craft_anything_testkit::{android::der_oid, crypto};
+        use p384::{
+            ecdsa::{Signature, SigningKey, signature::Signer},
+            elliptic_curve::rand_core::OsRng,
+        };
+        let message = b"both supported named curves retain both SEC1 encodings";
+        let original = crypto::p256_spki();
+        let (_, point) = der::spki_parts(&original).unwrap();
+        let p256_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(point).unwrap();
+        let p256_signature = crypto::p256_sign_sha256(message);
+        let p384_key = SigningKey::random(&mut OsRng);
+        let p384_signature: Signature = p384_key.sign(message);
+        for compressed in [false, true] {
+            let spki = ec_spki_with_parameters(&der_oid("1.2.840.10045.3.1.7"), p256_key.to_encoded_point(compressed).as_bytes());
+            assert!(verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha256), message, &p256_signature).is_valid());
+            let spki = ec_spki_with_parameters(&der_oid("1.3.132.0.34"), p384_key.verifying_key().to_encoded_point(compressed).as_bytes());
+            assert!(verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha384), message, p384_signature.to_der().as_bytes()).is_valid());
+            assert_eq!(verify_signature(&spki, SigScheme::Ecdsa(Digest::Sha384), b"changed", p384_signature.to_der().as_bytes()), Verified::Invalid);
+        }
+    }
+
     #[test]
     fn chain_links_and_self_signed() {
         use craft_anything_testkit::crypto;
@@ -830,6 +1193,133 @@ mod tests {
         // A single self-signed certificate verifies against itself.
         let ss = crypto::self_signed_rsa("Solo", "Org");
         assert!(verify_chain(&[&ss]).links[0].signature_verified.is_valid());
+    }
+
+    #[test]
+    fn chain_tries_later_issuers_with_the_same_name() {
+        use craft_anything_testkit::{
+            android::{der, der_oid},
+            crypto,
+        };
+        use p256::{
+            ecdsa::{Signature, SigningKey, signature::Signer},
+            elliptic_curve::rand_core::OsRng,
+        };
+        let decoy_key = SigningKey::random(&mut OsRng);
+        let point = decoy_key.verifying_key().to_encoded_point(false);
+        let algorithm = der(0x30, &[der_oid(EC_PUBLIC_KEY), der_oid("1.2.840.10045.3.1.7")].concat());
+        let spki = der(0x30, &[algorithm, der(0x03, &[&[0], point.as_bytes()].concat())].concat());
+        let decoy = crypto::make_cert("Shared CA", "Fixture Org", "Shared CA", &spki, "1.2.840.10045.4.3.2", &|message| {
+            let signature: Signature = decoy_key.sign(message);
+            signature.to_der().as_bytes().to_vec()
+        });
+        let issuer = crypto::make_cert("Shared CA", "Fixture Org", "Shared CA", &crypto::p256_spki(), "1.2.840.10045.4.3.2", &crypto::p256_sign_sha256);
+        let leaf = crypto::make_cert("Leaf", "Fixture Org", "Shared CA", &crypto::rsa_spki(), "1.2.840.10045.4.3.2", &crypto::p256_sign_sha256);
+        assert!(verify_cert_by(&decoy, &decoy).is_valid());
+        assert_eq!(verify_cert_by(&leaf, &decoy), Verified::Invalid);
+        assert!(verify_cert_by(&leaf, &issuer).is_valid());
+        for certs in [[leaf.as_slice(), decoy.as_slice(), issuer.as_slice()], [leaf.as_slice(), issuer.as_slice(), decoy.as_slice()]] {
+            let chain = verify_chain(&certs);
+            assert!(chain.fully_linked, "{chain:?}");
+            assert_eq!(chain.links.len(), 2);
+            assert_eq!(chain.root_sha256.as_deref(), Some(sha256_hex(&issuer).as_str()));
+            assert!(chain.links.iter().all(|link| link.signature_verified.is_valid()));
+            assert_eq!(chain.trusted_root, None);
+        }
+        let absent = verify_chain(&[&leaf, &decoy]);
+        assert!(!absent.fully_linked);
+        assert_eq!(absent.links.len(), 1);
+        assert_eq!(absent.links[0].signature_verified, Verified::Invalid);
+        let mut bounded = vec![leaf.as_slice()];
+        bounded.extend(std::iter::repeat_n(decoy.as_slice(), 62));
+        bounded.push(issuer.as_slice());
+        assert!(verify_chain(&bounded).fully_linked);
+        bounded.insert(1, decoy.as_slice());
+        let omitted = verify_chain(&bounded);
+        assert!(!omitted.fully_linked);
+        assert!(omitted.notes.iter().any(|note| note.contains("first 64 certificates")));
+    }
+
+    #[test]
+    fn self_issued_rollover_follows_the_actual_issuer_key() {
+        use craft_anything_testkit::crypto;
+        let root = crypto::self_signed_rsa("Rollover CA", "Fixture Org");
+        let rollover = crypto::make_cert("Rollover CA", "Fixture Org", "Rollover CA", &crypto::p256_spki(), "1.2.840.113549.1.1.11", &crypto::rsa_sign_sha256);
+        assert!(!verify_cert_by(&rollover, &rollover).is_valid());
+        assert!(verify_cert_by(&rollover, &root).is_valid());
+        let chain = verify_chain(&[&rollover, &root]);
+        assert!(chain.fully_linked, "{chain:?}");
+        assert_eq!(chain.links.len(), 2);
+        assert!(!chain.links[0].self_signed);
+        assert!(chain.links[1].self_signed);
+        assert_eq!(chain.root_sha256.as_deref(), Some(sha256_hex(&root).as_str()));
+        let missing = verify_chain(&[&rollover]);
+        assert!(!missing.fully_linked);
+        assert!(!missing.links[0].self_signed);
+    }
+
+    #[test]
+    fn verified_links_without_a_root_do_not_complete_a_chain() {
+        use craft_anything_testkit::crypto;
+        let a = crypto::make_cert("Cycle A", "Fixture Org", "Cycle B", &crypto::rsa_spki(), "1.2.840.10045.4.3.2", &crypto::p256_sign_sha256);
+        let b = crypto::make_cert("Cycle B", "Fixture Org", "Cycle A", &crypto::p256_spki(), "1.2.840.113549.1.1.11", &crypto::rsa_sign_sha256);
+        let cycle = verify_chain(&[&a, &b]);
+        assert!(cycle.links.iter().all(|link| link.signature_verified.is_valid()));
+        assert!(!cycle.fully_linked, "{cycle:?}");
+        assert!(cycle.trusted_root.is_none());
+        assert!(cycle.notes.iter().any(|note| note.contains("chain loops")), "{cycle:?}");
+        assert!(!cycle.notes.iter().any(|note| note.contains("walk limit")), "{cycle:?}");
+
+        let mut certificates = Vec::new();
+        for i in 0..18 {
+            certificates.push(crypto::make_cert(
+                &format!("Depth {i}"),
+                "Fixture Org",
+                &format!("Depth {}", (i + 1).min(17)),
+                &crypto::rsa_spki(),
+                "1.2.840.113549.1.1.11",
+                &crypto::rsa_sign_sha256,
+            ));
+        }
+        let refs: Vec<_> = certificates.iter().map(Vec::as_slice).collect();
+        let bounded = verify_chain(&refs);
+        assert_eq!(bounded.links.len(), 16);
+        assert!(bounded.links.iter().all(|link| link.signature_verified.is_valid()));
+        assert!(!bounded.fully_linked, "{bounded:?}");
+        assert!(bounded.notes.iter().any(|note| note.contains("walk limit")));
+    }
+
+    #[test]
+    fn chain_cycles_at_the_walk_bound_are_distinguished_from_roots() {
+        use craft_anything_testkit::crypto;
+        for cycle in [true, false] {
+            let certificates: Vec<_> = (0..16)
+                .map(|i| {
+                    let issuer = if i < 15 {
+                        i + 1
+                    } else if cycle {
+                        0
+                    } else {
+                        i
+                    };
+                    crypto::make_cert(
+                        &format!("Bound {i}"),
+                        "Fixture Org",
+                        &format!("Bound {issuer}"),
+                        &crypto::p256_spki(),
+                        "1.2.840.10045.4.3.2",
+                        &crypto::p256_sign_sha256,
+                    )
+                })
+                .collect();
+            let refs: Vec<_> = certificates.iter().map(Vec::as_slice).collect();
+            let chain = verify_chain(&refs);
+            assert_eq!(chain.links.len(), 16);
+            assert!(chain.links.iter().all(|link| link.signature_verified.is_valid()));
+            assert_eq!(chain.fully_linked, !cycle, "{chain:?}");
+            assert_eq!(chain.notes.iter().any(|note| note.contains("chain loops")), cycle, "{chain:?}");
+            assert!(!chain.notes.iter().any(|note| note.contains("walk limit")), "{chain:?}");
+        }
     }
 
     #[test]

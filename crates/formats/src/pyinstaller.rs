@@ -382,17 +382,82 @@ impl PackedFormat for PyInstaller {
 
     /// Extract a CArchive member or PYZ module within `max_bytes`, including any `.pyc` header.
     fn read(&self, data: &[u8], entry: &PackedEntry, max_bytes: u64) -> Result<Vec<u8>, FormatError> {
-        const PYC_HEADER_BYTES: u64 = 16;
-        let magic = entry.kind.as_deref().and_then(|k| k.strip_prefix(PYZ_KIND)).and_then(|m| u16::from_str_radix(m, 16).ok());
-        let body_limit = match magic {
-            Some(_) => max_bytes.checked_sub(PYC_HEADER_BYTES).ok_or_else(|| FormatError::TooLarge(format!("{} needs a .pyc header", entry.path)))?,
-            None => max_bytes,
+        read_member(data, entry, max_bytes)
+    }
+}
+
+/// A member's bytes: a PYZ module gets the `.pyc` header its magic number asks for, any other
+/// member is handed back as stored.
+fn read_member(data: &[u8], entry: &PackedEntry, max_bytes: u64) -> Result<Vec<u8>, FormatError> {
+    const PYC_HEADER_BYTES: u64 = 16;
+    let magic = entry.kind.as_deref().and_then(|k| k.strip_prefix(PYZ_KIND)).and_then(|m| u16::from_str_radix(m, 16).ok());
+    let body_limit = match magic {
+        Some(_) => max_bytes.checked_sub(PYC_HEADER_BYTES).ok_or_else(|| FormatError::TooLarge(format!("{} needs a .pyc header", entry.path)))?,
+        None => max_bytes,
+    };
+    let body = read_stored(data, entry, body_limit)?;
+    match magic {
+        Some(magic) => Ok(pyc::wrap_marshal(magic, &body)),
+        None => Ok(body),
+    }
+}
+
+/// What a bare PYZ archive's entries sit under: the file itself doesn't carry a name, and it's
+/// found inside a program under one (`PYZ-00.pyz`) that a standalone file doesn't give.
+const STANDALONE_ROOT: &str = "pyz";
+
+/// A PYZ archive on its own, as PyInstaller keeps it inside a program: the table of the program's
+/// Python modules and their marshalled code. A `.pyz` that's a Python zip application is a ZIP
+/// archive instead, and the ZIP reader still takes it (`detect` only says yes to PyInstaller's
+/// magic).
+pub struct PyzArchive;
+
+impl PackedFormat for PyzArchive {
+    fn id(&self) -> &'static str {
+        "pyinstaller_pyz"
+    }
+
+    fn title(&self) -> &'static str {
+        "PyInstaller PYZ archive"
+    }
+
+    fn detect(&self, data: &[u8]) -> bool {
+        data.get(..4) == Some(b"PYZ\0") && data.get(6..8) == Some(&[0x0d, 0x0a])
+    }
+
+    /// List the modules in its table, with the archive's Python version and what it is.
+    fn list(&self, data: &[u8]) -> Result<PackedListing, FormatError> {
+        let whole = PackedEntry {
+            path: STANDALONE_ROOT.into(),
+            offset: 0,
+            stored_size: u64::try_from(data.len()).unwrap_or(u64::MAX),
+            size: None,
+            compression: Compression::None,
+            kind: None,
         };
-        let body = read_stored(data, entry, body_limit)?;
-        match magic {
-            Some(magic) => Ok(pyc::wrap_marshal(magic, &body)),
-            None => Ok(body),
+        let read = read_pyz(data, &whole, MAX_ENTRIES, false).map_err(FormatError::Malformed)?;
+        let mut notes = Vec::new();
+        if read.encrypted {
+            notes.push(
+                "The program's Python modules look encrypted (PyInstaller's --key), so their names are listed but they can't be read back here.".to_string(),
+            );
         }
+        if read.outside > 0 {
+            notes.push(format!("{} module(s) lie outside the archive and cannot be read.", read.outside));
+        }
+        let facts = json!({
+            "python": pyc::release_for_magic(read.magic).map(|r| r.version),
+            "magic": read.magic,
+            "modules": read.total,
+            "namespace_packages": read.namespaces,
+            "encrypted": read.encrypted,
+        });
+        Ok(PackedListing { facts, entries: read.entries, notes, truncated: read.truncated })
+    }
+
+    /// One module's code as a `.pyc`, header included.
+    fn read(&self, data: &[u8], entry: &PackedEntry, max_bytes: u64) -> Result<Vec<u8>, FormatError> {
+        read_member(data, entry, max_bytes)
     }
 }
 

@@ -21,6 +21,7 @@ pub mod model;
 pub mod model_options;
 pub mod model_tools;
 pub mod openai;
+mod pace;
 pub mod price;
 pub mod prompt;
 pub mod providers;
@@ -35,8 +36,9 @@ pub use model::Effort;
 
 use crate::agent::{ApiConversation, EngineHost, LoopConfig, ModelSlot};
 use crate::model::{ChatModel, Delta, Msg, Stop, TurnRequest, TurnResult};
-use craft_anything_engine::{Engine, Settings};
+use craft_anything_engine::{CancelToken, Engine, Settings};
 use craft_anything_evidence::{ErrorCode, ToolError};
+use craft_anything_platform::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -171,6 +173,26 @@ fn compatible_client(name: &str, base: &str, key: Option<String>, model: &str, s
 
 /// Where OpenCode Go lists its models: the chat base ends in `/openai/v1`, while the list answers at
 /// the same service root with `/v1` (https://opencode.ai/inference/go/v1/models).
+/// Run a blocking request on a helper thread and wait for its answer, giving up as soon as `cancel`
+/// is set. A request given up on ends by itself when its own time limits run out.
+fn until_cancelled<T: Send + 'static>(cancel: &CancelToken, ask: impl FnOnce() -> Result<T, ToolError> + Send + 'static) -> Result<T, ToolError> {
+    let (send, answer) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .name("ask-server".into())
+        .spawn(move || {
+            let _ = send.send(ask());
+        })
+        .map_err(|e| ToolError::internal(format!("Couldn't start asking the server: {e}")))?;
+    loop {
+        cancel.check()?;
+        match answer.recv_timeout(Duration::from_millis(100)) {
+            Ok(result) => return result,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Err(ToolError::internal("Asking the server stopped without an answer.")),
+        }
+    }
+}
+
 fn opencode_go_models_base(base: &str) -> String {
     let base = base.trim_end_matches('/');
     match base.strip_suffix("/openai/v1") {
@@ -400,16 +422,20 @@ pub struct AiHub {
     pub engine: Arc<Engine>,
     settings_path: Option<PathBuf>,
     keys: KeyStore,
+    /// Serializes a backend's key and configuration changes, so a save can't land after a remove
+    /// has deleted the key and the backend. Held across a keychain call or a settings save, so a
+    /// waiter is a job, not a stuck lock.
+    backend_edits: Mutex<()>,
 }
 
 impl AiHub {
     pub fn new(engine: Arc<Engine>) -> Self {
-        AiHub { engine, settings_path: None, keys: KeyStore::system() }
+        AiHub { engine, settings_path: None, keys: KeyStore::system(), backend_edits: Mutex::new(()) }
     }
 
     /// A hub with explicit settings file and key store (tests, portable installs).
     pub fn with_stores(engine: Arc<Engine>, settings_path: PathBuf, keys: KeyStore) -> Self {
-        AiHub { engine, settings_path: Some(settings_path), keys }
+        AiHub { engine, settings_path: Some(settings_path), keys, backend_edits: Mutex::new(()) }
     }
 
     fn settings_path(&self) -> PathBuf {
@@ -505,11 +531,25 @@ impl AiHub {
     /// can chat. Returns the model. Anthropic's own
     /// address is added as an Anthropic backend, as its API isn't OpenAI's.
     pub fn add_server(&self, name: &str, address: &str, model: Option<&str>, key: Option<String>) -> Result<String, ToolError> {
-        self.add_server_within(name, address, model, key, SERVER_ANSWER_WAIT)
+        self.add_server_within(name, address, model, key, SERVER_ANSWER_WAIT, &CancelToken::default())
+    }
+
+    /// [`AiHub::add_server`], given up as soon as `cancel` is set, even while the server is still
+    /// being asked for its models: a person can stop waiting for one that is slow to answer (#1429).
+    pub fn add_server_until(&self, name: &str, address: &str, model: Option<&str>, key: Option<String>, cancel: &CancelToken) -> Result<String, ToolError> {
+        self.add_server_within(name, address, model, key, SERVER_ANSWER_WAIT, cancel)
     }
 
     /// [`AiHub::add_server`], waiting `wait` for the server to list its models once reached.
-    fn add_server_within(&self, name: &str, address: &str, model: Option<&str>, key: Option<String>, wait: Duration) -> Result<String, ToolError> {
+    fn add_server_within(
+        &self,
+        name: &str,
+        address: &str,
+        model: Option<&str>,
+        key: Option<String>,
+        wait: Duration,
+        cancel: &CancelToken,
+    ) -> Result<String, ToolError> {
         let name = name.trim();
         let address = address.trim().trim_end_matches('/');
         if name.is_empty() {
@@ -521,14 +561,20 @@ impl AiHub {
         }
         let key = key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
         let kind = if anthropic::is_anthropic_api(address) { BackendKind::Anthropic } else { BackendKind::OpenaiCompatible };
-        let listed = if kind == BackendKind::Anthropic {
-            anthropic::Anthropic::new(Some(address), key.clone().unwrap_or_default(), "").list_models(Duration::from_secs(10))
-        } else {
-            // OpenCode Go lists its models at /v1, not under the chat path a person would paste.
-            let probe = if openai::is_opencode_go(address) { opencode_go_models_base(address) } else { address.to_string() };
-            openai::OpenAi::compatible(name, &probe, key.clone(), "").list_models_within(SERVER_CONNECT_WAIT, wait)
-        };
+        let (asked_name, asked_address, asked_key) = (name.to_string(), address.to_string(), key.clone());
+        let listed = until_cancelled(cancel, move || {
+            if kind == BackendKind::Anthropic {
+                anthropic::Anthropic::new(Some(&asked_address), asked_key.unwrap_or_default(), "").list_models(Duration::from_secs(10))
+            } else {
+                // OpenCode Go lists its models at /v1, not under the chat path a person would paste.
+                let probe = if openai::is_opencode_go(&asked_address) { opencode_go_models_base(&asked_address) } else { asked_address };
+                openai::OpenAi::compatible(&asked_name, &probe, asked_key, "").list_models_within(SERVER_CONNECT_WAIT, wait)
+            }
+        });
         let models = listed.map_err(|e| {
+            if e.code == ErrorCode::Cancelled {
+                return e;
+            }
             // A server that took the request has the right address: it may still be starting, or
             // loading a model before it answers (#1429).
             if http::was_reached(&e) {
@@ -545,6 +591,7 @@ impl AiHub {
         // With no model named, one the server has loaded comes first: its `/models` may be a
         // download catalogue, and the first entry there may start a download and unload the
         // model in use (#1434).
+        cancel.check()?;
         let loaded = || {
             if kind == BackendKind::Anthropic || openai::is_opencode_go(address) {
                 return None;
@@ -650,6 +697,21 @@ impl AiHub {
     /// Each backend's options (an agent app's program and model…), by name.
     pub fn options(&self) -> std::collections::BTreeMap<String, BackendOptions> {
         self.config().backends.into_iter().map(|b| (b.config.name, b.options)).collect()
+    }
+
+    /// For each agent app on this computer whose saved program can't be used (an update moved it,
+    /// #721), the program that runs in its place. It looks at the disk and PATH: call it on a worker.
+    pub fn replaced_programs(&self) -> std::collections::BTreeMap<String, String> {
+        self.config()
+            .backends
+            .into_iter()
+            .filter(|b| b.config.kind == BackendKind::AgentCli && b.config.ssh_host.as_deref().is_none_or(|h| h.trim().is_empty()))
+            .filter_map(|b| {
+                let program = cli_agents::program_of(&b.config, &b.options).ok()?;
+                cli_agents::replaced_program(&b.options, &program)?;
+                Some((b.config.name, program))
+            })
+            .collect()
     }
 
     /// The model a backend uses: an API's model, or the one its agent is asked for. Returns
@@ -759,6 +821,8 @@ impl AiHub {
 
     /// Remove a backend and its stored key. Returns false when there was no such backend.
     pub fn remove_backend(&self, name: &str) -> Result<bool, ToolError> {
+        let edit = self.backend_edits.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        edit.label("Backend key or removal");
         if self.config_to_change()?.get(name).is_none() {
             return Ok(false);
         }
@@ -812,6 +876,59 @@ impl AiHub {
             }
             !b.config.kind.needs_key() || self.keys.resolve(name, b.config.kind).is_some()
         })
+    }
+
+    /// Which backends have a key saved in the app, rather than only in the environment. The
+    /// keychain can be slow, so the app reads this on a worker.
+    pub fn stored_backend_keys(&self) -> std::collections::BTreeMap<String, bool> {
+        self.config()
+            .backends
+            .iter()
+            .filter(|b| b.config.kind != BackendKind::AgentCli)
+            .map(|b| (b.config.name.clone(), self.keys.get(&b.config.name).is_some()))
+            .collect()
+    }
+
+    /// Whether an API backend has a key saved in the app (not the environment); never the key.
+    pub fn saved_backend_key(&self, name: &str) -> Result<bool, ToolError> {
+        if self.entry(name)?.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid("A coding agent keeps its own sign-in; there is no saved key to report here."));
+        }
+        Ok(self.keys.get(name).is_some())
+    }
+
+    /// Replace the key saved for an API backend (#1358). The backend and its options stay as they
+    /// are; an older key in the system keychain must not keep winning, so the new one is read back.
+    pub fn set_backend_key(&self, name: &str, key: &str) -> Result<(), ToolError> {
+        let edit = self.backend_edits.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        edit.label("Backend key or removal");
+        if self.entry(name)?.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid("A coding agent keeps its own sign-in; there is no key to save for it here."));
+        }
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(ToolError::invalid("The key is empty."));
+        }
+        self.keys.set(name, key)?;
+        // A keychain that refused the write can leave the fallback file holding the new key while
+        // the keychain still wins with the old one. Reading back makes that a loud failure; trying
+        // again after unlocking the keychain is safe.
+        if self.keys.get(name).as_deref() != Some(key) {
+            return Err(ToolError::new(ErrorCode::NoPermission, format!("The new key for {name} wasn't used: the system keychain still has an older one."))
+                .with_remediation("Unlock the keychain, or delete this AI's entry in your keychain app, then save the key again."));
+        }
+        Ok(())
+    }
+
+    /// Forget the key saved for an API backend, so the one in the environment is used again. The
+    /// backend itself stays.
+    pub fn remove_backend_key(&self, name: &str) -> Result<(), ToolError> {
+        let edit = self.backend_edits.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        edit.label("Backend key or removal");
+        if self.entry(name)?.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid("A coding agent keeps its own sign-in; there is no saved key to forget here."));
+        }
+        self.keys.delete(name)
     }
 
     /// This installation's OpenCode Go session id. A backend added before one was made, or found
@@ -897,6 +1014,10 @@ impl AiHub {
         };
         let model = match tunnel {
             Some(t) => Box::new(Tunneled { inner: model, _tunnel: t }) as Box<dyn ChatModel>,
+            None => model,
+        };
+        let model = match pace::gap(e.options.requests_per_minute) {
+            Some(gap) => Box::new(pace::Paced { inner: model, backend: c.name.clone(), gap }) as Box<dyn ChatModel>,
             None => model,
         };
         Ok(ModelSlot {

@@ -72,10 +72,12 @@ pub fn program_of(config: &BackendConfig, options: &BackendOptions) -> Result<St
 }
 
 /// The saved program path `program` stands in for, when [`program_of`] chose another one (#721).
-/// A bare name (`claude.exe`) found as the same agent elsewhere isn't a replacement.
+/// A bare name (`claude.exe`) found as the same agent elsewhere isn't a replacement, nor is a path
+/// that's still there (a saved folder, or the Claude desktop app): it isn't gone.
 pub fn replaced_program(options: &BackendOptions, program: &str) -> Option<String> {
     let saved = options.command.as_deref().map(str::trim).filter(|c| !c.is_empty() && *c != program)?;
-    Path::new(saved).parent().is_some_and(|p| !p.as_os_str().is_empty()).then(|| saved.to_string())
+    let path = Path::new(saved);
+    (path.parent().is_some_and(|p| !p.as_os_str().is_empty()) && !path.exists()).then(|| saved.to_string())
 }
 
 /// Resolve saved commands locally through the shared lookup, but leave SSH commands untouched.
@@ -1390,6 +1392,8 @@ mod tests {
         assert_eq!(replaced_program(&BackendOptions::default(), "codex"), None, "nothing saved");
         let bare = BackendOptions { command: Some("claude.exe".into()), ..Default::default() };
         assert_eq!(replaced_program(&bare, "claude"), None, "a bare name found as the same agent");
+        let folder = new.parent().unwrap();
+        assert_eq!(replaced_program(&chosen(folder), &new.display().to_string()), None, "a saved folder that's there isn't gone");
         assert_eq!(program_of(&config(Some("box")), &chosen(&gone)).unwrap(), gone.display().to_string(), "another computer's path isn't checked here");
         assert_eq!(program_of(&config(None), &BackendOptions::default()).unwrap(), "codex", "nothing chosen: the usual name");
         // #467: a saved app bundle is never started; the usual name is looked up instead.

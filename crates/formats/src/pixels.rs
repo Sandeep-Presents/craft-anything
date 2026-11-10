@@ -1,5 +1,5 @@
 //! Turning game textures' stored pixels into RGBA: uncompressed layouts and the 4×4 block formats
-//! (DXT1/BC1, DXT5/BC3, BC4, BC5, BC6H and BC7). Shared by the Unity and Unreal readers; rows come out in the
+//! (DXT1/BC1, DXT3/BC2, DXT5/BC3, BC4, BC5, BC6H and BC7). Shared by the Unity and Unreal readers; rows come out in the
 //! order they're stored (Unity stores the bottom row first, Unreal the top).
 
 use crate::bptc;
@@ -25,6 +25,8 @@ pub enum Layout {
     RFloat,
     RgFloat,
     RgbaFloat,
+    /// Nine-bit RGB mantissas with a shared five-bit exponent, displayed as opaque sRGB.
+    Rgb9e5,
     Rgb24,
     Rgba32,
     Argb32,
@@ -33,6 +35,8 @@ pub enum Layout {
     Rgba4444,
     Argb4444,
     Dxt1,
+    /// Four-colour blocks with one explicit four-bit alpha value per texel.
+    Dxt3,
     Dxt5,
     /// One channel in blocks (shown as grey).
     Bc4,
@@ -53,11 +57,11 @@ pub fn size(layout: Layout, width: u32, height: u32) -> Option<usize> {
         Layout::Alpha8 | Layout::R8 => w.checked_mul(h),
         Layout::Rgb565 | Layout::Rgba4444 | Layout::Argb4444 | Layout::RHalf | Layout::R16 | Layout::Rg8 => w.checked_mul(h)?.checked_mul(2),
         Layout::Rgb24 => w.checked_mul(h)?.checked_mul(3),
-        Layout::Rgba32 | Layout::Argb32 | Layout::Bgra32 | Layout::RgHalf | Layout::RFloat => w.checked_mul(h)?.checked_mul(4),
+        Layout::Rgba32 | Layout::Argb32 | Layout::Bgra32 | Layout::RgHalf | Layout::RFloat | Layout::Rgb9e5 => w.checked_mul(h)?.checked_mul(4),
         Layout::RgbaHalf | Layout::RgFloat => w.checked_mul(h)?.checked_mul(8),
         Layout::RgbaFloat => w.checked_mul(h)?.checked_mul(16),
         Layout::Dxt1 | Layout::Bc4 => blocks.checked_mul(8),
-        Layout::Dxt5 | Layout::Bc5 | Layout::Bc6h | Layout::Bc6hSigned | Layout::Bc7 => blocks.checked_mul(16),
+        Layout::Dxt3 | Layout::Dxt5 | Layout::Bc5 | Layout::Bc6h | Layout::Bc6hSigned | Layout::Bc7 => blocks.checked_mul(16),
     }
 }
 
@@ -147,6 +151,15 @@ fn halves(b: &[u8; 16]) -> ([u8; 8], [u8; 8]) {
     (first, second)
 }
 
+fn dxt3(b: &[u8; 16]) -> [[u8; 4]; 16] {
+    let (alpha, colour) = halves(b);
+    let mut texels = dxt_texels(&colour, false);
+    for (texel, value) in texels.iter_mut().zip(alpha.iter().flat_map(|byte| [byte & 15, byte >> 4])) {
+        texel[3] = value * 17;
+    }
+    texels
+}
+
 fn dxt5(b: &[u8; 16]) -> [[u8; 4]; 16] {
     let (alpha, colour) = halves(b);
     let mut texels = dxt_texels(&colour, false);
@@ -231,6 +244,12 @@ pub fn decode_with_limit(layout: Layout, width: u32, height: u32, data: &[u8], m
         Layout::RFloat => put(&mut float_pixels(floats, 1)),
         Layout::RgFloat => put(&mut float_pixels(floats, 2)),
         Layout::RgbaFloat => put(&mut float_pixels(floats, 4)),
+        Layout::Rgb9e5 => put(&mut data.as_chunks::<4>().0.iter().map(|bytes| {
+            let packed = u32::from_le_bytes(*bytes);
+            let scale = 2.0f32.powi((packed >> 27) as i32 - 24);
+            let channel = |shift: u32| bptc::srgb8(((packed >> shift) & 0x1ff) as f32 * scale);
+            [channel(0), channel(9), channel(18), 255]
+        })),
         Layout::Alpha8 => put(&mut data.iter().map(|a| [255, 255, 255, *a])),
         Layout::R8 => put(&mut data.iter().map(|r| [*r, *r, *r, 255])),
         Layout::R16 => put(&mut u16s.map(|value| {
@@ -246,6 +265,7 @@ pub fn decode_with_limit(layout: Layout, width: u32, height: u32, data: &[u8], m
         Layout::Rgba4444 => put(&mut u16s.map(|v| nibbles(v, [12, 8, 4, 0]))),
         Layout::Argb4444 => put(&mut u16s.map(|v| nibbles(v, [8, 4, 0, 12]))),
         Layout::Dxt1 => blocks(&mut out, w, h, data.as_chunks::<8>().0.iter().map(|b| dxt_texels(b, true))),
+        Layout::Dxt3 => blocks(&mut out, w, h, data.as_chunks::<16>().0.iter().map(dxt3)),
         Layout::Dxt5 => blocks(&mut out, w, h, data.as_chunks::<16>().0.iter().map(dxt5)),
         Layout::Bc4 => blocks(&mut out, w, h, data.as_chunks::<8>().0.iter().map(bc4)),
         Layout::Bc5 => blocks(&mut out, w, h, data.as_chunks::<16>().0.iter().map(bc5)),

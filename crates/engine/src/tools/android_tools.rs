@@ -397,9 +397,13 @@ fn android_package_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
     let mut warnings = pkg.warnings.clone();
     let mut lims = Vec::new();
     // Manifest
+    let mut manifest_coverage = Coverage { status: CoverageStatus::Partial, ..Coverage::default() };
     let (manifest, manifest_xml) = match member(&pkg, "AndroidManifest.xml") {
         Some(Ok(b)) => match axml::parse(&b) {
             Ok(doc) => {
+                if !doc.truncated {
+                    manifest_coverage.status = CoverageStatus::Complete;
+                }
                 warnings.extend(doc.warnings.iter().map(|w| format!("AndroidManifest.xml: {w}")));
                 let xml = p.include_manifest_xml.then(|| doc.to_xml(256 * 1024));
                 (Some(axml::manifest(&doc)), xml)
@@ -550,7 +554,7 @@ fn android_package_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, 
         .summary(summary)
         .confidence(Confidence::Observed)
         .limitations(lims)
-        .coverage(Coverage::complete(z.entries.len() as u64));
+        .coverage(manifest_coverage);
     Ok(ToolOutput::evidence(b.build()?))
 }
 
@@ -651,7 +655,11 @@ fn android_components_list(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutpu
     let by_kind: BTreeMap<&str, Value> = counts.iter().map(|(k, (n, r))| (*k, json!({"total": n, "reachable_from_outside": r}))).collect();
     let reachable = m.components.iter().filter(|c| c.exported).count();
     let open = m.components.iter().filter(|c| c.exported && !component_guard(c, &m).1).count();
-    let (items, cov) = page(&rows, p.offset, p.limit);
+    let (items, mut cov) = page(&rows, p.offset, p.limit);
+    if doc.truncated {
+        cov.status = CoverageStatus::Partial;
+        cov.total = None;
+    }
 
     let target = m.target_sdk.as_deref().and_then(|s| s.parse::<u32>().ok());
     let rule = match target {

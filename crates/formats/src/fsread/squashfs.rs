@@ -8,7 +8,7 @@
 
 use super::{FsEntry, FsImage, FsKind, Limits, join};
 use crate::bytes::Reader;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const META_MAX: usize = 8192;
 
@@ -145,21 +145,31 @@ pub fn read(data: &[u8], limits: &Limits) -> FsImage {
     let dir_end = [sb.frag_table, sb.id_table].into_iter().filter(|&t| t > sb.dir_table && t != u64::MAX).min().unwrap_or(sb.dir_table);
     let inodes = Meta::read(data, sb.inode_table, sb.dir_table, sb.compression, &mut img);
     let dirs = Meta::read(data, sb.dir_table, dir_end, sb.compression, &mut img);
-    let mut seen: Vec<u64> = Vec::new();
+    let mut seen = BTreeSet::new();
     walk(data, &sb, &inodes, &dirs, sb.root_ref, "", limits, &mut img, 0, &mut seen);
     img
 }
 
 #[allow(clippy::too_many_arguments)]
-fn walk(data: &[u8], sb: &Sb, inodes: &Meta, dirs: &Meta, inode_ref: u64, parent: &str, limits: &Limits, img: &mut FsImage, depth: usize, seen: &mut Vec<u64>) {
+fn walk(
+    data: &[u8],
+    sb: &Sb,
+    inodes: &Meta,
+    dirs: &Meta,
+    inode_ref: u64,
+    parent: &str,
+    limits: &Limits,
+    img: &mut FsImage,
+    depth: usize,
+    seen: &mut BTreeSet<u64>,
+) {
     if depth > limits.max_depth || img.entries.len() >= limits.max_entries {
         img.complete = false;
         return;
     }
-    if seen.contains(&inode_ref) {
+    if !seen.insert(inode_ref) {
         return;
     }
-    seen.push(inode_ref);
     let r = Reader::new(&inodes.data);
     let Some((pos, itype)) = inodes.at(inode_ref).and_then(|pos| Some((pos, r.u16_le(pos)?))) else {
         img.warn("squashfs: directory inode not read");
@@ -198,7 +208,7 @@ fn parse_dir(
     limits: &Limits,
     img: &mut FsImage,
     depth: usize,
-    seen: &mut Vec<u64>,
+    seen: &mut BTreeSet<u64>,
 ) {
     let r = Reader::new(listing);
     let mut pos = 0usize;

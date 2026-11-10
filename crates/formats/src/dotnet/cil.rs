@@ -525,26 +525,34 @@ pub fn parse_body(data: &[u8], off: usize) -> Option<MethodBody> {
             if fl & 0x8 != 0 {
                 let mut sect = (code_offset.checked_add(code_size as usize)?.checked_add(3)?) & !3;
                 for _ in 0..64 {
-                    let Some(kind) = r.u8(sect) else {
-                        body.warnings.push("extra data section runs past the file".into());
+                    let Some(header) = r.slice(sect, 4) else {
+                        body.warnings.push("extra data section header runs past the file".into());
                         break;
                     };
+                    let kind = header[0];
                     let fat = kind & 0x40 != 0;
-                    let (size, hdr) = if fat {
-                        let v = r.u32_le(sect).unwrap_or(0) >> 8;
-                        (v as usize, 4usize)
-                    } else {
-                        (usize::from(r.u8(sect + 1).unwrap_or(0)), 4usize)
-                    };
+                    let size =
+                        if fat { usize::from(header[1]) | (usize::from(header[2]) << 8) | (usize::from(header[3]) << 16) } else { usize::from(header[1]) };
+                    let hdr = 4;
                     if size < hdr {
                         body.warnings.push("empty extra data section".into());
                         break;
                     }
-                    if kind & 0x1 != 0 {
+                    let Some(section) = r.slice(sect, size) else {
+                        body.warnings.push("extra data section runs past the file".into());
+                        break;
+                    };
+                    if kind & 0x3f == 0x1 {
                         let csize = if fat { 24 } else { 12 };
-                        let n = (size - hdr) / csize;
+                        let n = if (size - hdr).is_multiple_of(csize) {
+                            (size - hdr) / csize
+                        } else {
+                            body.warnings.push("exception section ends with a partial clause".into());
+                            0
+                        };
+                        let r = Reader::new(section);
                         for i in 0..n.min(MAX_CLAUSES) {
-                            let c = sect + hdr + i * csize;
+                            let c = hdr + i * csize;
                             let (flags, to, tl, ho, hl, tok) = if fat {
                                 (r.u32_le(c), r.u32_le(c + 4), r.u32_le(c + 8), r.u32_le(c + 12), r.u32_le(c + 16), r.u32_le(c + 20))
                             } else {
@@ -580,6 +588,8 @@ pub fn parse_body(data: &[u8], off: usize) -> Option<MethodBody> {
                                 class_token_or_filter: tok,
                             });
                         }
+                    } else {
+                        body.warnings.push(format!("unknown extra data section kind {}", kind & 0x3f));
                     }
                     if kind & 0x80 == 0 {
                         break;

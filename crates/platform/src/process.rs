@@ -864,12 +864,19 @@ impl Supervisor {
 fn end(child: &mut dyn ChildWrapper, name: &str) {
     let _ = child.start_kill();
     let deadline = Instant::now() + REAP_GRACE;
-    while let Ok(None) = child.try_wait() {
-        if Instant::now() >= deadline {
-            log::warn!("{name}: still there {} s after it was stopped; not waiting for it", REAP_GRACE.as_secs());
-            return;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
+            Ok(None) => {
+                log::warn!("{name}: still there {} s after it was stopped; not waiting for it", REAP_GRACE.as_secs());
+                return;
+            }
+            Err(e) => {
+                log::warn!("{name}: couldn't tell whether it ended after it was stopped: {e}");
+                return;
+            }
         }
-        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -938,6 +945,11 @@ impl Launch {
     /// Write what the program prints (output and errors) to this file, replacing it. A file, not
     /// a pipe: the program keeps running after we exit, and writing to a pipe nobody reads would
     /// fail (or stop it).
+    ///
+    /// The file is opened for the program to append to, and while we are alive it is cut back to
+    /// empty once it passes [`LOG_CAP`](crate::process::LOG_CAP), so a program that prints
+    /// forever cannot fill the disk. Nothing breaks when it is cut: the program's next write lands
+    /// at the new end. Once we have exited the cut stops, and the file grows as it always did.
     pub fn log_to(mut self, file: impl Into<PathBuf>) -> Self {
         self.log = Some(file.into());
         self
@@ -978,7 +990,7 @@ impl Launch {
         use_search_path(&mut cmd);
         match &self.log {
             Some(path) => {
-                let out = std::fs::File::create(path).map_err(|e| ToolError::io(path.display(), e))?;
+                let out = open_log(path).map_err(|e| ToolError::io(path.display(), e))?;
                 let err = out.try_clone().map_err(|e| ToolError::io(path.display(), e))?;
                 cmd.stdout(out).stderr(err);
             }
@@ -1010,8 +1022,18 @@ impl Launch {
         // Reap it when it closes. If no thread can be made the child still runs (and `ended`
         // stays unknown); on Unix it stays a zombie until we exit, which is harmless.
         let watched = launched.clone();
+        let log = self.log.clone();
         let _ = std::thread::Builder::new().name(format!("launched-{name}")).spawn(move || {
+            let mut next_cut = Instant::now() + LOG_CUT_EVERY;
             while watched.poll().is_none() {
+                // Keep the log bounded while the program runs; the watch ends with it, so a program
+                // that outlives us is left exactly as it was before.
+                if let Some(path) = &log
+                    && Instant::now() >= next_cut
+                {
+                    cut_log(path);
+                    next_cut = Instant::now() + LOG_CUT_EVERY;
+                }
                 std::thread::sleep(LAUNCH_POLL);
             }
             if let Some(Ended { code: Some(c), .. }) = watched.ended()
@@ -1026,6 +1048,41 @@ impl Launch {
 
 /// How often a launched program is checked for having ended.
 const LAUNCH_POLL: Duration = Duration::from_millis(250);
+
+/// How big a launched program's log may get while we are alive: past this it is cut back to empty.
+/// A run's log is read for its last lines (a build's warnings, a game's crash), so keeping the tail
+/// is what matters and a cap this size holds many screens of it.
+pub const LOG_CAP: u64 = 1024 * 1024;
+
+/// How often the log is measured against [`LOG_CAP`].
+const LOG_CUT_EVERY: Duration = Duration::from_secs(2);
+
+/// Open a launched program's log for it to write to: appended, never truncated by its own writes,
+/// so a cut made from our side leaves nothing for it to trip over.
+fn open_log(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    // Windows refuses one open that both truncates and appends, so replace the file and then hand
+    // the program a handle that only appends.
+    std::fs::File::create(path)?;
+    std::fs::OpenOptions::new().append(true).open(path)
+}
+
+/// Cut a log back to empty once it has passed [`LOG_CAP`]. The program holding it open appends, so
+/// its next write lands at the new end; if the file can't be cut (someone else holds it), it is
+/// simply left alone until the next look.
+fn cut_log(path: &std::path::Path) {
+    let Ok(size) = std::fs::metadata(path).map(|m| m.len()) else { return };
+    if size <= LOG_CAP {
+        return;
+    }
+    match open_log_for_cut(path) {
+        Ok(()) => log::info!("cut {} at {size} bytes", path.display()),
+        Err(e) => log::warn!("could not cut {} at {size} bytes: {e}", path.display()),
+    }
+
+    fn open_log_for_cut(path: &std::path::Path) -> std::io::Result<()> {
+        std::fs::OpenOptions::new().write(true).open(path)?.set_len(0)
+    }
+}
 
 /// A program started with [`Launch::start_watched`]. Clones share the same program.
 #[derive(Debug, Clone)]
@@ -1296,6 +1353,73 @@ mod launch_tests {
         assert!(!l.is_running());
         let text = std::fs::read_to_string(&log).unwrap();
         assert!(text.contains("out-line") && text.contains("err-line"), "{text}");
+    }
+
+    /// A program that prints far more than the cap keeps running to the end, and its log is cut
+    /// while it writes: the cut is ours, not something its own writes run into.
+    #[test]
+    fn a_launched_programs_log_is_cut_back_while_it_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("run.log");
+        std::fs::write(dir.path().join("log-path"), log.display().to_string()).unwrap();
+        std::fs::write(dir.path().join("log-writer"), b"go").unwrap();
+        let l = Launch::new(std::env::current_exe().unwrap())
+            .args(["--ignored", "--exact", "process::launch_tests::log_writer_stand_in"])
+            .cwd(dir.path())
+            .hide_console()
+            .log_to(&log)
+            .start_watched()
+            .unwrap();
+        let ended = l.wait_timeout(Duration::from_secs(120)).expect("the writer ended");
+        assert_eq!(ended.code, Some(0), "a cut never breaks the program's own writes");
+        let report = std::fs::read_to_string(dir.path().join("wrote")).unwrap();
+        let (wrote, cuts): (u64, u32) = {
+            let mut parts = report.split_whitespace();
+            (parts.next().unwrap().parse().unwrap(), parts.next().unwrap().parse().unwrap())
+        };
+        assert!(wrote > LOG_CAP, "the stand-in printed more than the cap: {wrote}");
+        // The stand-in waits for a cut and writes on past it, so this doesn't depend on how fast
+        // the cuts come: it printed more than the cap, saw the file shrink, and its later writes
+        // were accepted.
+        assert!(cuts >= 1, "the log was cut while the program ran: {report}");
+        let kept = std::fs::metadata(&log).unwrap().len();
+        assert!(kept <= 2 * LOG_CAP, "the log stayed small after {wrote} bytes: {kept}");
+    }
+
+    /// Prints past the cap in chunks, waits to see its own log shrink, writes on to show the cut
+    /// left its writes alone, then says how much it printed and how many cuts it saw. Only runs
+    /// when the test above leaves its guard files in the working directory.
+    #[test]
+    #[ignore = "stand-in invoked by a_launched_programs_log_is_cut_back_while_it_runs"]
+    fn log_writer_stand_in() {
+        use std::io::Write;
+        if std::fs::read("log-writer").is_err() {
+            return;
+        }
+        let log = std::fs::read_to_string("log-path").unwrap().trim().to_string();
+        let chunk = vec![b'x'; 64 * 1024];
+        let mut out = std::io::stdout();
+        let (mut wrote, mut cuts, mut last) = (0u64, 0u32, 0u64);
+        // Enough chunks for a loaded machine: a cut comes every couple of seconds, and this goes on
+        // until it has seen one and written past it.
+        for _ in 0..4096 {
+            out.write_all(&chunk).unwrap();
+            out.write_all(b"\n").unwrap();
+            out.flush().unwrap();
+            wrote += chunk.len() as u64 + 1;
+            let kept = std::fs::metadata(&log).map(|m| m.len()).unwrap_or(0);
+            if kept < last {
+                cuts += 1;
+            }
+            last = kept;
+            // A cut has been seen and the writes after it have filled the file again, which is the
+            // thing worth proving: the cut doesn't get in the program's way.
+            if cuts > 0 && kept > LOG_CAP / 2 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        std::fs::write("wrote", format!("{wrote} {cuts}")).unwrap();
     }
 
     #[test]

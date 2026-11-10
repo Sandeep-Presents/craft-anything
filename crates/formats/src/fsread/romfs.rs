@@ -6,6 +6,7 @@
 
 use super::{FsEntry, FsImage, Limits, is_dot, join};
 use crate::bytes::Reader;
+use std::collections::BTreeSet;
 
 fn align16(n: usize) -> Option<usize> {
     n.checked_add(15).map(|v| v & !15)
@@ -48,12 +49,12 @@ pub fn read(data: &[u8], limits: &Limits) -> FsImage {
         img.complete = false;
         return img;
     };
-    let mut visited: Vec<usize> = Vec::new();
+    let mut visited = BTreeSet::new();
     // A dot-named root is the container itself, not a child to skip with `.` and `..`.
     let root_container = r.u32_be(root).is_some_and(|kind| kind & 7 == 1)
         && root.checked_add(16).and_then(|at| name_at(data, at, limits.max_name)).is_some_and(|(name, _)| name == "." || name.is_empty());
     if root_container {
-        visited.push(root);
+        visited.insert(root);
         let first = root.checked_add(4).and_then(|at| r.u32_be(at)).unwrap_or(0) as usize;
         walk(data, first, "", limits, &mut img, &mut visited, 0);
     } else {
@@ -63,7 +64,7 @@ pub fn read(data: &[u8], limits: &Limits) -> FsImage {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn walk(data: &[u8], first: usize, parent: &str, limits: &Limits, img: &mut FsImage, visited: &mut Vec<usize>, depth: usize) {
+fn walk(data: &[u8], first: usize, parent: &str, limits: &Limits, img: &mut FsImage, visited: &mut BTreeSet<usize>, depth: usize) {
     if depth > limits.max_depth {
         img.warn("directory nesting limit reached");
         img.complete = false;
@@ -82,12 +83,11 @@ fn walk(data: &[u8], first: usize, parent: &str, limits: &Limits, img: &mut FsIm
             img.complete = false;
             return;
         }
-        if visited.contains(&off) {
+        if !visited.insert(off) {
             img.warn("romfs header cycle detected");
             img.complete = false;
             return;
         }
-        visited.push(off);
         siblings += 1;
         if siblings > limits.max_entries {
             img.complete = false;
@@ -141,6 +141,65 @@ fn walk(data: &[u8], first: usize, parent: &str, limits: &Limits, img: &mut FsIm
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn wide_image(count: usize, cycle: Option<u32>) -> Vec<u8> {
+        fn put(data: &mut [u8], at: usize, value: u32) {
+            data[at..at + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        fn checksum(data: &mut [u8], start: usize, length: usize, at: usize) {
+            let sum = data[start..start + length].as_chunks::<4>().0.iter().fold(0u32, |sum, word| sum.wrapping_add(u32::from_be_bytes(*word)));
+            put(data, at, 0u32.wrapping_sub(sum));
+        }
+        let size = 96 + count * 48;
+        let mut data = vec![0; size.next_multiple_of(1024)];
+        data[..8].copy_from_slice(b"-rom1fs-");
+        put(&mut data, 8, size as u32);
+        data[16..21].copy_from_slice(b"tests");
+        put(&mut data, 32, 1);
+        put(&mut data, 36, 64);
+        data[48] = b'.';
+        checksum(&mut data, 32, 32, 44);
+        put(&mut data, 64, 96);
+        put(&mut data, 68, 32);
+        data[80..82].copy_from_slice(b"..");
+        checksum(&mut data, 64, 32, 76);
+        for i in 0..count {
+            let at = 96 + i * 48;
+            let next = if i + 1 < count { (at + 48) as u32 } else { cycle.unwrap_or(0) };
+            put(&mut data, at, next | 2);
+            put(&mut data, at + 8, 1);
+            let name = format!("item{i:05}");
+            data[at + 16..at + 16 + name.len()].copy_from_slice(name.as_bytes());
+            checksum(&mut data, at, 32, at + 12);
+            data[at + 32] = i as u8;
+        }
+        checksum(&mut data, 0, size.min(512), 12);
+        data
+    }
+
+    #[test]
+    fn wide_sibling_walk_keeps_order_limits_and_cycle_detection() {
+        let bytes = wide_image(4096, None);
+        let image = read(&bytes, &Limits::default());
+        assert!(image.complete, "{:?}", image.warnings);
+        assert_eq!(image.entries.len(), 4096);
+        assert_eq!(image.bytes, 4096);
+        for (i, entry) in image.entries.iter().enumerate() {
+            assert_eq!(entry.path, format!("item{i:05}"));
+            assert_eq!(entry.data.as_deref(), Some(&[i as u8][..]));
+        }
+        let limited = read(&bytes, &Limits { max_entries: 17, ..Limits::default() });
+        assert!(!limited.complete);
+        // The existing sibling-work limit also counts the skipped `..` header.
+        assert_eq!(limited.entries, image.entries[..16]);
+        assert_eq!(limited.bytes, 16);
+        for target in [32, 96] {
+            let cyclic = read(&wide_image(4096, Some(target)), &Limits::default());
+            assert!(!cyclic.complete);
+            assert_eq!(cyclic.entries, image.entries);
+            assert!(cyclic.warnings.iter().any(|warning| warning.contains("header cycle")));
+        }
+    }
 
     #[test]
     fn reads_a_small_image() {

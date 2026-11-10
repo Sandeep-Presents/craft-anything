@@ -52,7 +52,7 @@ pub struct RunSet {
 fn must_work_alone(hub: &AiHub, ws: &Workspace, opts: &RunOptions) -> bool {
     let cfg = hub.config();
     let in_session = |e: &crate::BackendEntry| e.config.kind != BackendKind::AgentCli;
-    let fresh = opts.message.is_none() || !ws.capture_dir().exists();
+    let fresh = opts.message.is_none() || !super::capture_in_mode(ws, super::run_deep_mode(hub, opts));
     builder_backend(&cfg, opts.backend.as_deref().or_else(|| super::project_builder(&cfg, ws))).is_ok_and(|e| in_session(&e))
         || (fresh && hub.chosen(Role::Extractor).and_then(|n| cfg.get(&n).cloned()).is_some_and(|e| in_session(&e)))
 }
@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn a_follow_up_with_an_api_extractor_can_build_beside_others() {
         let d = tempfile::tempdir().unwrap();
-        let ws = Workspace::create(d.path(), "A", "A game", TargetRef::None).unwrap();
+        let mut ws = Workspace::create(d.path(), "A", "A game", TargetRef::None).unwrap();
         let mut s = craft_anything_engine::testing::session();
         s.settings.ai = toml::from_str(
             "[roles]\nextractor = \"Key\"\n[[backends]]\nname = \"Agent\"\nkind = \"agent_cli\"\nmodel = \"claude-code\"\n[[backends]]\nname = \"Key\"\nkind = \"openrouter\"\nmodel = \"m\"\n",
@@ -394,6 +394,7 @@ mod tests {
         assert!(must_work_alone(&hub, &ws, &by_agent(None)), "a fresh study may use the Extractor");
         assert!(must_work_alone(&hub, &ws, &by_agent(Some("make it blue"))), "with nothing studied yet, so may this");
         std::fs::create_dir_all(ws.capture_dir()).unwrap();
+        ws.manifest.capture_deep = Some(true);
         assert!(!must_work_alone(&hub, &ws, &by_agent(Some("make it blue"))), "a follow-up doesn't");
     }
 

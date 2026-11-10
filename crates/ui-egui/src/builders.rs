@@ -305,8 +305,8 @@ impl CraftApp {
         let (name, address, model, key) = (f.name.trim().to_string(), f.address.clone(), f.model.trim().to_string(), Some(f.key.clone()));
         let choices = self.backend_choices;
         let shown = name.clone();
-        let job = self.jobs.spawn(trf("Connect {name}", &[("name", &name)]), true, move |_| {
-            let result = hub.add_server(&name, &address, Some(model.as_str()).filter(|m| !m.is_empty()), key).map(|_| ());
+        let job = self.jobs.spawn(trf("Connect {name}", &[("name", &name)]), true, move |j| {
+            let result = hub.add_server_until(&name, &address, Some(model.as_str()).filter(|m| !m.is_empty()), key, &j.cancel).map(|_| ());
             Ok(crate::Done::BackendAdded { name, result, choices })
         });
         self.server_form.connecting = Some((job, shown, std::time::Instant::now()));

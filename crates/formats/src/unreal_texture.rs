@@ -308,6 +308,7 @@ pub fn layout(pixel_format: &str) -> Option<Layout> {
         "PF_G32R32F" => Layout::RgFloat,
         "PF_A32B32G32R32F" => Layout::RgbaFloat,
         "PF_DXT1" => Layout::Dxt1,
+        "PF_DXT3" => Layout::Dxt3,
         "PF_DXT5" => Layout::Dxt5,
         "PF_BC4" => Layout::Bc4,
         "PF_BC5" => Layout::Bc5,

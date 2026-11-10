@@ -31,9 +31,13 @@ pub struct SignedData {
     pub message_digest: Option<String>,
     /// The `contentType` signed attribute OID (dotted).
     pub content_type: Option<String>,
-    /// The signer's issuer `Name` (DER) and serial (bytes), to pick its certificate.
+    /// The signer's issuer `Name` (DER) and serial (bytes), empty for a key identifier.
     pub signer_issuer: Vec<u8>,
     pub signer_serial: Vec<u8>,
+    /// The signer's subject key identifier, matched against the certificate extension.
+    pub signer_key_identifier: Option<Vec<u8>>,
+    /// Readable identity irregularities; these do not discard the certificates or algorithms.
+    pub signer_identity_notes: Vec<String>,
     /// The encapsulated eContent, when present (detached signatures have none).
     pub econtent: Option<Vec<u8>>,
 }
@@ -86,14 +90,33 @@ pub fn parse_signed_data(cms: &[u8]) -> Option<SignedData> {
     let signer_infos = signer_infos?;
     let signer = der::children(cms, &signer_infos).into_iter().next()?;
     let si = der::children(cms, &signer);
-    let mut idx = 0usize;
-    idx += 1; // version INTEGER
+    let version = si.first().filter(|field| field.tag == 0x02)?.bytes(cms)?;
+    let mut signer_identity_notes = Vec::new();
+    let mut idx = 1usize;
     let sid = si.get(idx)?;
-    let (signer_issuer, signer_serial) = {
-        let sid_kids = der::children(cms, sid);
-        let issuer = sid_kids.first().and_then(|t| t.whole(cms)).unwrap_or(&[]).to_vec();
-        let serial = sid_kids.get(1).and_then(|t| t.bytes(cms)).unwrap_or(&[]).to_vec();
-        (issuer, serial)
+    let (signer_issuer, signer_serial, signer_key_identifier) = match sid.tag {
+        0x30 => {
+            if version != [1] {
+                signer_identity_notes.push("SignerInfo version does not match its issuer-and-serial identifier (expected 1).".into());
+            }
+            let sid_kids = der::children(cms, sid);
+            if sid_kids.len() != 2 || sid_kids.last().is_none_or(|last| last.end() != sid.end()) {
+                return None;
+            }
+            let issuer = sid_kids.first().filter(|field| field.tag == 0x30)?.whole(cms)?.to_vec();
+            let serial = sid_kids.get(1).filter(|field| field.tag == 0x02)?.bytes(cms)?;
+            if serial.is_empty() {
+                signer_identity_notes.push("The signer serial number is empty; its issuer-and-serial identity cannot be matched.".into());
+            }
+            (issuer, serial.to_vec(), None)
+        }
+        0x80 => {
+            if version != [3] {
+                signer_identity_notes.push("SignerInfo version does not match its subject key identifier (expected 3).".into());
+            }
+            (Vec::new(), Vec::new(), Some(sid.bytes(cms)?.to_vec()))
+        }
+        _ => return None,
     };
     idx += 1;
     let digest_alg = si.get(idx).filter(|t| t.tag == 0x30)?;
@@ -140,14 +163,22 @@ pub fn parse_signed_data(cms: &[u8]) -> Option<SignedData> {
         content_type,
         signer_issuer,
         signer_serial,
+        signer_key_identifier,
+        signer_identity_notes,
         econtent,
     })
 }
 
 impl SignedData {
-    /// The signer's certificate: the one whose issuer+serial match the SignerIdentifier, else the
-    /// first (leaf) certificate.
+    /// The certificate whose issuer+serial or subject key identifier matches the SignerIdentifier.
+    /// An absent match leaves the signer's identity unknown.
     pub fn signer_cert(&self) -> Option<&[u8]> {
+        if let Some(key_id) = &self.signer_key_identifier {
+            return self.certificates.iter().find(|c| der::certificate_subject_key_identifier(c) == Some(key_id.as_slice())).map(Vec::as_slice);
+        }
+        if self.signer_issuer.is_empty() || self.signer_serial.is_empty() {
+            return None;
+        }
         for c in &self.certificates {
             if let Some(p) = der::certificate_parts(c)
                 && p.issuer == self.signer_issuer.as_slice()
@@ -156,7 +187,7 @@ impl SignedData {
                 return Some(c);
             }
         }
-        self.certificates.first().map(Vec::as_slice)
+        None
     }
 
     /// The signature scheme implied by the signer's signature and digest algorithms.

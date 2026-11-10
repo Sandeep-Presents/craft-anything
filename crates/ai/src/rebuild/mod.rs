@@ -221,12 +221,29 @@ fn is_carrying_on(opts: &RunOptions, history_in_mode: bool) -> bool {
     history_in_mode && (opts.continuing || opts.message.is_none())
 }
 
-/// Whether a run starts by studying: there is no capture to build from, or the project's kept
+/// Whether the project's `capture/` was made in this run's mode. A capture with no recorded mode
+/// (a failed study, or one copied in) isn't usable: the run studies again. A capture from before
+/// the mode was kept was recorded as Deep by the version-5 migration, like a saved session.
+pub(super) fn capture_in_mode(ws: &Workspace, deep: bool) -> bool {
+    ws.capture_dir().exists() && ws.manifest.capture_deep == Some(deep)
+}
+
+/// The mode a run starts in: the session's when it can be read, else the run's own choice, else
+/// the saved setting. Shared with the queue, so it and the run agree about the capture.
+pub(super) fn run_deep_mode(hub: &AiHub, opts: &RunOptions) -> bool {
+    !hub.engine
+        .try_session()
+        .map(|s| s.clean_room())
+        .or(opts.clean_room)
+        .unwrap_or_else(|| !craft_anything_engine::Settings::load_from(&hub.settings_path()).deep_mode)
+}
+
+/// Whether a run starts by studying: its capture isn't from this mode, or the project's kept
 /// conversation is for the other mode. A capture from the other mode must not be handed to this
-/// run's builder. A follow-up with no conversation at all keeps the old no-study path; only a
-/// conversation that was kept and then rejected for mode starts a new study.
-fn starts_with_study(opts: &RunOptions, kept: KeptHistory, has_capture: bool) -> bool {
-    !has_capture || (opts.message.is_none() && !kept.in_mode) || (!kept.in_mode && kept.elsewhere)
+/// run's builder. A follow-up with no conversation at all studies when the capture isn't usable;
+/// with a usable one it keeps the old no-study path.
+fn starts_with_study(opts: &RunOptions, kept: KeptHistory, usable_capture: bool) -> bool {
+    !usable_capture || (!kept.in_mode && (opts.message.is_none() || kept.elsewhere))
 }
 
 /// A running (or finished) rebuild.
@@ -255,13 +272,8 @@ impl RebuildRun {
         // The person's choice of mode is a session setting. A run that waited its turn uses the mode
         // now, not the one when it was queued; a tool holds the session while it starts a run, so it
         // passes the mode instead, and the saved settings are the last fallback.
-        let clean_room = hub
-            .engine
-            .try_session()
-            .map(|s| s.clean_room())
-            .or(opts.clean_room)
-            .unwrap_or_else(|| !craft_anything_engine::Settings::load_from(&hub.settings_path()).deep_mode);
-        let run_deep = !clean_room;
+        let run_deep = run_deep_mode(hub, &opts);
+        let clean_room = !run_deep;
         // A study is only carried on in the mode it was made in. A session kept in the other mode
         // may have read inside the original, and its capture must not be handed to this run.
         let saved_in_mode = ws.builder_session_in(run_deep);
@@ -287,7 +299,7 @@ impl RebuildRun {
         };
         // A chosen extractor (an API backend, e.g. Kimi K3) takes a game's files out after a fresh
         // study; the run only uses it in Deep mode on a game (see Worker::extract).
-        let fresh = opts.message.is_none() || !ws.capture_dir().exists();
+        let fresh = opts.message.is_none() || !capture_in_mode(&ws, run_deep);
         let extractor = match hub.chosen(Role::Extractor).and_then(|n| hub.config().get(&n).cloned()) {
             Some(e) if fresh && e.config.kind != BackendKind::AgentCli && !clean_room => {
                 let _ = std::fs::remove_file(ws.root.join(EXTRACT_TRANSCRIPT));
@@ -811,14 +823,14 @@ impl Worker {
             }
         }
         self.attach(ws)?;
+        let run_deep = !self.engine.session().clean_room();
         std::fs::create_dir_all(ws.app_dir()).map_err(|e| ToolError::io(ws.app_dir().display(), e))?;
         let no_kind = || {
             ToolError::new(ErrorCode::BadSettings, "No kind of project matches this request.")
                 .with_remediation("Describe what to make: a website, an app or a game.")
         };
         if ws.manifest.stack.is_empty() {
-            let deep = !self.engine.session().clean_room();
-            ws.manifest.stack = project::first_stack(&opts.kinds, ws, deep).ok_or_else(no_kind)?.to_string();
+            ws.manifest.stack = project::first_stack(&opts.kinds, ws, run_deep).ok_or_else(no_kind)?.to_string();
             ws.save()?;
         }
         let kind = opts.kinds.detect(&ws.manifest.request, &ws.manifest.target, &ws.manifest.stack).ok_or_else(no_kind)?;
@@ -828,16 +840,16 @@ impl Worker {
         let api_resumed = api.as_ref().is_some_and(crate::agent::ApiConversation::resumed);
         let kept = KeptHistory { in_mode: kept_without_api.in_mode || api_resumed, elsewhere: kept_without_api.elsewhere };
         let carrying_on = is_carrying_on(opts, kept.in_mode);
-        let first = starts_with_study(opts, kept, ws.capture_dir().exists());
+        let first = starts_with_study(opts, kept, capture_in_mode(ws, run_deep));
         if first {
-            self.study(ws, kind)?;
+            self.study(ws, kind, run_deep)?;
             if let Some((name, ex)) = extractor {
                 self.extract(ws, kind, &name, ex)?;
             }
         } else {
             // An API builder over SSH still calls tools in this process, so only a coding agent
             // on the other computer has a tool server this one can't hand the program to.
-            self.reopen_target(ws, kind, study::tools_run_remotely(remote, api.is_some()))?;
+            self.reopen_target(ws, kind, study::tools_run_remotely(remote, api.is_some()), run_deep)?;
         }
         // A coding agent resumes its own session; our loop resumes its kept transcript.
         let resumable = api.as_ref().is_none_or(crate::agent::ApiConversation::resumed);
@@ -1032,7 +1044,8 @@ impl Worker {
                 prompt = p;
                 continue;
             }
-            let not_good = checks.iter().find(|c| !c.good(opts.good_enough));
+            let kind_checks = kind.checks(ws);
+            let not_good = checks.iter().find(|c| !c.good(opts.good_enough) && kinds::can_refine(&kind_checks, c));
             if not_good.is_some() && progress_available && progress.stalled() {
                 // A check-only resume skipped the builder's before-turn scan. A real edit
                 // while the project was closed (or during this check) still starts an attempt.
@@ -1493,7 +1506,7 @@ const API_BUILDER: &str = "Your tools: build_files_list, build_file_read, build_
 const BLIND_BUILDER: &str = " You can't look at pictures: use capture/README.md, capture/capture.json and the evidence instead.";
 
 /// Added to a refinement for a builder that can check its own work.
-const CHECK_BEFORE_REPLYING: &str = " Before you reply, check your build again with rebuild_check and fix what it still lists.";
+const CHECK_BEFORE_REPLYING: &str = " Before you reply, check your build again with rebuild_check. Fix the results it says another builder turn can resolve, and state any remaining unverified comparisons.";
 
 /// The backend the person chose for this project, while it's still set up and on (else the
 /// default builds it).

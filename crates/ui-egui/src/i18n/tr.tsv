@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	Bir Unity oyununun IL2CPP üst verisini oku
 Read a game's files	Bir oyunun dosyalarını oku
 Read a project file	Bir proje dosyasını oku
 Read a setting	Bir ayarı oku
+Read a text file	Bir metin dosyasını oku
 Read an app's screen	Bir uygulamanın ekranını oku
 Read bytes	Baytları oku
 Read comment	Yorumu oku
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	{name} sunucusuna bağlanılıyor… {seconds} sn
 Forget a website sign-in	Bir web sitesinin oturumunu unut
 Sign in to a website	Bir web sitesinde oturum aç
+Stopped adding {name}.	{name} eklenmesi durduruldu.
+It isn't there any more, so {program} runs in its place.	Artık orada değil, bu yüzden yerine {program} çalışıyor.
+Use it	Bunu kullan

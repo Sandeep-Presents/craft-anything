@@ -893,6 +893,7 @@ Read a Unity game's IL2CPP metadata	อ่านเมทาดาทา IL2CPP 
 Read a game's files	อ่านไฟล์ของเกม
 Read a project file	อ่านไฟล์โปรเจกต์
 Read a setting	อ่านการตั้งค่า
+Read a text file	อ่านไฟล์ข้อความ
 Read an app's screen	อ่านหน้าจอแอป
 Read bytes	อ่านไบต์
 Read comment	อ่านคอมเมนต์
@@ -1465,3 +1466,6 @@ Default follows Auto mode: with it on, what can be undone goes ahead and the res
 Connecting to {name}… {seconds} s	กำลังเชื่อมต่อกับ {name}… {seconds} วินาที
 Forget a website sign-in	ลืมการลงชื่อเข้าใช้เว็บไซต์
 Sign in to a website	ลงชื่อเข้าใช้เว็บไซต์
+Stopped adding {name}.	หยุดเพิ่ม {name} แล้ว
+It isn't there any more, so {program} runs in its place.	ไม่มีอยู่ที่นั่นแล้ว จึงใช้ {program} แทน
+Use it	ใช้อันนี้

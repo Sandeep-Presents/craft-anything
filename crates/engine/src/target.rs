@@ -90,6 +90,8 @@ pub enum TargetKind {
     DosCom,
     /// Raw bytes with a user-declared architecture (firmware, shellcode).
     RawBinary,
+    /// Plain text, such as notes, source files and settings.
+    Text,
     Unknown,
 }
 
@@ -116,6 +118,7 @@ impl TargetKind {
             TargetKind::Sqlite => "A SQLite database (how an app stores its data)",
             TargetKind::DosCom => "A DOS program",
             TargetKind::RawBinary => "Raw machine code",
+            TargetKind::Text => "A text file (notes, source code or settings)",
             TargetKind::Unknown => "A file we don't recognise yet",
         }
     }
@@ -123,6 +126,31 @@ impl TargetKind {
     pub fn id(self) -> String {
         serde_json::to_value(self).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_else(|| "unknown".into())
     }
+}
+
+/// Whether an otherwise unknown file looks like text. Inspect at most 8 KiB:
+/// a byte-order mark counts as text, otherwise require valid UTF-8, no NULs
+/// and few control bytes. Empty input is not text.
+pub fn looks_like_text(bytes: &[u8]) -> bool {
+    const SNIFF: usize = 8 * 1024;
+    if bytes.starts_with(b"\xEF\xBB\xBF") || bytes.starts_with(b"\xFF\xFE") || bytes.starts_with(b"\xFE\xFF") {
+        return true;
+    }
+    let head = bytes.get(..bytes.len().min(SNIFF)).unwrap_or_default();
+    if head.is_empty() || head.contains(&0) {
+        return false;
+    }
+    let cut_at_end = bytes.len() > SNIFF;
+    let mut chunks = head.utf8_chunks().peekable();
+    while let Some(chunk) = chunks.next() {
+        // The window may end inside a character; only that last sequence may be incomplete.
+        let last = chunks.peek().is_none();
+        if !chunk.invalid().is_empty() && !(last && cut_at_end && chunk.invalid().len() < 4) {
+            return false;
+        }
+    }
+    let control = head.iter().filter(|b| b.is_ascii_control() && !matches!(b, b'\t' | b'\n' | b'\r' | 0x0c | 0x1b)).count();
+    control.saturating_mul(100) <= head.len()
 }
 
 /// Sniff the kind from the first bytes (and the name, only to break ties).
@@ -166,6 +194,8 @@ pub fn sniff(bytes: &[u8], name: &str) -> TargetKind {
         TargetKind::DosCom
     } else if [".js", ".mjs", ".cjs", ".html", ".htm", ".ts"].iter().any(|e| lower.ends_with(e)) {
         TargetKind::Script
+    } else if looks_like_text(bytes) {
+        TargetKind::Text
     } else {
         TargetKind::Unknown
     }
@@ -256,5 +286,12 @@ mod tests {
         assert_eq!(sniff(b"SQLite format 3\0\x10\x00", "app.db"), TargetKind::Sqlite);
         assert_eq!(sniff(b"", "x"), TargetKind::Unknown);
         assert_eq!(sniff(b"console.log(1)", "main.js"), TargetKind::Script);
+        assert_eq!(sniff(b"# Notes\n", "notes.md"), TargetKind::Text);
+        assert_eq!(sniff(b"key = true\n", "config.toml"), TargetKind::Text);
+        assert_eq!(sniff(b"\xEF\xBB\xBFhello", "notes.txt"), TargetKind::Text);
+        assert_eq!(sniff(b"\xFF\xFEh\0i\0", "notes.txt"), TargetKind::Text);
+        assert_eq!(sniff(b"\0\xFF\x02", "notes.md"), TargetKind::Unknown);
+        assert_eq!(TargetKind::Text.id(), "text");
+        assert!(TargetKind::Text.plain().contains("text file"));
     }
 }

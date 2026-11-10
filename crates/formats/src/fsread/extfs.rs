@@ -10,6 +10,7 @@
 
 use super::{FsEntry, FsImage, Limits, is_dot, join};
 use crate::bytes::Reader;
+use std::collections::BTreeSet;
 
 struct Sb {
     block_size: u64,
@@ -224,15 +225,14 @@ fn file_data(data: &[u8], sb: &Sb, inode_off: u64, flags: u32, size: u64, limits
 }
 
 #[allow(clippy::too_many_arguments)]
-fn walk(data: &[u8], sb: &Sb, ino: u32, parent: &str, limits: &Limits, img: &mut FsImage, depth: usize, seen: &mut Vec<u32>) {
+fn walk(data: &[u8], sb: &Sb, ino: u32, parent: &str, limits: &Limits, img: &mut FsImage, depth: usize, seen: &mut BTreeSet<u32>) {
     if depth > limits.max_depth || seen.len() > limits.max_entries {
         img.complete = false;
         return;
     }
-    if seen.contains(&ino) {
+    if !seen.insert(ino) {
         return;
     }
-    seen.push(ino);
     let Some(inode_off) = inode_offset(data, sb, ino) else { return };
     let r = Reader::new(data);
     let io = usize::try_from(inode_off).ok().filter(|&o| o.checked_add(128).is_some_and(|end| end <= data.len()));
@@ -271,7 +271,7 @@ fn walk(data: &[u8], sb: &Sb, ino: u32, parent: &str, limits: &Limits, img: &mut
 }
 
 #[allow(clippy::too_many_arguments)]
-fn child_entry(data: &[u8], sb: &Sb, ino: u32, ftype: u8, path: String, limits: &Limits, img: &mut FsImage, depth: usize, seen: &mut Vec<u32>) {
+fn child_entry(data: &[u8], sb: &Sb, ino: u32, ftype: u8, path: String, limits: &Limits, img: &mut FsImage, depth: usize, seen: &mut BTreeSet<u32>) {
     // ftype: 1=file, 2=dir, 7=symlink (when the filetype feature is on); fall back to i_mode.
     let Some(io) = inode_offset(data, sb, ino).and_then(|o| usize::try_from(o).ok()).filter(|&o| o.checked_add(128).is_some_and(|end| end <= data.len()))
     else {
@@ -314,7 +314,7 @@ pub fn read(data: &[u8], limits: &Limits) -> FsImage {
         img.warn("filesystem is encrypted; file contents are not decrypted");
         img.complete = false;
     }
-    let mut seen = Vec::new();
+    let mut seen = BTreeSet::new();
     walk(data, &sb, 2, "", limits, &mut img, 0, &mut seen);
     img
 }

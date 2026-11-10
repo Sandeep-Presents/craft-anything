@@ -33,9 +33,7 @@ fn every_addressor_kind_is_named() {
         assert_eq!(dm(&format!("$s4main1xSiv{code}")), format!("main.x.{name} : Swift.Int"));
     }
     assert_eq!(dm("$s4main1AV1xSivauZ"), "static main.A.x.unsafeMutableAddressor : Swift.Int");
-    // `swift-demangle` prints a subscript's accessor before its type:
-    // `main.A.subscript.unsafeMutableAddressor : (Swift.Int) -> Swift.Int`.
-    assert_eq!(dm("$s4main1AVyS2iciau"), "main.A.subscript(Swift.Int) -> Swift.Int.unsafeMutableAddressor");
+    assert_eq!(dm("$s4main1AVyS2iciau"), "main.A.subscript.unsafeMutableAddressor : (Swift.Int) -> Swift.Int");
 }
 
 /// `swift-demangle` decodes none of these: no kind letter, or one it doesn't know.

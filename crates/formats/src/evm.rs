@@ -6,6 +6,7 @@
 use crate::FormatError;
 use serde::Serialize;
 use serde_json::{Map, Value};
+use std::collections::BTreeSet;
 
 /// Largest bytecode we analyse (16 MiB; deployed contracts are at most 24 KiB).
 pub const MAX_CODE: usize = 16 << 20;
@@ -337,10 +338,15 @@ fn cbor_item(b: &[u8], pos: &mut usize, depth: u32) -> Option<Value> {
             }
             let mut m = Map::new();
             for _ in 0..n {
-                let k = match cbor_item(b, pos, depth + 1)? {
-                    Value::String(s) => s,
-                    other => other.to_string(),
-                };
+                // The metadata view uses JSON object keys. Coercing other CBOR key
+                // types to strings can merge distinct keys and hide bytecode.
+                if b.get(*pos).map(|byte| byte >> 5) != Some(3) {
+                    return None;
+                }
+                let Value::String(k) = cbor_item(b, pos, depth + 1)? else { return None };
+                if m.contains_key(&k) {
+                    return None;
+                }
                 let v = cbor_item(b, pos, depth + 1)?;
                 let v = match (k.as_str(), &v) {
                     ("solc", Value::String(s)) if s.starts_with("0x") && s.len() == 8 => {
@@ -455,6 +461,7 @@ pub fn analyze(code: &[u8]) -> Result<EvmInterface, FormatError> {
         .any(|(k, i)| i.op == 0x34 && rejects_value(body, &ins, k, &index_of));
 
     let mut functions: Vec<EvmFunction> = Vec::new();
+    let mut selectors = BTreeSet::new();
     let mut splits = 0usize;
     let mut last_jumpi: Option<usize> = None;
     let mut solc_like = 0usize;
@@ -510,10 +517,10 @@ pub fn analyze(code: &[u8]) -> Result<EvmInterface, FormatError> {
         if n < 4 && extraction.is_none() {
             continue;
         }
-        let selector = format!("0x{sel:08x}");
-        if functions.iter().any(|f| f.selector == selector) {
+        if !selectors.insert(sel) {
             continue;
         }
+        let selector = format!("0x{sel:08x}");
         if pattern == "eq-jumpi" {
             solc_like += 1;
         } else {
