@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	无法更改审批：
 What the builder may do without asking you, in this project.	在这个项目中，构建助手无需问你就可以做的事。
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	默认跟随自动模式：开启时，可撤销的操作会执行，其余的会被拒绝；关闭时，构建助手会询问。
 Connecting to {name}… {seconds} s	正在连接 {name}… {seconds} 秒
+Forget a website sign-in	忘记网站登录
+Sign in to a website	登录网站

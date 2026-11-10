@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	เปลี่ยนการอนุมัต�
 What the builder may do without asking you, in this project.	สิ่งที่ตัวสร้างทำได้โดยไม่ถามในโปรเจกต์นี้
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	ค่าเริ่มต้นตามโหมดอัตโนมัติ: เปิดไว้จะทำสิ่งที่ย้อนกลับได้ต่อและปฏิเสธที่เหลือ ปิดไว้ตัวสร้างจะถาม
 Connecting to {name}… {seconds} s	กำลังเชื่อมต่อกับ {name}… {seconds} วินาที
+Forget a website sign-in	ลืมการลงชื่อเข้าใช้เว็บไซต์
+Sign in to a website	ลงชื่อเข้าใช้เว็บไซต์

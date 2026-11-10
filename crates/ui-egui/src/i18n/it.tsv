@@ -1465,3 +1465,5 @@ Couldn't change the approvals:	Impossibile cambiare le approvazioni:
 What the builder may do without asking you, in this project.	Cosa può fare il costruttore senza chiedertelo, in questo progetto.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	Predefinito segue la modalità automatica: se è attiva, ciò che si può annullare va avanti e il resto è rifiutato; se è spenta, il costruttore chiede.
 Connecting to {name}… {seconds} s	Connessione a {name}… {seconds} s
+Forget a website sign-in	Dimentica l'accesso a un sito web
+Sign in to a website	Accedi a un sito web

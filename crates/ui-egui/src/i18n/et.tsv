@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	Kinnitusi ei õnnestunud muuta:
 What the builder may do without asking you, in this project.	Mida ehitaja tohib selles projektis sinult küsimata teha.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	Vaikimisi järgib automaatrežiimi: kui see on sees, tehakse tagasipööratavad toimingud ära ja ülejäänud keeldutakse; kui see on väljas, küsib ehitaja.
 Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
+Forget a website sign-in	Unusta veebisaidi sisselogimine
+Sign in to a website	Logi veebisaidile sisse

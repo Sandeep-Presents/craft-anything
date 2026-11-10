@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	Não foi possível alterar as aprovações:
 What the builder may do without asking you, in this project.	O que o agente pode fazer sem perguntar a você, neste projeto.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	A opção Padrão segue o Modo automático: com ele ativado, o que pode ser desfeito é executado e o restante é recusado; com ele desativado, o agente pergunta antes.
 Connecting to {name}… {seconds} s	Conectando a {name}… {seconds} s
+Forget a website sign-in	Esquecer o login de um site
+Sign in to a website	Entrar em um site

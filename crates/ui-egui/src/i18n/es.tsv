@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	No se pudieron cambiar las aprobaciones:
 What the builder may do without asking you, in this project.	Lo que el constructor puede hacer sin preguntarte, en este proyecto.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	Predeterminado sigue al modo automático: activado, lo que se puede deshacer se hace y el resto se rechaza; desactivado, el constructor pregunta.
 Connecting to {name}… {seconds} s	Conectando con {name}… {seconds} s
+Forget a website sign-in	Olvidar el inicio de sesión de un sitio web
+Sign in to a website	Iniciar sesión en un sitio web

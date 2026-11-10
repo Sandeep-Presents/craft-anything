@@ -1463,3 +1463,5 @@ Couldn't change the approvals:	無法變更審核：
 What the builder may do without asking you, in this project.	在這個專案中，建置助手不必問你就可以做的事。
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	預設跟隨自動模式：開啟時，可復原的操作會執行，其餘會被拒絕；關閉時，建置助手會詢問。
 Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
+Forget a website sign-in	忘記網站登入
+Sign in to a website	登入網站
