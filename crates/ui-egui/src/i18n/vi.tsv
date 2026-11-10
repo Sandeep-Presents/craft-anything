@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	Đang kết nối với {name}… {seconds} 
 Stopped adding {name}.	Đã dừng thêm {name}.
 It isn't there any more, so {program} runs in its place.	Nó không còn ở đó nữa, nên {program} chạy thay thế.
 Use it	Dùng nó
+Earlier investigations	Các cuộc điều tra trước
+Continue an earlier investigation	Tiếp tục một cuộc điều tra trước
+Read earlier investigations	Đọc các cuộc điều tra trước
+Open the investigation	Mở cuộc điều tra
+Carrying on with an earlier investigation: {question}	Tiếp tục cuộc điều tra trước: {question}
+Carrying on with an earlier investigation.	Tiếp tục một cuộc điều tra trước.
+Hide earlier investigations	Ẩn các cuộc điều tra trước
+Show earlier investigations	Hiện các cuộc điều tra trước
+Investigation	Cuộc điều tra
+{when} · {evidence} evidence records · {findings} findings	{when} · {evidence} bằng chứng · {findings} phát hiện
+Couldn't open that investigation.	Không mở được cuộc điều tra đó.

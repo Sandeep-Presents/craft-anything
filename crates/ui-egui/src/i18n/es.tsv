@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	Conectando con {name}… {seconds} s
 Stopped adding {name}.	Se dejó de añadir {name}.
 It isn't there any more, so {program} runs in its place.	Ya no está ahí, así que se usa {program} en su lugar.
 Use it	Usarlo
+Earlier investigations	Investigaciones anteriores
+Continue an earlier investigation	Continuar una investigación anterior
+Read earlier investigations	Leer las investigaciones anteriores
+Open the investigation	Abrir la investigación
+Carrying on with an earlier investigation: {question}	Seguimos con una investigación anterior: {question}
+Carrying on with an earlier investigation.	Seguimos con una investigación anterior.
+Hide earlier investigations	Ocultar las investigaciones anteriores
+Show earlier investigations	Mostrar las investigaciones anteriores
+Investigation	Investigación
+{when} · {evidence} evidence records · {findings} findings	{when} · {evidence} pruebas · {findings} hallazgos
+Couldn't open that investigation.	No se pudo abrir esa investigación.

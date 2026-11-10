@@ -23,6 +23,7 @@ impl CraftApp {
     pub fn refresh_projects(&mut self) {
         let locations = self.settings.project_locations();
         self.jobs.spawn("Read projects", false, move |_| Ok(Done::Projects(Workspace::list_in(&locations))));
+        self.refresh_investigations();
     }
 
     /// The open project is building or waiting its turn.

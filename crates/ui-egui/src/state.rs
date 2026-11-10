@@ -450,6 +450,9 @@ pub struct UiState {
     /// The sidebar's Pinned section is folded away.
     #[serde(default)]
     pub pins_collapsed: bool,
+    /// The sidebar's Earlier investigations are listed (folded away at first).
+    #[serde(default)]
+    pub investigations_shown: bool,
     /// The project's prompt box asks questions about the build instead of asking for changes.
     #[serde(default)]
     pub just_ask: bool,
@@ -572,6 +575,7 @@ impl Default for UiState {
             rename_input: String::new(),
             sidebar_folded: false,
             pins_collapsed: false,
+            investigations_shown: false,
             just_ask: false,
             plan_height: None,
             pin_draft: Default::default(),

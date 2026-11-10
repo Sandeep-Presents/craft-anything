@@ -72,6 +72,8 @@ const ACTIONS: &[Action] = &[
     a("set_approval",        "what one kind of builder action gets: allow, ask or refuse", Tool(&["project_approvals_set"])),
     a("ask_pin",             "pin a build, frozen or light (its size first)",  Tool(&["project_pin_create"])),
     a("refresh_pins",        "the sidebar's pinned builds, and which run",     Tool(&["project_pins_list"])),
+    a("refresh_investigations", "the sidebar's earlier investigations",       Tool(&["core_investigations_list"])),
+    a("open_investigation",  "carry on with an earlier investigation",         Tool(&["core_investigation_open"])),
     a("open_pin",            "open a pinned build (or another copy)",          Tool(&["project_pin_open"])),
     a("stop_pin",            "close what a pin opened",                        Tool(&["project_pin_stop"])),
     a("add_pictures",        "pictures of the original for the builder",       Tool(&["rebuild_start"])),

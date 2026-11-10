@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	{name}에 연결하는 중… {seconds}초
 Stopped adding {name}.	{name} 추가를 멈췄습니다.
 It isn't there any more, so {program} runs in its place.	더 이상 그곳에 없어서 대신 {program}이(가) 실행됩니다.
 Use it	이것 사용
+Earlier investigations	이전 조사
+Continue an earlier investigation	이전 조사 이어서 하기
+Read earlier investigations	이전 조사 읽기
+Open the investigation	조사 열기
+Carrying on with an earlier investigation: {question}	이전 조사를 이어서 합니다: {question}
+Carrying on with an earlier investigation.	이전 조사를 이어서 합니다.
+Hide earlier investigations	이전 조사 숨기기
+Show earlier investigations	이전 조사 보기
+Investigation	조사
+{when} · {evidence} evidence records · {findings} findings	{when} · 증거 {evidence}개 · 발견 {findings}개
+Couldn't open that investigation.	그 조사를 열 수 없습니다.

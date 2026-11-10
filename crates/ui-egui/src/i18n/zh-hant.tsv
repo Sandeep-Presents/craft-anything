@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
 Stopped adding {name}.	已停止新增 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那裡，因此改用 {program}。
 Use it	使用它
+Earlier investigations	先前的調查
+Continue an earlier investigation	繼續先前的調查
+Read earlier investigations	讀取先前的調查
+Open the investigation	開啟調查
+Carrying on with an earlier investigation: {question}	繼續先前的調查：{question}
+Carrying on with an earlier investigation.	繼續先前的調查。
+Hide earlier investigations	隱藏先前的調查
+Show earlier investigations	顯示先前的調查
+Investigation	調查
+{when} · {evidence} evidence records · {findings} findings	{when} · {evidence} 筆證據 · {findings} 項發現
+Couldn't open that investigation.	無法開啟該調查。

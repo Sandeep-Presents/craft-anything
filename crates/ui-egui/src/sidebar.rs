@@ -63,6 +63,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         section_gap(ui, fold, 18.0);
         // Pinned builds, between the screens and the projects, to open in one click.
         crate::pins::section(app, ui, fold);
+        crate::investigations::section(app, ui, fold);
         // Folded, the heading's words don't fit: the rule and the icon stay, on the same line, so
         // nothing moves when the sidebar folds.
         let refresh = |ui: &mut Ui| icons::button(ui, "refresh-cw", 22.0, false, "Look for projects again").clicked();

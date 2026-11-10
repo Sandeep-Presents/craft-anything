@@ -36,6 +36,8 @@ pub const TOOLS: &[&str] = &[
     "core_finding_edit",
     "core_handoff_write",
     "core_journal_read",
+    "core_investigations_list",
+    "core_investigation_open",
     "core_report_save",
     "core_report_write",
     // Generated pictures and models, and the keys that pay for them.

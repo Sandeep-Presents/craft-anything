@@ -22,6 +22,7 @@ pub mod home;
 pub mod i18n;
 mod icon_data;
 pub mod icons;
+pub mod investigations;
 pub mod jobs;
 pub mod just_ask;
 pub mod make;
@@ -47,6 +48,7 @@ pub mod workbench;
 
 use craft_anything_ai::{AgentEvent, AiHub, BackendConfig, Conversation, Detected};
 use craft_anything_engine::evidence::{ErrorCode, Evidence, ToolError, Unknown};
+use craft_anything_engine::tools::investigation_history;
 use craft_anything_engine::{CallOptions, Caller, Consent, Engine, Mode, Settings, TargetKind, ToolOutput, clean_room};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -500,6 +502,8 @@ pub struct CraftApp {
     pub workspace: Option<craft_anything_engine::workspace::Workspace>,
     /// Every project in the projects folder, newest first.
     pub projects: Vec<craft_anything_engine::workspace::Workspace>,
+    /// What chats with no project open kept, newest first (`investigations`).
+    pub investigations: Vec<craft_anything_engine::tools::investigation_history::EarlierInvestigation>,
     /// A preview server for a project opened without a run.
     pub preview: Option<String>,
     /// Questions asked about each project's build this session, and their answers (`just_ask`).
@@ -608,6 +612,7 @@ impl CraftApp {
             session_usage: Default::default(),
             workspace: None,
             projects: Vec::new(),
+            investigations: Vec::new(),
             preview: None,
             pins: Vec::new(),
             pinned_copy_bytes: None,
@@ -988,6 +993,9 @@ impl CraftApp {
             ("project_play", Err(e)) => self.toast(format!("{} {}", tr("Couldn't start it."), e.for_people()), true),
             ("project_assets_budget" | "project_assets_allow", Ok(_)) => self.assets_changed(),
             ("rebuild_question_ask", r) => self.question_done(r),
+            (investigation_history::LIST_TOOL, Ok(v)) => self.investigations_listed(&v),
+            (investigation_history::OPEN_TOOL, Ok(v)) => self.investigation_opened(&v),
+            (investigation_history::OPEN_TOOL, Err(e)) => self.toast(format!("{} {}", tr("Couldn't open that investigation."), e.for_people()), true),
             ("project_build_finish", Ok(v)) => {
                 if let Some(ws) = self.workspace.as_mut().filter(|w| v["project"].as_str().is_some_and(|p| w.root == std::path::Path::new(p))) {
                     let _ = ws.reload();

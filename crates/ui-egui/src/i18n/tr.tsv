@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	{name} sunucusuna bağlanılıyor… {second
 Stopped adding {name}.	{name} eklenmesi durduruldu.
 It isn't there any more, so {program} runs in its place.	Artık orada değil, bu yüzden yerine {program} çalışıyor.
 Use it	Bunu kullan
+Earlier investigations	Önceki incelemeler
+Continue an earlier investigation	Önceki bir incelemeye devam et
+Read earlier investigations	Önceki incelemeleri oku
+Open the investigation	İncelemeyi aç
+Carrying on with an earlier investigation: {question}	Önceki bir incelemeye devam ediliyor: {question}
+Carrying on with an earlier investigation.	Önceki bir incelemeye devam ediliyor.
+Hide earlier investigations	Önceki incelemeleri gizle
+Show earlier investigations	Önceki incelemeleri göster
+Investigation	İnceleme
+{when} · {evidence} evidence records · {findings} findings	{when} · {evidence} kanıt · {findings} bulgu
+Couldn't open that investigation.	Bu inceleme açılamadı.

@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	Подключение к {name}… {seconds
 Stopped adding {name}.	Добавление {name} остановлено.
 It isn't there any more, so {program} runs in its place.	Его там больше нет, поэтому вместо него запускается {program}.
 Use it	Использовать
+Earlier investigations	Прежние исследования
+Continue an earlier investigation	Продолжить прежнее исследование
+Read earlier investigations	Прочитать прежние исследования
+Open the investigation	Открыть исследование
+Carrying on with an earlier investigation: {question}	Продолжаем прежнее исследование: {question}
+Carrying on with an earlier investigation.	Продолжаем прежнее исследование.
+Hide earlier investigations	Скрыть прежние исследования
+Show earlier investigations	Показать прежние исследования
+Investigation	Исследование
+{when} · {evidence} evidence records · {findings} findings	{when} · доказательств: {evidence} · выводов: {findings}
+Couldn't open that investigation.	Не удалось открыть это исследование.

@@ -159,7 +159,7 @@ impl Session {
         }
         let investigation = crate::tools::investigation_tools::load(self);
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|error| ToolError::internal(error.to_string()))?;
-        let root = self.config_dir().join("investigations").join(format!("session-{}.cany", stamp.as_nanos()));
+        let root = crate::tools::investigation_history::folder(&self.config_dir()).join(format!("session-{}.cany", stamp.as_nanos()));
         let project = Project::create(&root, "Investigation", crate::project::Purpose::default())?;
         for evidence in self.ledger() {
             project.store_evidence(evidence)?;

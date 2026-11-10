@@ -1466,3 +1466,14 @@ Connecting to {name}… {seconds} s	{name}-თან დაკავშირე
 Stopped adding {name}.	{name}-ის დამატება შეჩერდა.
 It isn't there any more, so {program} runs in its place.	ის აღარ არის იქ, ამიტომ მის ნაცვლად {program} ეშვება.
 Use it	გამოყენება
+Earlier investigations	წინა გამოძიებები
+Continue an earlier investigation	წინა გამოძიების გაგრძელება
+Read earlier investigations	წინა გამოძიებების წაკითხვა
+Open the investigation	გამოძიების გახსნა
+Carrying on with an earlier investigation: {question}	ვაგრძელებთ წინა გამოძიებას: {question}
+Carrying on with an earlier investigation.	ვაგრძელებთ წინა გამოძიებას.
+Hide earlier investigations	წინა გამოძიებების დამალვა
+Show earlier investigations	წინა გამოძიებების ჩვენება
+Investigation	გამოძიება
+{when} · {evidence} evidence records · {findings} findings	{when} · მტკიცებულება: {evidence} · მიგნება: {findings}
+Couldn't open that investigation.	ამ გამოძიების გახსნა ვერ მოხერხდა.

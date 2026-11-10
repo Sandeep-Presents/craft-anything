@@ -3200,3 +3200,36 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
     let start = h.get_by_label("Start").rect();
     assert!(start.left() >= 0.0 && start.right() <= content.right(), "Start ({start:?}) stays inside the window ({content:?})");
 }
+
+/// Earlier chats' investigations are in the sidebar, folded at first, and opening one carries on
+/// with it (#1395).
+#[test]
+fn an_earlier_investigation_is_reopened_from_the_sidebar() {
+    use craft_anything_engine::{CallOptions, Caller, Engine, Session};
+    // Its own config folder: the investigation is written there, not in the real one.
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().to_path_buf();
+    let mut h = harness(move || {
+        let mut session = Session::isolated(&config);
+        session.settings.first_run_done = true;
+        session.settings.language = "en".into();
+        let a = demo::app(std::sync::Arc::new(Engine::new(session)));
+        a.engine.call("core_brief_write", serde_json::json!({ "question": "What does it send?" }), CallOptions::new(Caller::Ui)).unwrap();
+        let mut s = a.engine.session();
+        s.ensure_shared_project().unwrap();
+        s.clear_ledger();
+        s.project = None;
+        drop(s);
+        a
+    });
+    h.state_mut().refresh_projects();
+    assert!(wait(&mut h, |a| !a.investigations.is_empty()));
+    h.run_steps(2);
+    assert!(h.query_by_label("What does it send?").is_none(), "folded at first");
+    h.get_by_label("Show earlier investigations").click();
+    h.run_steps(3);
+    h.get_by_label("What does it send?").click();
+    assert!(wait(&mut h, |a| a.engine.try_session().is_some_and(|s| s.project.is_some())));
+    assert!(wait(&mut h, |a| a.state.chat.iter().any(|c| matches!(c, ChatItem::Status(t) if t.contains("What does it send?")))));
+    assert_eq!(h.state().state.screen, Screen::Ask);
+}

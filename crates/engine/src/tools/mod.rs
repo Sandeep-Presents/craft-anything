@@ -18,6 +18,7 @@
 use crate::session::Session;
 use craft_anything_evidence::{Environment, EvidenceBuilder, ToolError};
 
+pub mod investigation_history;
 pub mod investigation_tools;
 // Readable Markdown/HTML investigation reports from findings + evidence.
 pub mod native_annotate;
@@ -133,6 +134,7 @@ pub fn all() -> Vec<crate::ToolSpec> {
     v.extend(web_runtime_tools::specs());
     v.extend(application_tools::specs());
     v.extend(investigation_tools::specs());
+    v.extend(investigation_history::specs());
     v.extend(report_tools::specs());
     v.extend(native_listing::specs());
     v.extend(native_function::specs());
