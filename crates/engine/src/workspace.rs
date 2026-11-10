@@ -168,25 +168,55 @@ pub enum TargetRef {
     Local {
         path: PathBuf,
     },
+    /// An app installed on a phone or TV reached over adb: the device's serial (as
+    /// `adb_devices_find` lists it) and the app's package name. Studied as a person uses it.
+    Device {
+        serial: String,
+        package: String,
+    },
     /// Only a description.
     None,
 }
 
 impl TargetRef {
-    /// A URL becomes a website; an existing path a local target; anything else nothing.
+    /// What a device target is written as: `adb:<serial>/<package>`.
+    pub const DEVICE_PREFIX: &'static str = "adb:";
+
+    /// A URL becomes a website; `adb:<serial>/<package>` an app on a device; an existing path a
+    /// local target; anything else nothing.
     pub fn parse(s: &str) -> TargetRef {
         let t = s.trim().trim_matches('"');
         if t.starts_with("http://") || t.starts_with("https://") {
             return TargetRef::Website { url: t.to_string() };
         }
+        if let Some(rest) = t.strip_prefix(Self::DEVICE_PREFIX) {
+            return Self::parse_device(rest).unwrap_or(TargetRef::None);
+        }
         let p = PathBuf::from(t);
         if !t.is_empty() && p.is_absolute() && p.exists() { TargetRef::Local { path: p } } else { TargetRef::None }
+    }
+
+    /// `<serial>/<package>` with both parts valid, else why not.
+    pub fn parse_device(s: &str) -> Result<TargetRef, ToolError> {
+        let (serial, package) = s.trim().rsplit_once('/').ok_or_else(|| {
+            ToolError::invalid(format!("not an app on a device: {s:?}"))
+                .with_remediation("Write it as adb:<serial>/<package>, e.g. adb:192.168.1.20:5555/com.example.tv; adb_devices_find lists the serials.")
+        })?;
+        let serial = craft_anything_engines::adb::validate_serial(serial.trim())?;
+        let package = craft_anything_engines::adb::validate_package(package.trim())?;
+        Ok(TargetRef::Device { serial: serial.to_string(), package: package.to_string() })
+    }
+
+    /// Whether this is written as a device target (`adb:…`), whether or not it parses.
+    pub fn looks_like_device(s: &str) -> bool {
+        s.trim().trim_matches('"').starts_with(Self::DEVICE_PREFIX)
     }
 
     pub fn label(&self) -> String {
         match self {
             TargetRef::Website { url } => url.clone(),
             TargetRef::Local { path } => path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string()),
+            TargetRef::Device { serial, package } => format!("{package} on {serial}"),
             TargetRef::None => String::new(),
         }
     }
@@ -677,6 +707,8 @@ pub fn suggest_name(request: &str, target: &TargetRef) -> String {
             host.trim_start_matches("www.").to_string()
         }
         TargetRef::Local { path } => path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
+        // The last segment of the package name: "tv" for com.example.tv, "app" for com.example.app.
+        TargetRef::Device { package, .. } => package.rsplit('.').next().unwrap_or(package).to_string(),
         TargetRef::None => request.split_whitespace().take(5).collect::<Vec<_>>().join(" "),
     }
 }
@@ -1586,6 +1618,22 @@ mod tests {
     fn targets_parse() {
         assert_eq!(TargetRef::parse(" https://a.com "), TargetRef::Website { url: "https://a.com".into() });
         assert_eq!(TargetRef::parse("just words"), TargetRef::None);
+        // An app on a device: the serial (an address works) and the package, both checked.
+        let device = TargetRef::Device { serial: "192.168.1.20:5555".into(), package: "com.example.tv".into() };
+        assert_eq!(TargetRef::parse(" adb:192.168.1.20:5555/com.example.tv "), device);
+        assert_eq!(
+            TargetRef::parse("adb:emulator-5554/com.example.tv"),
+            TargetRef::Device { serial: "emulator-5554".into(), package: "com.example.tv".into() }
+        );
+        assert_eq!(TargetRef::parse("adb:192.168.1.20:5555"), TargetRef::None, "no package");
+        assert_eq!(TargetRef::parse("adb:192.168.1.20:5555/not a package"), TargetRef::None);
+        assert_eq!(TargetRef::parse("adb:bad serial!/com.example.tv"), TargetRef::None);
+        assert!(TargetRef::parse_device("x").is_err() && TargetRef::looks_like_device("adb:x") && !TargetRef::looks_like_device("https://x"));
+        assert_eq!(device.label(), "com.example.tv on 192.168.1.20:5555");
+        assert_eq!(suggest_name("anything", &device), "tv");
+        let json = serde_json::to_value(&device).unwrap();
+        assert_eq!(json["kind"], "device");
+        assert_eq!(serde_json::from_value::<TargetRef>(json).unwrap(), device);
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(TargetRef::parse(&dir.path().display().to_string()), TargetRef::Local { path: dir.path().to_path_buf() });
     }

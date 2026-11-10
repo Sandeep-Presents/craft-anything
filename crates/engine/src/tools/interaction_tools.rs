@@ -528,6 +528,16 @@ pub fn off_limits(ws: Option<&Workspace>, tool: &str, input: &Value) -> Option<S
             },
             None => false,
         },
+        // An app on a device: the builder's shell never reaches it. A command that names the
+        // app's package, or adb with that device, is refused; the craft-anything adb tools are
+        // the way to look at a screen.
+        crate::workspace::TargetRef::Device { serial, package } => match tool {
+            "Bash" | "PowerShell" => {
+                let cmd = s("command").to_ascii_lowercase();
+                cmd.contains(&package.to_ascii_lowercase()) || (cmd.contains("adb") && cmd.contains(&serial.to_ascii_lowercase()))
+            }
+            _ => false,
+        },
         crate::workspace::TargetRef::None => false,
     };
     refused.then(|| OFF_LIMITS.to_string())
@@ -960,6 +970,22 @@ mod tests {
         assert!(off_limits(Some(&site), "Bash", &json!({"command": "curl -s https://example.com/robots.txt"})).is_some());
         assert!(off_limits(Some(&site), "Bash", &json!({"command": "npm run build"})).is_none());
         assert_eq!((host_of("https://user@Shop.Test:8443/a"), host_of("not a url")), (Some("shop.test".into()), None));
+
+        // An app on a device: its package, or adb with its device, never from the builder's shell.
+        let device = Workspace::create(
+            &dir.path().join("projects"),
+            "d",
+            "Recreate this app",
+            TargetRef::Device { serial: "192.168.1.20:5555".into(), package: "com.example.tv".into() },
+        )
+        .unwrap();
+        let bash = |cmd: &str| off_limits(Some(&device), "Bash", &json!({"command": cmd})).is_some();
+        assert!(bash("adb -s 192.168.1.20:5555 shell pm path com.example.tv"));
+        assert!(bash("adb shell run-as COM.EXAMPLE.TV ls"), "any spelling of the package");
+        assert!(bash("adb -s 192.168.1.20:5555 shell input keyevent 20"), "adb with that device, even to press a key");
+        assert!(!bash("./gradlew :tv:assembleDebug"), "the build is fine");
+        assert!(!bash("adb devices"), "adb alone, naming neither, is fine");
+        assert!(!off_limits(Some(&device), "Read", &file(&device.app_dir())).is_some(), "the project stays open");
     }
 
     #[test]
