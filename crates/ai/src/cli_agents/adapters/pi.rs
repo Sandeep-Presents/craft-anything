@@ -100,6 +100,21 @@ impl AgentAdapter for PiCli {
         Some("Sign in the way pi does: run `pi` once in a terminal, sign in to the provider its default model uses, then start the build again.".into())
     }
 
+    /// pi keeps each session as `sessions/--<folder>--/<timestamp>_<id>.jsonl` under its own
+    /// folder, so a project can keep a copy that travels with it.
+    fn session_file(&self, id: &str) -> Option<std::path::PathBuf> {
+        agent_dir().and_then(|dir| session_file_in(&dir, id))
+    }
+
+    fn handoff(&self, saved: &str, max: usize) -> Option<String> {
+        pi_handoff(saved, max)
+    }
+
+    fn restore_session(&self, id: &str, saved: &[u8], cwd: &std::path::Path) -> Result<bool, ToolError> {
+        let dir = agent_dir().ok_or_else(|| ToolError::new(ErrorCode::BadSettings, "Couldn't find pi's folder on this computer."))?;
+        restore_session_in(&dir, id, saved, cwd)
+    }
+
     fn args(&self, cx: &ArgsCx) -> Vec<String> {
         let mut a = cx.options.args.clone();
         a.extend(["-p".into(), "--mode".into(), "json".into(), "--append-system-prompt".into(), cx.preamble.to_string()]);
@@ -260,6 +275,148 @@ fn builder_server(mcp: &McpCommand) -> McpCommand {
         server.args.push("--all-tools".into());
     }
     server
+}
+
+/// pi's own folder: `PI_CODING_AGENT_DIR`, else `~/.pi/agent`. A folder chosen for the backend in
+/// Settings is not applied: pi reads that variable itself, and a second place to look would put
+/// sessions where pi does not.
+fn agent_dir() -> Option<std::path::PathBuf> {
+    match std::env::var_os("PI_CODING_AGENT_DIR").filter(|v| !v.is_empty()) {
+        Some(dir) => Some(std::path::PathBuf::from(dir)),
+        None => dirs::home_dir().map(|home| home.join(".pi").join("agent")),
+    }
+}
+
+/// An id pi would use: a UUID, or whatever `--session-id` was given. Anything else (a hand-edited
+/// project file) names no session.
+fn session_id_ok(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// The folder pi gives a working folder: the leading separator removed and `/`, `\` and `:` read
+/// as `-`, between two `--` (`/w/P` is `--w-P--`, as pi's own session files are named).
+fn session_folder(cwd: &std::path::Path) -> String {
+    let text = cwd.to_string_lossy();
+    let text = text.strip_prefix('/').unwrap_or(&text);
+    format!("--{}--", text.replace(['/', '\\', ':'], "-"))
+}
+
+/// Folders under pi's `sessions/` looked through for one session, so a big history stays bounded.
+const SESSION_FOLDERS: usize = 10_000;
+
+/// The file pi keeps session `id` in under `dir`, if this computer has it: the newest one, since a
+/// run that didn't find a put-back copy starts a second file under the same id.
+fn session_file_in(dir: &std::path::Path, id: &str) -> Option<std::path::PathBuf> {
+    if !session_id_ok(id) {
+        return None;
+    }
+    let suffix = format!("_{id}.jsonl");
+    let mut newest: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+    for folder in std::fs::read_dir(dir.join("sessions")).ok()?.flatten().take(SESSION_FOLDERS) {
+        let Ok(files) = std::fs::read_dir(folder.path()) else { continue };
+        for path in files.flatten().map(|f| f.path()) {
+            let named = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(&suffix));
+            if !named || !path.is_file() {
+                continue;
+            }
+            let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) else { continue };
+            if newest.as_ref().is_none_or(|(at, _)| modified > *at) {
+                newest = Some((modified, path));
+            }
+        }
+    }
+    newest.map(|(_, path)| path)
+}
+
+/// Where a kept copy put back for `cwd` belongs: pi's folder for that working folder, named after
+/// the session's own timestamp so pi reads it as one of its own.
+fn kept_session_path(dir: &std::path::Path, id: &str, stamp: &str, cwd: &std::path::Path) -> std::path::PathBuf {
+    dir.join("sessions").join(session_folder(cwd)).join(format!("{stamp}_{id}.jsonl"))
+}
+
+/// A stamp for a kept session that names no timestamp of its own.
+const KEPT_STAMP: &str = "1970-01-01T00-00-00-000Z";
+
+/// Put a kept copy of session `id` back where pi looks for it in `cwd`. `Ok(false)`: it's here
+/// already. A copy of another session is refused rather than restored.
+fn restore_session_in(dir: &std::path::Path, id: &str, saved: &[u8], cwd: &std::path::Path) -> Result<bool, ToolError> {
+    if !session_id_ok(id) {
+        return Err(ToolError::invalid("The project names its builder's session with an id pi doesn't use."));
+    }
+    if session_file_in(dir, id).is_some() {
+        return Ok(false);
+    }
+    let header = saved.split(|b| *b == b'\n').next().and_then(|line| serde_json::from_slice::<Value>(line).ok());
+    let Some(header) = header.filter(|h| h.get("id").and_then(Value::as_str) == Some(id)) else {
+        return Err(ToolError::invalid("The conversation kept in the project is of another session."));
+    };
+    let stamp = header
+        .get("timestamp")
+        .and_then(Value::as_str)
+        .map(|t| t.replace([':', '.'], "-"))
+        .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == 'T'))
+        .unwrap_or_else(|| KEPT_STAMP.to_string());
+    // `/tmp` is a link to `/private/tmp` on macOS, and `/var` to `/private/var`: pi's own working
+    // folder is the real one, so the copy has to land there or the run won't find it.
+    let cwd = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let path = kept_session_path(dir, id, &stamp, &cwd);
+    craft_anything_platform::fs::write_atomic_private(&path, saved)?;
+    Ok(true)
+}
+
+/// What a new session needs to know of an earlier one: the newest exchanges in the kept copy of a
+/// session, each clipped, keeping at most `max` characters. pi's entries are a tree (`id`/
+/// `parentId`); the newest are the tail of the file, which is the branch that was last written.
+fn pi_handoff(saved: &str, max: usize) -> Option<String> {
+    let clip = |text: &str| {
+        let text = text.trim();
+        if text.chars().count() > HANDOFF_ENTRY { format!("{}…", text.chars().take(HANDOFF_ENTRY).collect::<String>()) } else { text.to_string() }
+    };
+    let texts = |content: Option<&Value>| -> String {
+        content
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|b| b.get("type").and_then(Value::as_str) == Some("text"))
+            .filter_map(|b| b.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let mut entries = Vec::new();
+    for v in saved.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()) {
+        if v.get("type").and_then(Value::as_str) != Some("message") {
+            continue;
+        }
+        let Some(message) = v.get("message") else { continue };
+        let content = message.get("content");
+        match message.get("role").and_then(Value::as_str) {
+            Some("user") => {
+                let text = content.and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| texts(content));
+                if !text.trim().is_empty() {
+                    entries.push(format!("Craft Anything asked you: {}", clip(&text)));
+                }
+            }
+            Some("assistant") => {
+                let text = texts(content);
+                if !text.trim().is_empty() {
+                    entries.push(format!("You answered: {}", clip(&text)));
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut kept = Vec::new();
+    let mut used = 0usize;
+    for entry in entries.iter().rev() {
+        let n = entry.chars().count().saturating_add(2);
+        if used.saturating_add(n) > max {
+            break;
+        }
+        used = used.saturating_add(n);
+        kept.push(entry.as_str());
+    }
+    kept.reverse();
+    (!kept.is_empty()).then(|| kept.join("\n\n"))
 }
 
 /// The extension file this run loads, or a path that isn't there when the folder can't take one,
@@ -518,6 +675,88 @@ mod tests {
         ] {
             assert_eq!(classify(why), kind, "{why}");
         }
+    }
+
+    /// A folder of a test's own, so a run never writes over another's.
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!("craft-anything-pi-test-{}-{}-{name}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+        std::fs::create_dir_all(&dir).expect("a test folder");
+        dir
+    }
+
+    /// The kept copy of a session, as the project would hold it.
+    fn kept(id: &str) -> String {
+        format!(
+            "{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"timestamp\":\"2026-11-09T07:55:11.094Z\",\"cwd\":\"/w/P\"}}\n\
+             {{\"type\":\"message\",\"id\":\"a\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"build a clock\"}}]}}}}\n\
+             {{\"type\":\"message\",\"id\":\"b\",\"message\":{{\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":\"Writing app/index.html\"}},{{\"type\":\"toolCall\",\"id\":\"c\",\"name\":\"build_file_write\",\"arguments\":{{}}}}]}}}}\n"
+        )
+    }
+
+    /// pi names a working folder between two `--`, with its separators read as `-`.
+    #[test]
+    fn a_working_folder_is_named_the_way_pi_names_it() {
+        assert_eq!(session_folder(std::path::Path::new("/private/tmp/p")), "--private-tmp-p--");
+        assert_eq!(session_folder(std::path::Path::new(r"C:\w\p")), "--C--w-p--");
+    }
+
+    /// A project carried to another computer gets its builder's conversation back, in the folder
+    /// pi looks for it in; a copy of another session is refused.
+    #[test]
+    fn a_session_travels_with_the_project() {
+        let dir = temp_dir("session");
+        let id = "01a1bf4d-d376-7776-9210-8cdc5ee15094";
+        let cwd = std::path::Path::new("/w/P");
+        assert!(session_file_in(&dir, id).is_none(), "nothing here yet");
+        assert!(restore_session_in(&dir, id, kept(id).as_bytes(), cwd).expect("put back"), "it was put back");
+        let path = session_file_in(&dir, id).expect("found by id");
+        assert!(path.ends_with(format!("2026-11-09T07-55-11-094Z_{id}.jsonl")), "{path:?}");
+        assert_eq!(path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()), Some("--w-P--"), "{path:?}");
+        assert!(!restore_session_in(&dir, id, kept(id).as_bytes(), cwd).expect("already here"), "a second copy is nothing to do");
+        // A copy of another session is refused where the session isn't here: nothing is written
+        // under this one's name.
+        let empty = temp_dir("wrong-session");
+        let other = kept("11111111-2222-3333-4444-555555555555");
+        assert!(restore_session_in(&empty, id, other.as_bytes(), cwd).is_err(), "another session's file is refused");
+        assert!(session_file_in(&empty, id).is_none(), "and nothing was put there");
+        let _ = std::fs::remove_dir_all(&empty);
+        // An id pi would not use names no session.
+        assert!(session_file_in(&dir, "../../etc/passwd").is_none());
+        assert!(restore_session_in(&dir, "a/b", kept(id).as_bytes(), cwd).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The copy lands in the folder pi really uses: a linked path (`/tmp` on macOS) is resolved.
+    #[test]
+    fn a_copy_lands_in_the_real_folder_pi_uses() {
+        let dir = temp_dir("canonical");
+        let cwd = dir.join("project");
+        std::fs::create_dir_all(&cwd).expect("a working folder");
+        let id = "01a1bf4d-d376-7776-9210-8cdc5ee15094";
+        assert!(restore_session_in(&dir, id, kept(id).as_bytes(), &cwd).expect("put back"));
+        let real = std::fs::canonicalize(&cwd).expect("the real path");
+        let path = session_file_in(&dir, id).expect("found by id");
+        let folder = path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str());
+        assert_eq!(folder, Some(session_folder(&real).as_str()), "{path:?}");
+        // A second run writing under the same id is the one a copy keeps.
+        let newer = path.with_file_name(format!("2099-01-01T00-00-00-000Z_{id}.jsonl"));
+        std::fs::write(&newer, kept(id)).expect("a newer file");
+        assert_eq!(session_file_in(&dir, id).as_deref(), Some(newer.as_path()), "the newest file wins");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// What a new conversation is told of the earlier one: the newest exchanges, clipped.
+    #[test]
+    fn a_handoff_keeps_the_newest_exchange_and_leaves_out_tool_calls() {
+        let text = pi_handoff(&kept("x"), 16_000).expect("something to tell");
+        assert!(text.contains("Craft Anything asked you: build a clock"), "{text}");
+        assert!(text.contains("You answered: Writing app/index.html"), "{text}");
+        assert!(!text.contains("build_file_write"), "a tool call is not an answer: {text}");
+        assert!(pi_handoff("", 16_000).is_none());
+        // Only the newest entry fits when the room is small.
+        let narrow = pi_handoff(&kept("x"), 40).expect("one entry");
+        assert_eq!(narrow, "You answered: Writing app/index.html", "{narrow}");
     }
 
     /// A server, a tool or a flag with a quote in it must not break the extension's JavaScript.

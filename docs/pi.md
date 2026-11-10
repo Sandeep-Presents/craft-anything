@@ -38,6 +38,18 @@ thinking depth goes in through `--thinking` when one is chosen.
 - A question about a build starts a fresh pi session with reading tools only (or none in Clean
   room), so it leaves the builder's conversation untouched.
 
+## Sessions that travel with the project
+
+pi keeps each conversation as `sessions/--<folder>--/<timestamp>_<id>.jsonl` under its own folder
+(`PI_CODING_AGENT_DIR`, else `~/.pi/agent`). The project keeps a copy of it (`agent-session.jsonl`,
+written after every turn), and a project moved to another computer puts it back in the folder pi
+looks in for that project's working folder, named after the conversation's own timestamp, so the
+same conversation carries on (#451). A folder reached through a link — `/tmp` is `/private/tmp` on
+macOS — is resolved first, because pi names the real folder; without that the copy lands beside it
+and pi starts a second conversation under the same id. When the copy is of another session, or
+nothing can be put back, the id is dropped and the next turn starts from the brief, what is in
+`app/`, and the newest exchanges kept in the copy (`handoff`).
+
 ## The tool server
 
 pi has no `--mcp-config` flag the way Claude Code does. Servers come from `mcp.json` — which a
@@ -99,5 +111,8 @@ Anything's tools, which carry the same approvals.
   reached Ready, with `app/index.html` and `app/styles.css` written through `build_file_write` and
   `build_file_edit`, `build_checklist` and `rebuild_check` called, and a refused website approval
   reported back as such. `craft.json` records `agent_session_by: "pi"`.
-- Not verified: a resumed build in a second run, a Clean room build, a build over SSH, and pi
-  versions other than 1.5.0.
+- A session that travels: a build, its project copied to another folder, every local pi session for
+  it deleted, then `--continue-in <copy>` — pi continued the restored file (the follow-up prompt is
+  the file's second user message) and the change reached `app/index.html`.
+- Not verified: a Clean room build, a build over SSH, a model chosen in Settings, and pi versions
+  other than 1.5.0.

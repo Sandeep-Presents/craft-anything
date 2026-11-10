@@ -164,11 +164,13 @@ Anthropic. See [docs/claude-code.md](docs/claude-code.md) for how and why. A Cod
 exists but hasn't been verified on a real install yet. **GitHub Copilot** can use your installed
 Copilot CLI through ACP: sign in separately with `copilot login`. **Grok Build** can use your
 installed `grok` program through ACP (`grok agent stdio`): sign in separately with `grok login`.
-See [docs/grok.md](docs/grok.md). Other agents that speak ACP (Gemini CLI,
+See [docs/grok.md](docs/grok.md). **Pi** runs headless (`pi -p --mode json`) with our tools
+through a per-run extension, and a build is held to reading plus those tools. See
+[docs/pi.md](docs/pi.md). Other agents that speak ACP (Gemini CLI,
 Qwen Code, opencode, goose, Hermes, Maki, Devin) can be switched to it per backend; of those, Maki
 and Devin have been run live (Devin authenticates with the backend's stored key — its own CLI
-sign-in doesn't count over ACP). Anthropic, OpenAI, OpenRouter, xAI (Grok, when `XAI_API_KEY` is
-set) and local OpenAI-compatible servers are available for questions and analysis (Settings → AI).
+sign-in doesn't count over ACP). Anthropic, OpenAI, OpenRouter, xAI (Grok, when `XAI_API_KEY` is set) and local
+OpenAI-compatible servers are available for questions and analysis (Settings → AI).
 
 ## Built for agents
 

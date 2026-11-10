@@ -717,7 +717,9 @@ Owner: open · Status: in progress
       the only way in, since pi has no `--mcp-config`. A builder keeps reading and our tools only:
       no `edit`, `write`, `bash` or `codemode` of its own, so every change goes through the tools
       whose effects and consent we record. pi's own approval prompt has no equivalent flag; a
-      permission bridge is still owed. See [Pi](pi.md). Two live builds on macOS reached Ready.
+      permission bridge is still owed. A project's session travels with it and is put back in the
+      folder pi names (the linked `/tmp` resolved first). See [Pi](pi.md). Three live builds on
+      macOS reached Ready; one carried to another folder continued from the restored session.
       — claimed: jiahao, branch feature/r2.2-pi-agent
 - [x] Grok Build as a coding agent over ACP (`grok agent stdio`): discovery in `~/.grok/bin`,
       the person's own `grok login` (a missing `auth.json` is unknown, so an API key still
