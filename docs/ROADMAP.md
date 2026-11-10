@@ -650,6 +650,7 @@ yet, and the quick start is how every new person begins.
       records… Leave them out to page it as it is", and ran the 20 s line-up again with
       `show: changed` before finding `list: "pairs"` with `matching`. Name the lists (`pairs`,
       `ambiguous`, `only_left`, `only_right`) in both
+      — claimed: chordpli, branch bugfix/r5.7-browse-list-names
 - [ ] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
       v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
       pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with
