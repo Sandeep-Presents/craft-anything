@@ -100,7 +100,7 @@ Add a plugin	إضافة مكوّن إضافي
 Add an AI brain and I'll read this evidence for you, answer follow-up questions and point at the proof.	أضف ذكاءً اصطناعيًا وسأقرأ هذه الأدلة نيابةً عنك، وأجيب عن أسئلة المتابعة، وأشير إلى الدليل.
 Add an AI by its address	إضافة ذكاء اصطناعي بعنوانه
 Add another	إضافة آخر
-Add it again, to choose another account's folder for it.	إضافته مرة أخرى لاختيار مجلد حساب آخر له.
+Add it again, to choose another account's folder for it.	أضفه مرة أخرى لتختار له مجلد حساب آخر.
 Add more info. The builder reads it at its next step.	أضف مزيدًا من المعلومات. يقرؤها وكيل البناء في خطوته التالية.
 Add pictures	إضافة صور
 Add pictures of the original	إضافة صور للأصل
@@ -111,7 +111,7 @@ Added {n} picture(s). The builder uses them from your next change.	أُضيفت 
 Address to file offset	تحويل العنوان إلى إزاحة في الملف
 Adds its decompiler to Deep mode. Craft Anything can download and set it up for you.	يضيف أداة فك ترجمته إلى الوضع المعمّق. يستطيع Craft Anything تنزيله وإعداده لك.
 Advanced	متقدّم
-After installing one, look for it again.	إعادة البحث بعد تثبيت أحدها.
+After installing one, look for it again.	بعد تثبيت أحدها، ابحث عنه مجددًا.
 Agent	الوكيل
 Allow generated assets	السماح بالموارد المولّدة
 Allow once	السماح مرة واحدة
@@ -578,7 +578,7 @@ Its own code	شيفرته الخاصة
 Its own sign-in, settings and conversations: another folder is another account. Empty: its usual folder.	تسجيل دخوله وإعداداته ومحادثاته الخاصة: مجلد آخر يعني حسابًا آخر. فارغ: مجلده المعتاد.
 Java archive overview	نظرة عامة على أرشيف Java
 Java class	صنف Java
-Java method bytecode and pseudo-Java	شيفرة البايت لدالة Java وشيفرة Java زائفة
+Java method bytecode and pseudo-Java	شيفرة البايت لدالة Java وشيفرة شبه Java
 Java program code (one class)	شيفرة برنامج Java (صنف واحد)
 Java programs	برامج Java
 Java runtime	بيئة تشغيل Java
@@ -883,7 +883,7 @@ Project name	اسم المشروع
 Projects	المشاريع
 Projects and builds	المشاريع والنسخ المبنية
 Property list	قائمة الخصائص (Property List)
-Pseudo-C	Pseudo-C
+Pseudo-C	شبه C
 Purpose	الغرض
 Raise the asset budget	رفع ميزانية الموارد
 Raise the budget by {amount}	رفع الميزانية بمقدار {amount}
@@ -1283,8 +1283,8 @@ Working… ({n} steps so far)	جارٍ العمل… (الخطوات حتى ال
 Write a project file	كتابة ملف مشروع
 Write a readable report	كتابة تقرير مقروء
 Write comment	كتابة تعليق
-Write inline comment	كتابة تعليق ضمني
-Write pseudo-C to a folder	كتابة شيفرة C الزائفة في مجلد
+Write inline comment	كتابة تعليق مضمّن
+Write pseudo-C to a folder	كتابة شيفرة شبه C في مجلد
 Write the brief	كتابة الملخّص
 Write the handoff	كتابة مذكرة التسليم
 Wrote {what} to {}	كُتب {what} في {}
@@ -1448,7 +1448,7 @@ Choose what the builder's approvals get	تحديد ما تلقاه طلبات ا
 Reading the web	القراءة من الويب
 Other commands	أوامر أخرى
 Files outside the project	الملفات خارج المشروع
-Pushing and publishing	الدفع والنشر
+Pushing and publishing	رفع التعديلات والنشر
 Deleting outside the project	الحذف خارج المشروع
 System changes	تغييرات النظام
 Other tools	أدوات أخرى
