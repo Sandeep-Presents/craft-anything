@@ -1461,7 +1461,10 @@ Owner: open · Status: in progress
       file can be checked
 - [x] Bun: take each module's stored source map and bytecode out as files.
       — claimed: Afloat16, branch feature/r3.11-bun-module-payloads
-- [ ] A standalone `.pyz`
+- [x] A standalone `.pyz`: a PyInstaller PYZ archive given on its own is its own packed reader
+      (`pyinstaller_pyz`), listing the program's modules and handing one back as a `.pyc`; a
+      Python zip application named `.pyz` stays with the ZIP reader
+      — claimed: muraa-p, branch feature/r3.11-standalone-pyz
 - [ ] `native_source_folder_write` uses the built-in decompiler only: use Ghidra in Deep mode when
       it's there
 - [x] Keep stand-in response samples distinct when headers, content types or body-availability metadata differ.
