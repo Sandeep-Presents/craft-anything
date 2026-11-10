@@ -2234,6 +2234,103 @@ fn a_running_build_says_what_it_is_on_and_opens_up_into_its_activity() {
     h.get_by_label("What happened in this build");
 }
 
+/// The details box at the bottom of a long feed keeps its own height (it was squeezed to about
+/// three lines), long lines wrap when asked, its edge changes its height, and it opens in a
+/// window of its own that goes when closed.
+#[test]
+fn the_build_details_box_keeps_its_height_wraps_and_opens_in_its_own_window() {
+    use craft_anything_ai::rebuild::{RunEvent, RunSet, StandIns};
+    use craft_anything_ai::{AgentEvent, AiConfig, BackendConfig, BackendEntry, BackendKind, BackendOptions};
+    use craft_anything_engine::workspace::{Step, TargetRef, Workspace};
+    use craft_anything_ui_egui::activity_box::{LINE, Look};
+    let d = tempfile::tempdir().unwrap();
+    let ws = Workspace::create(d.path(), "Alpha", "A notes app", TargetRef::None).unwrap();
+    let runs = StandIns::new();
+    let (dir, starter) = (d.path().to_path_buf(), runs.starter());
+    let mut h = harness(move || {
+        let engine = demo::engine(Mode::Beginner, true);
+        let mut cfg = AiConfig::default();
+        let agent = BackendConfig {
+            name: "Claude Code".into(),
+            kind: BackendKind::AgentCli,
+            model: "claude-code".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        };
+        cfg.upsert(BackendEntry { config: agent, options: BackendOptions::default() });
+        engine.session().settings.ai = cfg.to_table().unwrap();
+        let mut app = demo::app(engine);
+        app.settings.projects_dir = Some(dir);
+        app.runs = RunSet::new(1).with_starter(starter);
+        app
+    });
+    h.run_steps(2);
+    h.state_mut().open_workspace(ws.clone());
+    h.state_mut().continue_build();
+    h.run_steps(2);
+    // A feed taller than the window, and more lines than the box shows.
+    let said: String = (0..60).map(|i| format!("Paragraph {i} of what the builder said.\n\n")).collect();
+    assert!(runs.send(&ws.root, RunEvent::Agent(AgentEvent::TextDelta { text: said })));
+    for i in 0..40 {
+        assert!(runs.send(&ws.root, RunEvent::Step { step: Step::Build, text: format!("Building part {i}…") }));
+        let input = serde_json::json!({"command": format!("echo step-{i:02}")});
+        assert!(runs.send(&ws.root, RunEvent::Agent(AgentEvent::ToolStarted { call_id: format!("c{i}"), tool: "Bash".into(), input })));
+    }
+    let long = format!("cargo build --release --features {}", "a-long-feature,".repeat(30));
+    let input = serde_json::json!({"command": long});
+    assert!(runs.send(&ws.root, RunEvent::Agent(AgentEvent::ToolStarted { call_id: "long".into(), tool: "Bash".into(), input })));
+    h.run_steps(3);
+    h.get_by_label("More detail").click();
+    // It opens over a few frames.
+    h.run_steps(12);
+    // From its title to the grip under it: ten lines and the card's edges.
+    let tall = h.get_by_label("Drag to change the height").rect().top() - h.get_by_label("More detail").rect().bottom();
+    assert!(tall >= 10.0 * LINE, "the box is {tall} points tall at the bottom of a long feed");
+    let id = egui::Id::new(("run_details", &ws.root));
+    assert_eq!(Look::of(&h.ctx, id), Look::default());
+
+    // One line, not cut off: the box scrolls sideways.
+    // The box's line, under the status row's "Now: Running…".
+    let long_line = |h: &Harness<'static, CraftApp>| {
+        h.query_all_by_label_contains("Running cargo build --release").map(|n| n.rect()).max_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
+    };
+    assert!(long_line(&h).height() <= LINE + 1.0, "{:?}", long_line(&h));
+    h.get_by_label("Wrap long lines").click();
+    h.run_steps(3);
+    assert!(Look::of(&h.ctx, id).wrap);
+    assert!(long_line(&h).height() > LINE * 1.5, "wrapped: {:?}", long_line(&h));
+
+    // The edge: arrow keys while it has focus.
+    h.get_by_label("Drag to change the height").focus();
+    // egui keeps the arrows for a widget from its second frame with focus.
+    h.run_steps(2);
+    for _ in 0..3 {
+        h.key_press(egui::Key::ArrowDown);
+        h.run_steps(1);
+    }
+    assert_eq!(Look::of(&h.ctx, id).height, Look::default().height + 3.0 * LINE);
+    // The feed keeps its bottom in view, so the taller box moves up over the next frames.
+    h.run_steps(4);
+
+    // Its own window, here inside the app (tests have one window), until it's closed.
+    h.get_by_label("Open in its own window").hover();
+    h.run_steps(1);
+    h.get_by_label("Open in its own window").click();
+    h.run_steps(3);
+    assert_eq!(h.state().activity_windows.len(), 1);
+    let window = h.get_by_label("Alpha: build activity").rect();
+    // The window's own Close, not the title bar's.
+    h.query_all_by_label("Close").find(|n| window.contains_rect(n.rect())).unwrap().click();
+    h.run_steps(3);
+    assert!(h.state().activity_windows.is_empty());
+    assert!(h.query_by_label("Alpha: build activity").is_none());
+    // The box is still at its newest line (a button over its scroll bar sent it to the top).
+    let grip = h.get_by_label("Drag to change the height").rect();
+    let last = long_line(&h);
+    assert!(last.bottom() <= grip.top() && last.bottom() > grip.top() - 3.0 * LINE, "{last:?} above {grip:?}");
+}
+
 #[test]
 fn a_build_that_stopped_part_way_offers_to_continue() {
     use craft_anything_ai::rebuild::{RunSet, StandIns};

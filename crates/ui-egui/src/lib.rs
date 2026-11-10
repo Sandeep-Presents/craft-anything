@@ -7,6 +7,7 @@
 //! holding it never freezes a frame; the last snapshot ([`SessionView`]) is shown meanwhile.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod activity_box;
 pub mod approvals;
 pub mod builders;
 pub mod chat;
@@ -123,6 +124,7 @@ pub const USED_ICONS: &[&str] = &[
     "user",
     "wand-sparkles",
     "workflow",
+    "wrap-text",
     "wrench",
     "x",
     "zap",
@@ -495,6 +497,8 @@ pub struct CraftApp {
     pub preview: Option<String>,
     /// Questions asked about each project's build this session, and their answers (`just_ask`).
     pub asked: std::collections::HashMap<PathBuf, Vec<just_ask::Asked>>,
+    /// Builds whose activity has a window of its own ([`activity_box::windows`]).
+    pub activity_windows: Vec<activity_box::PoppedOut>,
     /// Every project's pinned builds, and whether they're running (read by `refresh_pins`).
     pub pins: Vec<pins::PinRow>,
     pub pinned_copy_bytes: Option<u64>,
@@ -602,6 +606,7 @@ impl CraftApp {
             pins: Vec::new(),
             pinned_copy_bytes: None,
             asked: Default::default(),
+            activity_windows: Vec::new(),
             pins_read_at: None,
             open_url: None,
             thumbs: Default::default(),
@@ -1840,6 +1845,7 @@ impl CraftApp {
         palette::show(self, &ctx);
         settings_ui::show(self, &ctx);
         home::modals(self, &ctx);
+        activity_box::windows(self, &ctx);
         self.toasts(&ctx);
         self.drop_overlay(&ctx);
         titlebar::window_edge(&ctx);

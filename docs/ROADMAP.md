@@ -1377,6 +1377,10 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
+- [x] A build's "More detail" box shows about four lines and cuts long commands off. It keeps a
+      height the person can drag, wraps long lines or scrolls sideways, and opens in a window of
+      its own that keeps up with the build
+      — claimed: tanish2k09, branch feature/r2.9-build-details-box
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress

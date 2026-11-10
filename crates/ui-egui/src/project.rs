@@ -9,7 +9,7 @@ use crate::state::{FeedItem, MakeDraft, Modal, PlanStatus, PlanStep, Screen, Use
 use crate::theme::{self, Tokens};
 use crate::{CraftApp, Done, chat, icons, prompt_box, widgets};
 use craft_anything_ai::AgentEvent;
-use craft_anything_ai::rebuild::activity::{Action, ActivityNow, LineKind};
+use craft_anything_ai::rebuild::activity::{Action, ActivityNow};
 use craft_anything_ai::rebuild::feed::{self, apply};
 use craft_anything_ai::rebuild::{self, AppKind, KindRegistry, KindWords, Note, RebuildRun, RunEvent, RunOptions, Started, Step, Stopped, TargetKind};
 use craft_anything_engine::inbox::{Answer, Inbox, Request, RequestKind};
@@ -1296,10 +1296,10 @@ fn now_words(app: &CraftApp, now: &ActivityNow) -> Option<String> {
 /// whole log to open. Inside the feed's scroll area, so it can never push the prompt box away.
 /// `status_row`: the row above already says what it's on.
 fn run_details(app: &mut CraftApp, ui: &mut Ui, status_row: bool) {
-    const LINE: f32 = 18.0;
-    const MOST_SHOWN: f32 = 260.0;
     let t = Tokens::get(ui.ctx());
     let running = app.running();
+    let Some(ws) = app.workspace.as_ref() else { return };
+    let (root, name) = (ws.root.clone(), ws.manifest.name.clone());
     let Some(run) = app.open_run() else { return };
     let count = run.activity_len();
     if count == 0 {
@@ -1314,38 +1314,12 @@ fn run_details(app: &mut CraftApp, ui: &mut Ui, status_row: bool) {
     };
     let log = run.activity_log();
     let mut open_log = false;
+    let mut pop_out = false;
     egui::CollapsingHeader::new(RichText::new(title).color(t.text_dim).size(theme::CAPTION)).id_salt("run_details").icon(widgets::disclosure_icon).show(
         ui,
         |ui| {
-            widgets::card(&t).inner_margin(Margin::symmetric(10, 8)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                // The rows are exactly this tall, or the scroll area miscounts them.
-                ui.spacing_mut().item_spacing.y = 0.0;
-                ui.spacing_mut().interact_size.y = LINE;
-                egui::ScrollArea::vertical().id_salt("run_details_lines").max_height(MOST_SHOWN).auto_shrink([false, true]).stick_to_bottom(true).show_rows(
-                    ui,
-                    LINE,
-                    count,
-                    |ui, range| {
-                        for line in run.activity_lines(range) {
-                            let (colour, words) = match line.kind {
-                                LineKind::Failed | LineKind::Problem => (t.warning, t.text),
-                                LineKind::Done => (t.success, t.text_dim),
-                                LineKind::Stage => (t.accent_ink, t.text),
-                                LineKind::Started | LineKind::Said => (t.text_dim, t.text),
-                                LineKind::Note | LineKind::Output => (t.text_faint, t.text_dim),
-                            };
-                            ui.horizontal(|ui| {
-                                ui.set_height(LINE);
-                                ui.label(RichText::new(crate::usage::duration_words(line.at)).font(theme::mono(theme::CAPTION)).color(t.text_faint));
-                                ui.label(RichText::new(line.kind.tag()).font(theme::mono(theme::CAPTION)).color(colour));
-                                ui.add(egui::Label::new(RichText::new(&line.text).font(theme::mono(theme::CAPTION)).color(words)).truncate())
-                                    .on_hover_text(&line.text);
-                            });
-                        }
-                    },
-                );
-            });
+            // Each project's box keeps its own height and wrapping.
+            pop_out = crate::activity_box::inline(ui, run, egui::Id::new(("run_details", &root)));
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tr("A command's output shows here when it finishes.")).color(t.text_faint).size(theme::CAPTION));
                 open_log = widgets::open_log_button(ui, &log);
@@ -1357,6 +1331,9 @@ fn run_details(app: &mut CraftApp, ui: &mut Ui, status_row: bool) {
     }
     if open_log {
         app.open_log(&log);
+    }
+    if pop_out {
+        crate::activity_box::pop_out(app, root, name);
     }
 }
 

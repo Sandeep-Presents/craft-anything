@@ -16,8 +16,9 @@ use std::ops::Range;
 const KEPT_LINES: usize = 1000;
 /// The longest line kept, in characters.
 const LONGEST_LINE: usize = 600;
-/// The longest thing an action names, in characters.
-const LONGEST_OBJECT: usize = 200;
+/// The longest thing an action names, in characters: room for a long command (the details box
+/// wraps it or scrolls sideways), and for the words around it within [`LONGEST_LINE`].
+const LONGEST_OBJECT: usize = 500;
 /// A log this long is set aside as `build-activity.old.log` and a new one started.
 const LOG_LIMIT: u64 = 8 << 20;
 
@@ -422,6 +423,11 @@ mod tests {
         assert_eq!(describe("Edit", &json!({"file_path": "/projects/x/app/src/main.rs"}), &roots).words(), "Editing src/main.rs");
         assert_eq!(describe("Read", &json!({"file_path": "/projects/x/capture/a.png"}), &roots).words(), "Reading capture/a.png");
         assert_eq!(describe("Grep", &json!({"pattern": "horse"}), &roots).words(), "Searching for horse");
+        // A long command stays whole, up to a point.
+        let long = format!("cargo build --features {}", "f,".repeat(200));
+        assert_eq!(describe("Bash", &json!({"command": long}), &roots).words(), format!("Running {long}"));
+        let longer = "x".repeat(LONGEST_OBJECT * 2);
+        assert_eq!(describe("Bash", &json!({"command": longer}), &roots).object.unwrap().chars().count(), LONGEST_OBJECT + 1);
         // Tools without words: the tool's own title, when the caller has one.
         let ours = describe("web_site_open", &json!({"url": "http://x.test/"}), &roots);
         assert_eq!(ours.words(), "web site open: http://x.test/");

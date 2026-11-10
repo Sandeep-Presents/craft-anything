@@ -673,6 +673,15 @@ preset narrows the bar to 2 px at rest, so the thumb showed only on hover. When 
 library's colours, check every widget that borrows them, in both themes, and test contrast with
 numbers (3:1 for parts you interact with), not by eye.
 
+**A scroll area inside another got what was left of the other's first screen.** egui gives a
+scroll area the room left in the one it's in, counted from the top of that one's content; at the
+bottom of a long feed that's nothing, so the build's details box got egui's 64-point floor (about
+three lines) whatever its `max_height`. Give a nested scroll area its own space (`allocate_ui`
+with its height). Fixing it turned up two more: buttons drawn over the box with `scope_builder`
+moved the layout's cursor back up to them, so the rows after the box were drawn over it (draw an
+overlay in `new_child`, which takes no room), and a button over the scroll bar also scrolled the
+lines when pressed. Render the frame and look (`Harness::render`) before trusting rect checks.
+
 **Files read while drawing.** The Project screen parsed `package.json` 2–4 times a frame, listed
 the reference pictures and checked screenshot files on every repaint, and read the side panel's
 files on every frame a build event arrived; on a slow or network drive the window would freeze.
