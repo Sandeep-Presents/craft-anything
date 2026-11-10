@@ -660,11 +660,17 @@ yet, and the quick start is how every new person begins.
       612, `only_left` 29746, `only_right` 32342); it ran the line-up once and every browse
       call asked for `pairs`, none failed (22 calls, $1.06)
       — claimed: chordpli, branch bugfix/r5.7-browse-list-names
-- [ ] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
+- [x] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
       v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
       pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with
-      the crate hash left out
+      the crate hash left out. A new `name_without_hash` stage compares demangled names with the
+      instantiating crate kept, and calls are compared the same way: the same two `cargo` builds
+      now pair 14,036 (13,356 by name), with masked-bytes pairs down from 888 to 233
       — claimed: chordpli, branch bugfix/r5.7-rust-hash-free-names
+- [ ] After that, 1,347 of the 1,630 name groups left ambiguous hold one symbol at several
+      addresses in one build (a local copy per codegen unit): pair copies whose bytes agree, or
+      say they're copies. `hex_encode` → `_git_oid_tostr` is now a low-confidence structure pair
+      (the new build inlined `hex_encode`)
 - [ ] Live check on Windows: rebuild a project while its frozen pin runs, and the build isn't
       blocked
 
