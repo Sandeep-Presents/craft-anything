@@ -74,6 +74,7 @@ A simple snake game	간단한 뱀 게임
 A small download (under 200 MB). Free, no account needed.	작은 다운로드(200 MB 미만)입니다. 무료이며 계정이 필요 없습니다.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	앱 이름, 필요한 것, 허용된 권한을 적어 둔 작은 파일입니다.
 A smart contract (EVM bytecode)	스마트 계약 (EVM 바이트코드)
+A text file (a script, notes or settings)	텍스트 파일(스크립트, 메모 또는 설정)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	바이트를 두 글자 코드(00~FF)로 적는 방식입니다. 파일을 가장 날것 그대로 보는 방법입니다.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	웹 페이지로 데스크톱 앱을 만드는 방식입니다. 앱은 사실상 자체 브라우저를 가진 웹사이트입니다.
 A website	웹사이트
@@ -562,6 +563,7 @@ Is anything in here a program?	여기에 프로그램이 들어 있나요?
 Is anything sensitive saved in plain text?	민감한 정보가 평문으로 저장돼 있나요?
 Is it safe to look inside programs?	프로그램 안을 살펴봐도 괜찮나요?
 Is it safe to run?	실행해도 안전한가요?
+Is it a script or notes?	스크립트인가요, 메모인가요?
 Is there any readable text inside?	안에 읽을 수 있는 글자가 있나요?
 Is this file safe to open?	이 파일을 열어도 안전한가요?
 It closed straight away.	바로 닫혔습니다.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	인터넷으로 무엇을 보내나요?
 What does this app do?	이 앱은 무엇을 하나요?
 What does this app store?	이 앱은 무엇을 저장하나요?
 What does this contract do?	이 컨트랙트는 무엇을 하나요?
+What does this file say?	이 파일은 무엇을 말하나요?
 What does this module do?	이 모듈은 무엇을 하나요?
 What does this program do?	이 프로그램은 무엇을 하나요?
 What does {what} do?	{what}의 역할은 무엇인가요?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	질문에 답할 AI
 Which file is the main program?	어느 파일이 주 프로그램인가요?
 Which files does it read or write?	어떤 파일을 읽거나 쓰나요?
 Which function is this in	이 위치가 속한 함수
+Which program reads it?	어떤 프로그램이 이 파일을 읽나요?
 Which servers does it talk to?	어떤 서버와 통신하나요?
 Which servers were contacted?	어떤 서버에 접속했나요?
 Which websites does it load?	어떤 웹사이트를 불러오나요?

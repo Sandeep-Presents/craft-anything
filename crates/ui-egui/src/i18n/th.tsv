@@ -74,6 +74,7 @@ A simple snake game	เกมงูกินหางง่าย ๆ
 A small download (under 200 MB). Free, no account needed.	ดาวน์โหลดเล็ก (ต่ำกว่า 200 MB) ฟรี ไม่ต้องมีบัญชี
 A small file that lists what an app is called, what it needs and what it's allowed to do.	ไฟล์เล็กที่บอกชื่อแอป สิ่งที่ต้องใช้ และสิ่งที่ทำได้
 A smart contract (EVM bytecode)	สมาร์ตคอนแทรกต์ (ไบต์โค้ด EVM)
+A text file (a script, notes or settings)	ไฟล์ข้อความ (สคริปต์ บันทึก หรือการตั้งค่า)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	วิธีเขียนไบต์เป็นรหัสสองตัวอักษร (00 ถึง FF) มุมมองดิบที่สุดของไฟล์
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	วิธีสร้างแอปเดสก์ท็อปจากหน้าเว็บ แอปคือเว็บไซต์ที่มีเบราว์เซอร์ของตัวเอง
 A website	เว็บไซต์
@@ -562,6 +563,7 @@ Is anything in here a program?	มีอะไรในนี้เป็นโ�
 Is anything sensitive saved in plain text?	มีข้อมูลอ่อนไหวเก็บเป็นข้อความธรรมดาไหม?
 Is it safe to look inside programs?	ปลอดภัยไหมที่จะดูภายในโปรแกรม?
 Is it safe to run?	รันได้ปลอดภัยไหม?
+Is it a script or notes?	เป็นสคริปต์หรือบันทึก?
 Is there any readable text inside?	มีข้อความที่อ่านได้อยู่ข้างในไหม?
 Is this file safe to open?	ไฟล์นี้ปลอดภัยที่จะเปิดไหม?
 It closed straight away.	มันปิดทันที
@@ -1224,6 +1226,7 @@ What does it send over the internet?	มันส่งอะไรออกอ�
 What does this app do?	แอปนี้ทำอะไร?
 What does this app store?	แอปนี้เก็บอะไร?
 What does this contract do?	คอนแทรกต์นี้ทำอะไร?
+What does this file say?	ไฟล์นี้บอกอะไร?
 What does this module do?	โมดูลนี้ทำอะไร?
 What does this program do?	โปรแกรมนี้ทำอะไร?
 What does {what} do?	{what} ทำอะไร?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	AI ตัวใดตอบคำถามคุ
 Which file is the main program?	ไฟล์ใดเป็นโปรแกรมหลัก?
 Which files does it read or write?	อ่านหรือเขียนไฟล์ใด?
 Which function is this in	อยู่ในฟังก์ชันใด
+Which program reads it?	โปรแกรมใดอ่านไฟล์นี้?
 Which servers does it talk to?	คุยกับเซิร์ฟเวอร์ใด?
 Which servers were contacted?	ติดต่อเซิร์ฟเวอร์ใดบ้าง?
 Which websites does it load?	โหลดเว็บไซต์ใด?

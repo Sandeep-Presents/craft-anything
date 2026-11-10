@@ -74,6 +74,7 @@ A simple snake game	Basit bir yılan oyunu
 A small download (under 200 MB). Free, no account needed.	Küçük bir indirme (200 MB'ın altında). Ücretsiz, hesap gerekmez.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Bir uygulamanın adını, neye ihtiyaç duyduğunu ve neleri yapabileceğini listeleyen küçük dosya.
 A smart contract (EVM bytecode)	Bir akıllı sözleşme (EVM bayt kodu)
+A text file (a script, notes or settings)	Bir metin dosyası (betik, notlar veya ayarlar)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Baytları iki karakterlik kodlarla (00–FF) yazma biçimi. Bir dosyanın en ham görünümü.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Masaüstü uygulamalarını web sayfalarından yapma yolu. Uygulama, aslında kendi tarayıcısı olan bir web sitesidir.
 A website	Bir web sitesi
@@ -562,6 +563,7 @@ Is anything in here a program?	Buradaki herhangi bir şey program mı?
 Is anything sensitive saved in plain text?	Düz metin olarak kaydedilmiş hassas bir şey var mı?
 Is it safe to look inside programs?	Programların içine bakmak güvenli mi?
 Is it safe to run?	Çalıştırmak güvenli mi?
+Is it a script or notes?	Bir betik mi yoksa notlar mı?
 Is there any readable text inside?	İçinde okunabilir metin var mı?
 Is this file safe to open?	Bu dosyayı açmak güvenli mi?
 It closed straight away.	Hemen kapandı.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	İnternete ne gönderiyor?
 What does this app do?	Bu uygulama ne yapıyor?
 What does this app store?	Bu uygulama ne saklıyor?
 What does this contract do?	Bu sözleşme ne yapıyor?
+What does this file say?	Bu dosya ne diyor?
 What does this module do?	Bu modül ne yapıyor?
 What does this program do?	Bu program ne yapıyor?
 What does {what} do?	{what} ne yapıyor?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Sorularınızı hangi AI yanıtlıyor
 Which file is the main program?	Hangi dosya ana program?
 Which files does it read or write?	Hangi dosyaları okuyor veya yazıyor?
 Which function is this in	Bu hangi fonksiyonun içinde
+Which program reads it?	Hangi program okuyor?
 Which servers does it talk to?	Hangi sunucularla konuşuyor?
 Which servers were contacted?	Hangi sunucularla iletişime geçildi?
 Which websites does it load?	Hangi web sitelerini yüklüyor?

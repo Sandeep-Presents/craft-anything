@@ -79,6 +79,8 @@ pub enum TargetKind {
     Directory,
     /// A JavaScript or HTML file.
     Script,
+    /// A file that reads as text: a script in another language, notes, settings or a log.
+    Text,
     /// A HAR or other network capture.
     NetworkCapture,
     Plist,
@@ -110,6 +112,7 @@ impl TargetKind {
             TargetKind::Asar => "The packed contents of an Electron app (a website inside a desktop app)",
             TargetKind::Directory => "A folder",
             TargetKind::Script => "A script or web page",
+            TargetKind::Text => "A text file (a script, notes or settings)",
             TargetKind::NetworkCapture => "A recording of network traffic",
             TargetKind::Plist => "An Apple settings file (plist)",
             TargetKind::Evm => "A smart contract (EVM bytecode)",
@@ -166,6 +169,10 @@ pub fn sniff(bytes: &[u8], name: &str) -> TargetKind {
         TargetKind::DosCom
     } else if [".js", ".mjs", ".cjs", ".html", ".htm", ".ts"].iter().any(|e| lower.ends_with(e)) {
         TargetKind::Script
+    } else if crate::tools::text_tools::looks_like_text(bytes) {
+        // Read by what's in it, not by its name: a Markdown note and a Python script are both
+        // text, and a file with a text extension that's really compressed stays unknown.
+        TargetKind::Text
     } else {
         TargetKind::Unknown
     }
@@ -256,5 +263,18 @@ mod tests {
         assert_eq!(sniff(b"SQLite format 3\0\x10\x00", "app.db"), TargetKind::Sqlite);
         assert_eq!(sniff(b"", "x"), TargetKind::Unknown);
         assert_eq!(sniff(b"console.log(1)", "main.js"), TargetKind::Script);
+    }
+
+    #[test]
+    fn a_file_that_reads_as_text_is_text_and_not_unknown() {
+        assert_eq!(sniff(b"# Notes\n\n- a step\n", "NOTES.md"), TargetKind::Text);
+        assert_eq!(sniff(b"import os\nprint(os.name)\n", "tool.py"), TargetKind::Text);
+        assert_eq!(sniff(b"\xFF\xFEa\x00b\x00", "notes.txt"), TargetKind::Text);
+        assert_eq!(sniff(b"{\"name\": \"snake\"}", "settings.json"), TargetKind::Text);
+        // The bytes decide, not the name: a compressed file called `.txt` stays unknown.
+        assert_eq!(sniff(b"\x1f\x8b\x08\x00\x00\x00", "notes.txt"), TargetKind::Unknown);
+        // A .js file keeps its own kind, and an empty file is still unknown.
+        assert_eq!(sniff(b"console.log(1)\n", "main.js"), TargetKind::Script);
+        assert_eq!(sniff(b"", "empty.txt"), TargetKind::Unknown);
     }
 }

@@ -74,6 +74,7 @@ A simple snake game	Một trò chơi rắn săn mồi đơn giản
 A small download (under 200 MB). Free, no account needed.	Bản tải về nhỏ (dưới 200 MB). Miễn phí, không cần tài khoản.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Một tệp nhỏ liệt kê tên ứng dụng, thứ nó cần và những gì nó được phép làm.
 A smart contract (EVM bytecode)	Một hợp đồng thông minh (bytecode EVM)
+A text file (a script, notes or settings)	Một tệp văn bản (script, ghi chú hoặc cài đặt)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Cách viết các byte thành mã hai ký tự (00 đến FF). Đây là cách xem thô nhất của một tệp.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Một cách xây dựng ứng dụng máy tính từ các trang web. Về cơ bản, ứng dụng là một trang web có trình duyệt riêng.
 A website	Một trang web
@@ -562,6 +563,7 @@ Is anything in here a program?	Có thứ gì trong đây là chương trình kh�
 Is anything sensitive saved in plain text?	Có thông tin nhạy cảm nào được lưu dưới dạng văn bản thuần không?
 Is it safe to look inside programs?	Xem bên trong chương trình có an toàn không?
 Is it safe to run?	Chạy có an toàn không?
+Is it a script or notes?	Đây là script hay ghi chú?
 Is there any readable text inside?	Bên trong có văn bản đọc được không?
 Is this file safe to open?	Mở tệp này có an toàn không?
 It closed straight away.	Nó đã đóng ngay lập tức.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	Nó gửi gì qua internet?
 What does this app do?	Ứng dụng này làm gì?
 What does this app store?	Ứng dụng này lưu trữ gì?
 What does this contract do?	Hợp đồng này làm gì?
+What does this file say?	Tệp này nói gì?
 What does this module do?	Mô-đun này làm gì?
 What does this program do?	Chương trình này làm gì?
 What does {what} do?	{what} làm gì?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	AI nào trả lời câu hỏi của bạn
 Which file is the main program?	Tệp nào là chương trình chính?
 Which files does it read or write?	Nó đọc hoặc ghi những tệp nào?
 Which function is this in	Nằm trong hàm nào
+Which program reads it?	Chương trình nào đọc nó?
 Which servers does it talk to?	Nó trao đổi với những máy chủ nào?
 Which servers were contacted?	Những máy chủ nào đã được liên hệ?
 Which websites does it load?	Nó tải những trang web nào?

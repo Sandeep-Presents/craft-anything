@@ -74,6 +74,7 @@ A simple snake game	简单的贪吃蛇游戏
 A small download (under 200 MB). Free, no account needed.	下载量较小 (不到 200 MB)。免费，无须账户。
 A small file that lists what an app is called, what it needs and what it's allowed to do.	一个小文件，列出应用名称、所需条件及允许执行的操作。
 A smart contract (EVM bytecode)	智能合约 (EVM 字节码)
+A text file (a script, notes or settings)	文本文件（脚本、笔记或设置）
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	用两个字符的编码 (00 到 FF) 表示字节的方式，展示文件最原始的内容。
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	一种使用网页构建桌面应用的方式，应用本质上就是自带浏览器的网站。
 A website	网站
@@ -562,6 +563,7 @@ Is anything in here a program?	这里面有程序吗？
 Is anything sensitive saved in plain text?	是否有敏感信息以明文保存？
 Is it safe to look inside programs?	查看程序内部安全吗？
 Is it safe to run?	运行它安全吗？
+Is it a script or notes?	它是脚本还是笔记？
 Is there any readable text inside?	里面有可读的文本吗？
 Is this file safe to open?	这个文件可以安全打开吗？
 It closed straight away.	它启动后立即关闭了。
@@ -1224,6 +1226,7 @@ What does it send over the internet?	它通过互联网发送了什么？
 What does this app do?	这个应用有什么用途？
 What does this app store?	这个应用会存储什么？
 What does this contract do?	这个合约有什么作用？
+What does this file say?	这个文件说了什么？
 What does this module do?	这个模块有什么用途？
 What does this program do?	这个程序有什么功能？
 What does {what} do?	{what} 有什么作用？
@@ -1256,6 +1259,7 @@ Which AI answers your questions	由哪个 AI 回答你的问题
 Which file is the main program?	哪个文件是主程序？
 Which files does it read or write?	它会读写哪些文件？
 Which function is this in	这属于哪个函数
+Which program reads it?	哪个程序读取它？
 Which servers does it talk to?	它与哪些服务器通信？
 Which servers were contacted?	连接了哪些服务器？
 Which websites does it load?	它会加载哪些网站？

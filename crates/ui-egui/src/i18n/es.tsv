@@ -74,6 +74,7 @@ A simple snake game	Un juego de serpiente sencillo
 A small download (under 200 MB). Free, no account needed.	Una descarga pequeña (menos de 200 MB). Gratis, sin cuenta.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Un archivo pequeño que dice cómo se llama una app, qué necesita y qué puede hacer.
 A smart contract (EVM bytecode)	Un contrato inteligente (bytecode EVM)
+A text file (a script, notes or settings)	Un archivo de texto (un script, notas o ajustes)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Una forma de escribir bytes como códigos de dos caracteres (00 a FF). La vista más cruda de un archivo.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Una forma de hacer apps de escritorio con páginas web. La app es básicamente un sitio web con su propio navegador.
 A website	Un sitio web
@@ -562,6 +563,7 @@ Is anything in here a program?	¿Hay algún programa aquí dentro?
 Is anything sensitive saved in plain text?	¿Hay algo sensible guardado en texto plano?
 Is it safe to look inside programs?	¿Es seguro mirar dentro de los programas?
 Is it safe to run?	¿Es seguro ejecutarlo?
+Is it a script or notes?	¿Es un script o notas?
 Is there any readable text inside?	¿Hay texto legible ahí dentro?
 Is this file safe to open?	¿Es seguro abrir este archivo?
 It closed straight away.	Se cerró de inmediato.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	¿Qué envía por internet?
 What does this app do?	¿Qué hace esta app?
 What does this app store?	¿Qué guarda esta app?
 What does this contract do?	¿Qué hace este contrato?
+What does this file say?	¿Qué dice este archivo?
 What does this module do?	¿Qué hace este módulo?
 What does this program do?	¿Qué hace este programa?
 What does {what} do?	¿Qué hace {what}?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Qué IA responde tus preguntas
 Which file is the main program?	¿Qué archivo es el programa principal?
 Which files does it read or write?	¿Qué archivos lee o escribe?
 Which function is this in	En qué función está esto
+Which program reads it?	¿Qué programa lo lee?
 Which servers does it talk to?	¿Con qué servidores habla?
 Which servers were contacted?	¿A qué servidores se contactó?
 Which websites does it load?	¿Qué sitios web carga?

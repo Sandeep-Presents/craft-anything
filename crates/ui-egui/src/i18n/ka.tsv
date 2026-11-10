@@ -112,6 +112,7 @@ A simple snake game	მარტივი „გველის“ თამა�
 A small download (under 200 MB). Free, no account needed.	მცირე ჩამოსატვირთი (200 MB-მდე). უფასოა, ანგარიში საჭირო არ არის.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	პატარა ფაილი, სადაც ჩამოწერილია, რა ჰქვია აპს, რა სჭირდება და რისი გაკეთების უფლება აქვს.
 A smart contract (EVM bytecode)	ჭკვიანი კონტრაქტი (EVM ბაიტკოდი)
+A text file (a script, notes or settings)	ტექსტური ფაილი (სკრიპტი, შენიშვნები ან პარამეტრები)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	ბაიტების ორსიმბოლოიანი კოდებით ჩაწერის ხერხი (00-დან FF-მდე). ფაილის ყველაზე ნედლი ხედი.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	ვებგვერდებისგან დესკტოპის აპების შექმნის ხერხი. ასეთი აპი, არსებითად, ვებსაიტია საკუთარი ბრაუზერით.
 A website	ვებსაიტი
@@ -593,6 +594,7 @@ Is anything in here a program?	არის აქ რამე, რაც პ�
 Is anything sensitive saved in plain text?	ინახება რამე მგრძნობიარე ღია ტექსტად?
 Is it safe to look inside programs?	უსაფრთხოა პროგრამების შიგნით ჩახედვა?
 Is it safe to run?	უსაფრთხოა მისი გაშვება?
+Is it a script or notes?	ეს სკრიპტია თუ შენიშვნები?
 Is there any readable text inside?	არის შიგნით წაკითხვადი ტექსტი?
 Is this file safe to open?	უსაფრთხოა ამ ფაილის გახსნა?
 It closed straight away.	მაშინვე დაიხურა.
@@ -1241,6 +1243,7 @@ What does it send over the internet?	რას აგზავნის ის �
 What does this app do?	რას აკეთებს ეს აპი?
 What does this app store?	რას ინახავს ეს აპი?
 What does this contract do?	რას აკეთებს ეს კონტრაქტი?
+What does this file say?	რას ამბობს ეს ფაილი?
 What does this module do?	რას აკეთებს ეს მოდული?
 What does this program do?	რას აკეთებს ეს პროგრამა?
 What does {what} do?	რას აკეთებს {what}?
@@ -1273,6 +1276,7 @@ Which AI answers your questions	რომელი AI პასუხობს �
 Which file is the main program?	რომელი ფაილია მთავარი პროგრამა?
 Which files does it read or write?	რომელ ფაილებს კითხულობს ან წერს ის?
 Which function is this in	რომელ ფუნქციაშია ეს
+Which program reads it?	რომელი პროგრამა კითხულობს მას?
 Which servers does it talk to?	რომელ სერვერებს უკავშირდება ის?
 Which servers were contacted?	რომელ სერვერებს დაუკავშირდა?
 Which websites does it load?	რომელ ვებსაიტებს ტვირთავს ის?

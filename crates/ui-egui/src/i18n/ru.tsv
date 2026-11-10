@@ -60,6 +60,7 @@ A simple snake game	Простая игра «Змейка»
 A small download (under 200 MB). Free, no account needed.	Небольшая загрузка (до 200 МБ). Бесплатно, аккаунт не нужен.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Небольшой файл, в котором указано, как называется приложение, что ему нужно и что ему разрешено делать.
 A smart contract (EVM bytecode)	Смарт-контракт (байт-код EVM)
+A text file (a script, notes or settings)	Текстовый файл (скрипт, заметки или настройки)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Способ записи байтов в виде двухсимвольных кодов (от 00 до FF). Самый «сырой» вид файла.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Способ создавать настольные приложения из веб-страниц. Приложение по сути — веб-сайт со своим браузером.
 A website	Веб-сайт
@@ -550,6 +551,7 @@ Is anything in here a program?	Есть ли здесь что-нибудь, я�
 Is anything sensitive saved in plain text?	Сохранено ли что-нибудь чувствительное в открытом виде?
 Is it safe to look inside programs?	Безопасно ли заглядывать внутрь программ?
 Is it safe to run?	Безопасно ли запускать?
+Is it a script or notes?	Это скрипт или заметки?
 Is there any readable text inside?	Есть ли внутри читаемый текст?
 Is this file safe to open?	Безопасно ли открывать этот файл?
 It closed straight away.	Оно сразу закрылось.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	Что оно отправляет в ин�
 What does this app do?	Что делает это приложение?
 What does this app store?	Что хранит это приложение?
 What does this contract do?	Что делает этот контракт?
+What does this file say?	Что в этом файле?
 What does this module do?	Что делает этот модуль?
 What does this program do?	Что делает эта программа?
 What does {what} do?	Что делает {what}?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Какой ИИ отвечает на ваши �
 Which file is the main program?	Какой файл является основной программой?
 Which files does it read or write?	Какие файлы оно читает или записывает?
 Which function is this in	В какой функции это находится
+Which program reads it?	Какая программа его читает?
 Which servers does it talk to?	С какими серверами оно общается?
 Which servers were contacted?	С какими серверами связывались?
 Which websites does it load?	Какие веб-сайты оно загружает?

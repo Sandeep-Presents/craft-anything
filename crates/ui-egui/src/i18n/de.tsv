@@ -74,6 +74,7 @@ A simple snake game	Ein einfaches Snake-Spiel
 A small download (under 200 MB). Free, no account needed.	Ein kleiner Download (unter 200 MB). Kostenlos, kein Konto nötig.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Eine kleine Datei, die auflistet, wie eine App heißt, was sie braucht und was sie darf.
 A smart contract (EVM bytecode)	Ein Smart Contract (EVM-Bytecode)
+A text file (a script, notes or settings)	Eine Textdatei (ein Skript, Notizen oder Einstellungen)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Eine Schreibweise für Bytes als zweistellige Codes (00 bis FF). Die rohste Ansicht einer Datei.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Eine Möglichkeit, Desktop-Apps aus Webseiten zu bauen. Die App ist im Grunde eine Website mit eigenem Browser.
 A website	Eine Website
@@ -562,6 +563,7 @@ Is anything in here a program?	Ist hier drin etwas ein Programm?
 Is anything sensitive saved in plain text?	Ist etwas Sensibles im Klartext gespeichert?
 Is it safe to look inside programs?	Ist es sicher, in Programme hineinzusehen?
 Is it safe to run?	Ist es sicher, es auszuführen?
+Is it a script or notes?	Ist es ein Skript oder Notizen?
 Is there any readable text inside?	Ist darin lesbarer Text enthalten?
 Is this file safe to open?	Ist diese Datei sicher zu öffnen?
 It closed straight away.	Es wurde sofort wieder geschlossen.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	Was sendet es über das Internet?
 What does this app do?	Was macht diese App?
 What does this app store?	Was speichert diese App?
 What does this contract do?	Was macht dieser Contract?
+What does this file say?	Was steht in dieser Datei?
 What does this module do?	Was macht dieses Modul?
 What does this program do?	Was macht dieses Programm?
 What does {what} do?	Was macht {what}?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Welche KI deine Fragen beantwortet
 Which file is the main program?	Welche Datei ist das Hauptprogramm?
 Which files does it read or write?	Welche Dateien liest oder schreibt es?
 Which function is this in	In welcher Funktion das ist
+Which program reads it?	Welches Programm liest sie?
 Which servers does it talk to?	Mit welchen Servern spricht es?
 Which servers were contacted?	Welche Server wurden kontaktiert?
 Which websites does it load?	Welche Websites lädt es?

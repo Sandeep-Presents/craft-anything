@@ -74,6 +74,7 @@ A simple snake game	Un semplice gioco del serpente
 A small download (under 200 MB). Free, no account needed.	Un download piccolo (sotto i 200 MB). Gratis, senza account.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Un file piccolo che elenca come si chiama un'app, di cosa ha bisogno e cosa può fare.
 A smart contract (EVM bytecode)	Uno smart contract (bytecode EVM)
+A text file (a script, notes or settings)	Un file di testo (uno script, note o impostazioni)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Un modo di scrivere i byte come codici di due caratteri (da 00 a FF). La vista più grezza di un file.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Un modo di costruire app desktop a partire da pagine web. L'app è in pratica un sito con un browser tutto suo.
 A website	Un sito
@@ -563,6 +564,7 @@ Is anything in here a program?	C'è un programma qui dentro?
 Is anything sensitive saved in plain text?	C'è qualcosa di sensibile salvato in chiaro?
 Is it safe to look inside programs?	È sicuro guardare dentro i programmi?
 Is it safe to run?	È sicuro eseguirlo?
+Is it a script or notes?	È uno script o delle note?
 Is there any readable text inside?	C'è del testo leggibile dentro?
 Is this file safe to open?	Questo file è sicuro da aprire?
 It closed straight away.	Si è chiuso subito.
@@ -1226,6 +1228,7 @@ What does it send over the internet?	Cosa manda su internet?
 What does this app do?	Cosa fa questa app?
 What does this app store?	Cosa conserva questa app?
 What does this contract do?	Cosa fa questo contratto?
+What does this file say?	Cosa dice questo file?
 What does this module do?	Cosa fa questo modulo?
 What does this program do?	Cosa fa questo programma?
 What does {what} do?	Cosa fa {what}?
@@ -1258,6 +1261,7 @@ Which AI answers your questions	Quale IA risponde alle tue domande
 Which file is the main program?	Quale file è il programma principale?
 Which files does it read or write?	Quali file legge o scrive?
 Which function is this in	In quale funzione si trova
+Which program reads it?	Quale programma lo legge?
 Which servers does it talk to?	Con quali server parla?
 Which servers were contacted?	Quali server sono stati contattati?
 Which websites does it load?	Quali siti carica?

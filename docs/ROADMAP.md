@@ -1506,10 +1506,16 @@ Owner: open · Status: in progress
       and for the `.md` tried `core_overview_show` ("Unknown file magic"), then triage, then
       `core_text_read`. All three quoted the file exactly; none used a byte or string search
       — claimed: chordpli, branch test/r3.11-text-read-live-chat
-- [ ] A text file is still "A file we don't recognise yet" everywhere but triage's answer: the
+- [x] A text file is still "A file we don't recognise yet" everywhere but triage's answer: the
       target's kind stays `unknown`, so `core_targets_list` and triage's `description` say so, and
       Codex tried `core_overview_show` on a `.md` before triage. Give text its own target kind (or
-      description) so the list and the app call it text
+      description) so the list and the app call it text. Text now has its own kind: `sniff` asks
+      the text rule text files are already judged by (a mark, valid UTF-8, no zero bytes, few
+      control characters) before falling back to `unknown`, so the list, triage's `description`, the title bar and the Ask screen call a
+      Markdown note, script, settings or log "A text file (a script, notes or settings)", and the
+      Ask screen offers text questions for it. The bytes decide, not the name: a `.txt` that is
+      really compressed stays `unknown`, and a `.js` file keeps `script`
+      — claimed: muraa-p, branch feature/r3.11-text-target-kind
 
 ### R3.12 Format parser correctness
 Owner: open · Status: in progress

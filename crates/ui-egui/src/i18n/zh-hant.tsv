@@ -74,6 +74,7 @@ A simple snake game	簡單的貪食蛇遊戲
 A small download (under 200 MB). Free, no account needed.	下載量較小 (不到 200 MB)。免費，無須帳戶。
 A small file that lists what an app is called, what it needs and what it's allowed to do.	一個小檔案，列出應用程式名稱、所需條件及允許執行的操作。
 A smart contract (EVM bytecode)	智慧合約 (EVM 位元組碼)
+A text file (a script, notes or settings)	文字檔（指令碼、筆記或設定）
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	用兩個字元的編碼 (00 到 FF) 表示位元組的方式，顯示檔案最原始的內容。
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	一種使用網頁建置桌面應用程式的方式，應用程式本質上就是自帶瀏覽器的網站。
 A website	網站
@@ -562,6 +563,7 @@ Is anything in here a program?	這裡面有程式嗎？
 Is anything sensitive saved in plain text?	是否有敏感資訊以明文儲存？
 Is it safe to look inside programs?	檢視程式內部安全嗎？
 Is it safe to run?	執行它安全嗎？
+Is it a script or notes?	它是指令碼還是筆記？
 Is there any readable text inside?	裡面有可讀的文字嗎？
 Is this file safe to open?	這個檔案可以安全開啟嗎？
 It closed straight away.	它啟動後立即關閉了。
@@ -1224,6 +1226,7 @@ What does it send over the internet?	它透過網際網路傳送了什麼？
 What does this app do?	這個應用程式有什麼用途？
 What does this app store?	這個應用程式會儲存什麼？
 What does this contract do?	這個合約有什麼作用？
+What does this file say?	這個檔案說了什麼？
 What does this module do?	這個模組有什麼用途？
 What does this program do?	這個程式有什麼功能？
 What does {what} do?	{what} 有什麼作用？
@@ -1256,6 +1259,7 @@ Which AI answers your questions	由哪個 AI 回答你的問題
 Which file is the main program?	哪個檔案是主程式？
 Which files does it read or write?	它會讀寫哪些檔案？
 Which function is this in	這屬於哪個函式
+Which program reads it?	哪個程式讀取它？
 Which servers does it talk to?	它與哪些伺服器通訊？
 Which servers were contacted?	連線了哪些伺服器？
 Which websites does it load?	它會載入哪些網站？

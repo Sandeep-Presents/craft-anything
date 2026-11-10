@@ -74,6 +74,7 @@ A simple snake game	Jednoduchá hra Had
 A small download (under 200 MB). Free, no account needed.	Malá velikost ke stažení (méně než 200 MB). Zdarma, bez účtu.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Malý soubor s názvem aplikace, jejími požadavky a oprávněními.
 A smart contract (EVM bytecode)	Chytrý kontrakt (bajtkód EVM)
+A text file (a script, notes or settings)	Textový soubor (skript, poznámky nebo nastavení)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Zápis bajtů pomocí dvouznakových kódů (00 až FF). Nejzákladnější pohled na obsah souboru.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Způsob vytváření desktopových aplikací z webových stránek. Aplikace je v podstatě web s vlastním prohlížečem.
 A website	Web
@@ -562,6 +563,7 @@ Is anything in here a program?	Je zde nějaký program?
 Is anything sensitive saved in plain text?	Jsou citlivé údaje uloženy jako prostý text?
 Is it safe to look inside programs?	Je bezpečné nahlížet do programů?
 Is it safe to run?	Je bezpečné to spustit?
+Is it a script or notes?	Je to skript nebo poznámky?
 Is there any readable text inside?	Je uvnitř nějaký čitelný text?
 Is this file safe to open?	Je bezpečné tento soubor otevřít?
 It closed straight away.	Ihned se ukončil.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	Co to odesílá přes internet?
 What does this app do?	Co tato aplikace dělá?
 What does this app store?	Co tato aplikace ukládá?
 What does this contract do?	Co tento kontrakt dělá?
+What does this file say?	Co je v tomto souboru?
 What does this module do?	Co tento modul dělá?
 What does this program do?	Co tento program dělá?
 What does {what} do?	Co dělá {what}?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Která AI odpovídá na vaše otázky
 Which file is the main program?	Který soubor je hlavní program?
 Which files does it read or write?	Které soubory čte nebo zapisuje?
 Which function is this in	Ve které funkci se to nachází
+Which program reads it?	Který program ho čte?
 Which servers does it talk to?	Se kterými servery komunikuje?
 Which servers were contacted?	Které servery byly kontaktovány?
 Which websites does it load?	Které weby načítá?

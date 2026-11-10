@@ -74,6 +74,7 @@ A simple snake game	Lihtne usumäng
 A small download (under 200 MB). Free, no account needed.	Väike allalaadimine (alla 200 MB). Tasuta, kontot pole vaja.
 A small file that lists what an app is called, what it needs and what it's allowed to do.	Väike fail, kus on kirjas rakenduse nimi, vajadused ja lubatud tegevused.
 A smart contract (EVM bytecode)	Nutileping (EVM-i baitkood)
+A text file (a script, notes or settings)	Tekstifail (skript, märkmed või seaded)
 A way of writing bytes as two-character codes (00 to FF). The rawest view of a file.	Viis kirjutada baidid kahekohaliste koodidena (00 kuni FF). Faili kõige toorem vaade.
 A way to build desktop apps out of web pages. The app is basically a website with its own browser.	Viis ehitada töölauarakendusi veebilehtedest. Rakendus on põhimõtteliselt veebileht oma brauseriga.
 A website	Veebileht
@@ -562,6 +563,7 @@ Is anything in here a program?	Kas siin sees on midagi programmi?
 Is anything sensitive saved in plain text?	Kas midagi tundlikku on salvestatud lihttekstina?
 Is it safe to look inside programs?	Kas programmidesse sisse vaadata on turvaline?
 Is it safe to run?	Kas seda on turvaline käivitada?
+Is it a script or notes?	Kas see on skript või märkmed?
 Is there any readable text inside?	Kas sees on loetavat teksti?
 Is this file safe to open?	Kas seda faili on turvaline avada?
 It closed straight away.	See sulgus kohe.
@@ -1224,6 +1226,7 @@ What does it send over the internet?	Mida see interneti kaudu saadab?
 What does this app do?	Mida see rakendus teeb?
 What does this app store?	Mida see rakendus salvestab?
 What does this contract do?	Mida see leping teeb?
+What does this file say?	Mida see fail ütleb?
 What does this module do?	Mida see moodul teeb?
 What does this program do?	Mida see programm teeb?
 What does {what} do?	Mida {what} teeb?
@@ -1256,6 +1259,7 @@ Which AI answers your questions	Milline AI vastab sinu küsimustele
 Which file is the main program?	Milline fail on põhiprogramm?
 Which files does it read or write?	Milliseid faile see loeb või kirjutab?
 Which function is this in	Millises funktsioonis see on
+Which program reads it?	Milline programm seda loeb?
 Which servers does it talk to?	Milliste serveritega see suhtleb?
 Which servers were contacted?	Millistega serveritest ühendust võeti?
 Which websites does it load?	Milliseid veebilehti see laadib?
