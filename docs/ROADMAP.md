@@ -924,7 +924,7 @@ Owner: open · Status: in progress
       refuses when no model or key is set up, or an OpenRouter model has no OpenRouter key: both
       would offer a sign-in and wait for a browser nobody is at (#72).
       — claimed: hasnain607, branch feature/r2.2-aider-adapter
-- [ ] Aider: a Clean room run is refused in `validate_access`, but only the ACP path called it, so a
+- [x] Aider: a Clean room run is refused in `validate_access`, but only the ACP path called it, so a
       native run (`run_cli`) still started Aider and its unchecked reads. Call it before the setup
       check, with a test through the launch path
       — claimed: hasnain607, branch bugfix/r2.2-aider-clean-room-run-cli

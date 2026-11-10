@@ -945,6 +945,12 @@ fn run_cli(spec: &CliSpec, text: &str, retry: bool, tx: &Sender<AgentEvent>, sto
         });
         return nothing_done(&name);
     }
+    // An access mode this agent can't hold (Clean room, for one whose reads we can't check) is
+    // refused before anything else starts.
+    if let Err(e) = adapter.validate_access(access_for(spec.builder.is_some(), spec.deep, spec.question)) {
+        let _ = tx.send(AgentEvent::Error { message: e.message, remediation: e.remediation, log: None });
+        return nothing_done(&name);
+    }
     // The folder the agent's process starts in below.
     let cwd = remote.is_none().then(|| spec.project.clone().or_else(|| std::env::current_dir().ok())).flatten();
     if let Err(e) = adapter.check_native_options(&spec.options, cwd.as_deref()) {
@@ -3329,5 +3335,31 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
             assert!(!fix.to_lowercase().contains("copilot"), "{fix}");
             assert_eq!(fix.contains("Use test-agent sign-in."), guidance.is_some());
         }
+    }
+
+    /// A Clean room run of an agent whose reads can't be checked is refused on the path every
+    /// native run takes, before its program starts.
+    #[cfg(unix)]
+    #[test]
+    fn a_clean_room_run_of_aider_is_refused_before_it_starts() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("aider");
+        std::fs::write(&program, "#!/bin/sh\necho run >> \"$(dirname \"$0\")/runs\"\nexit 0\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = BackendConfig { name: "Aider".into(), kind: BackendKind::AgentCli, model: "aider".into(), base_url: None, ssh_host: None, enabled: true };
+        let options = BackendOptions { command: Some(program.display().to_string()), ..Default::default() };
+        let mut spec = CliSpec::new(config, options, false, None);
+        spec.deep = false;
+        let mut c = CliConversation::new(spec);
+        c.send("x");
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut all = Vec::new();
+        while std::time::Instant::now() < deadline && !all.iter().any(|e| matches!(e, AgentEvent::TurnDone { .. })) {
+            all.extend(c.poll());
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(all.iter().any(|e| matches!(e, AgentEvent::Error { message, .. } if message.contains("Clean room"))), "{all:?}");
+        assert!(!dir.path().join("runs").exists(), "Aider must not start in a Clean room run");
     }
 }
