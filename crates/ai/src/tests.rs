@@ -1524,6 +1524,23 @@ fn hub_config_keys_and_test_backend() {
     assert!(h.compare("Local", "Local", true).is_err());
 }
 
+/// A catalogue that names its API as text keeps its chat models and drops the others; an id with
+/// a control character is dropped rather than shown.
+#[test]
+fn a_model_list_with_a_text_api_keeps_chat_models() {
+    let models = json!({"data":[
+        {"id":"openai/gpt-4o-mini","api":"chat"},
+        {"id":"openai/text-embedding-3-small","api":"embedding"},
+        {"id":"bad\u{1b}[31m","api":"chat"},
+        {"id":"gpt-5.4","api":{"chat-completions":{}}},
+        {"id":"other","api":{"responses":{}}},
+    ]})
+    .to_string();
+    let (url, _) = mock(vec![(200, "application/json", models)]);
+    let list = openai::OpenAi::compatible("Router", &url, None, "").list_models(Duration::from_secs(5)).unwrap();
+    assert_eq!(list, vec!["openai/gpt-4o-mini", "gpt-5.4"]);
+}
+
 /// #369: when OpenRouter has no provider that supports tools for a model (404 once only those are
 /// asked for), the turn goes on with the text protocol instead of failing; the first request
 /// required parameters, the second sends no tools.

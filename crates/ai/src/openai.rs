@@ -242,13 +242,14 @@ impl OpenAi {
         let arr = v.get("data").or_else(|| v.get("models")).and_then(Value::as_array).cloned().unwrap_or_default();
         // A catalogue may list a model only for another API (Responses, Messages): such an entry
         // would fail on a chat-completions client, so skip it when the entry says which APIs it
-        // serves. Empty and repeated ids are dropped too.
+        // serves. A catalogue that names the API as text ("chat") lists chat models. Empty and
+        // repeated ids are dropped too, and so are ids with control characters.
         let mut out: Vec<String> = Vec::new();
         for m in arr {
-            if m.get("api").is_some_and(|a| a.get("chat-completions").is_none()) {
+            if m.get("api").is_some_and(|a| if let Some(api) = a.as_str() { api != "chat" } else { a.get("chat-completions").is_none() }) {
                 continue;
             }
-            let Some(id) = m.get("id").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) else { continue };
+            let Some(id) = m.get("id").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty() && !s.chars().any(char::is_control)) else { continue };
             if !out.iter().any(|seen| seen == id) {
                 out.push(id.to_string());
             }
