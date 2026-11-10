@@ -1406,6 +1406,7 @@ fn an_ai_server_is_added_by_its_address() {
         delta: egui::vec2(0.0, -300.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Wheel,
     });
     h.run_steps(20);
     h.get_by_label("Add").click();
