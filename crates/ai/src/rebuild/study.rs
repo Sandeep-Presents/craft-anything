@@ -171,6 +171,22 @@ impl Worker {
                 }
                 craft_anything_engine::project::write_atomic(&capture.join("README.md"), notes.as_bytes())?;
             }
+            // An app on a device is only ever watched from outside, in either mode: what the
+            // device says about itself now; the map of its screens comes with the device study.
+            TargetRef::Device { serial, package } => {
+                self.step(ws, Step::Study, Status::Inspecting, &format!("Looking at {package} on {serial}…"))?;
+                let capture = ws.capture_dir();
+                std::fs::create_dir_all(&capture).map_err(|e| ToolError::io(capture.display(), e))?;
+                let mut notes = format!(
+                    "# {package} on {serial}\n\nAn app on a device is watched as a person uses it: nothing inside it (its files, code or packages) is read, in Clean room or Deep mode.\n\n## The device\n\n"
+                );
+                notes.push_str(&match self.call("adb_device_show", json!({"serial": serial})) {
+                    Ok(out) => format!("{}\n", summary_of(&out)),
+                    Err(e) => format!("The device didn't answer: {}\n", e.message),
+                });
+                notes.push_str("\n## Its screens\n\nNot mapped yet: map them with adb_app_map into capture/map/ (screens.json and a folder per screen), then work from that.\n");
+                craft_anything_engine::project::write_atomic(&capture.join("README.md"), notes.as_bytes())?;
+            }
             TargetRef::None => {
                 let capture = ws.capture_dir();
                 std::fs::create_dir_all(&capture).map_err(|e| ToolError::io(capture.display(), e))?;
@@ -362,6 +378,14 @@ fn remove_deep_only(capture: &Path) -> Result<(), ToolError> {
         Err(e) => return Err(ToolError::io(runs.display(), e)),
     }
     Ok(())
+}
+
+/// A tool result's one-line summary (its evidence summary, or the value's first line).
+pub(super) fn summary_of(out: &ToolOutput) -> String {
+    match out {
+        ToolOutput::Evidence(e) => e.summary.clone(),
+        ToolOutput::Value(v) => serde_json::to_string(v).unwrap_or_default().chars().take(400).collect(),
+    }
 }
 
 /// A short text view of a tool result for the study notes.
