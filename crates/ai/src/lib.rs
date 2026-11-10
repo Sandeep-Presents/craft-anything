@@ -49,6 +49,13 @@ impl ServerWindow {
         agent::offers_lean(tools, self.local, self.budget(configured))
     }
 
+    /// Whether the lean list is only for now: it is lean, the server hasn't named a window, and
+    /// one naming a large window would lift it. A budget set below the full list's stays lean.
+    pub fn lean_until_told(&self, tools: ToolList, configured: Option<u64>) -> bool {
+        let told = ServerWindow { window: Some(window::Window { tokens: u64::MAX / 2, source: "" }), ..*self };
+        self.window.is_none() && self.lean_tools(tools, configured) && !told.lean_tools(tools, configured)
+    }
+
     /// The budget a conversation gets with this setting (`None`: Auto), worked out exactly as the
     /// agent loop does before its first request.
     pub fn budget(&self, configured: Option<u64>) -> u64 {

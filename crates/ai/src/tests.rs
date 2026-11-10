@@ -687,6 +687,14 @@ fn a_budget_is_worked_out_from_the_servers_window() {
     assert_eq!(w(None, true).budget(None), crate::context::LOCAL_CONTEXT_TOKENS);
     assert_eq!(w(None, false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS);
     assert_eq!(w(Some(1_000_000), false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS, "a paid service isn't raised");
+    // The lean list is only for now when a server naming a large window would lift it.
+    let auto = crate::ToolList::Auto;
+    assert!(w(None, true).lean_until_told(auto, None), "Auto budget, no window yet");
+    assert!(!w(None, true).lean_until_told(auto, Some(10_000)), "a small budget stays lean");
+    assert!(w(None, true).lean_tools(auto, Some(10_000)));
+    assert!(!w(Some(16_384), true).lean_until_told(auto, None), "the server named a small window");
+    assert!(!w(None, true).lean_until_told(crate::ToolList::Lean, None), "a chosen list");
+    assert!(!w(None, false).lean_until_told(auto, None), "a paid service isn't lean");
     let (h, _d) = hub();
     let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
     h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();

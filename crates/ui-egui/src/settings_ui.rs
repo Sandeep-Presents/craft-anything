@@ -638,10 +638,10 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                 if tools == ToolList::Auto
                                     && let Some(Some(Some(server))) = server
                                 {
-                                    let works_out = match (server.lean_tools(tools, saved), server.window.is_some() || !server.local) {
+                                    let works_out = match (server.lean_tools(tools, saved), server.lean_until_told(tools, saved)) {
                                         (false, _) => tr("(every tool)"),
-                                        (true, true) => tr("(the lean list)"),
-                                        (true, false) => tr("(the lean list until its server says it holds more)"),
+                                        (true, false) => tr("(the lean list)"),
+                                        (true, true) => tr("(the lean list until its server says it holds more)"),
                                     };
                                     ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
                                 }
