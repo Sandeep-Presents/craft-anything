@@ -481,6 +481,8 @@ been run live.
       for the window read from the server (#1155)
 - [x] A per-backend context budget in `[[ai.backends]]` (`LoopConfig::context_tokens` exists), for
       services whose real window differs from 150k (#374) — implementation: `6bd94b84828ec89b805cb8a246f557d0a778c037`
+- [ ] A per-backend request rate in `[[ai.backends]]`, for services that limit requests per
+      second or minute (#668) — claimed: justinjohn0306, branch `feature/r5.4-requests-per-minute`
 - [x] Find LM Studio on another port (#73): the port in its settings file (when it is there) and
       the ports 1235-1239 are probed like the usual servers; OpenCode's own `baseURL`s were already
       read (#83)
