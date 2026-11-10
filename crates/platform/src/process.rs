@@ -864,12 +864,19 @@ impl Supervisor {
 fn end(child: &mut dyn ChildWrapper, name: &str) {
     let _ = child.start_kill();
     let deadline = Instant::now() + REAP_GRACE;
-    while let Ok(None) = child.try_wait() {
-        if Instant::now() >= deadline {
-            log::warn!("{name}: still there {} s after it was stopped; not waiting for it", REAP_GRACE.as_secs());
-            return;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
+            Ok(None) => {
+                log::warn!("{name}: still there {} s after it was stopped; not waiting for it", REAP_GRACE.as_secs());
+                return;
+            }
+            Err(e) => {
+                log::warn!("{name}: couldn't tell whether it ended after it was stopped: {e}");
+                return;
+            }
         }
-        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
