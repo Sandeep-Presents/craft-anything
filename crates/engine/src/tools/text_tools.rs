@@ -119,9 +119,9 @@ fn utf8(bytes: &[u8]) -> (String, usize) {
 }
 
 fn utf16(bytes: &[u8], unit: fn([u8; 2]) -> u16) -> (String, usize) {
-    let pairs = bytes.chunks_exact(2);
-    let odd = !pairs.remainder().is_empty();
-    let units = pairs.map(|p| unit([p.first().copied().unwrap_or(0), p.get(1).copied().unwrap_or(0)]));
+    let (pairs, rest) = bytes.as_chunks::<2>();
+    let odd = !rest.is_empty();
+    let units = pairs.iter().map(|p| unit(*p));
     let mut text = String::with_capacity(bytes.len() / 2);
     let mut replaced = usize::from(odd);
     for c in char::decode_utf16(units) {
@@ -169,9 +169,11 @@ struct Page {
     full: bool,
 }
 
-fn page(all: &[&str], start: usize, limit: usize) -> Page {
+/// The page of `lines` from `start`. Takes the lines as they come, so a file of millions of short
+/// lines is never held as a list.
+fn page<'a>(lines: impl Iterator<Item = &'a str>, start: usize, limit: usize) -> Page {
     let mut out = Page { text: String::new(), lines: 0, cut: Vec::new(), full: false };
-    for (i, line) in all.iter().enumerate().skip(start) {
+    for (i, line) in lines.enumerate().skip(start) {
         if out.lines >= limit {
             break;
         }
@@ -204,10 +206,9 @@ fn core_text_read(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolEr
     };
     ctx.cancel.check()?;
 
-    let all: Vec<&str> = d.text.lines().collect();
-    let total = all.len();
+    let total = d.text.lines().count();
     let start = p.offset.min(total);
-    let pg = page(&all, start, p.limit);
+    let pg = page(d.text.lines(), start, p.limit);
     let end = start.saturating_add(pg.lines);
 
     let mut lims = vec![Limitation::new(
