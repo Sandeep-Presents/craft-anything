@@ -16,7 +16,8 @@ use std::time::Duration;
 
 #[derive(Debug, Args)]
 pub struct RebuildArgs {
-    /// A web address, an absolute path to an app, game or file, or `-` for none.
+    /// A web address, `adb:<serial>/<package>` for an app on a phone or TV, an absolute path to
+    /// an app, game or file, or `-` for none.
     pub target: String,
     /// What to make, in your words.
     pub request: String,

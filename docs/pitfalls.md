@@ -55,6 +55,9 @@ added an app the new rule rejected; both were green on their own branch.
   And with a layout change: #687 moved coding agents onto their own tab of what Detect found, and
   #664, merged next, tested a button on that list without picking the tab. Checking that two PRs
   merge cleanly isn't checking that their tests pass together: run the UI tests on the merge.
+  And a new tool is a new UI string: #754 added five adb tools whose titles had no catalog entry,
+  so CI's gate failed on `i18n-coverage`, which the finish list doesn't name. A tool's title and
+  its toolset's title go into every catalog in the same PR; `cargo xtask ci` runs the check.
 
 **A table row kept twice by a merge.** Two PRs edited the same STATUS.md row; resolving the
 conflict kept both versions, so five rows reached `main` twice, each copy with a different
@@ -132,6 +135,11 @@ It happened a third time with Ghidra: the test session's engine store was empty,
 still searched PATH, `~/.local/bin` and `/opt/ghidra`, so two Deep-mode tests got Ghidra's answer
 on a machine that had it. `testing::session()` now sets `engines.only_configured`, so it finds only
 the engines its settings or store name.
+And a fourth time with the adb screen tools: the test returned early "when adb is here" only before
+its missing-adb half, and its bad-input half, above that, needed adb found to get as far as the
+tool. It passed on every machine it was written on. No half of a test may lean on the machine:
+build one session with a stand-in and one that finds nothing, and before pushing run the tests
+with the program's folders covered (`bwrap --dev-bind / / --tmpfs <its folder> cargo test …`).
 
 **A failing crate hid the next crate's tests.** `cargo test -p a -p b` stopped after a failure in
 `a`, so `b`'s tests never ran; the rerun was filtered to the failing test, and a broken engine id
@@ -631,6 +639,10 @@ a note, a log line), and test the success path end to end, not just the picking.
 The fix then made the check create `checks/round-N/routes/` first, which made `round-N` exist, and
 `web_site_capture` (which refuses an existing folder) stopped the run. Create a tool's output parent
 right before that tool runs, never a folder that another tool must create itself.
+It happened again in the Android device check: it made `checks/round-N/device/` but not
+`device/states/`, and `adb_screen_state_capture` refuses a folder whose parent is missing, so
+every screen came back "couldn't be read" and the first live round scored 0% (the build check
+had passed). A check's first live run is on a build known to match; a 0% there is the check.
 
 **A size measured after drawing, used a frame late.** The prompt box's height was measured each
 frame and used to size the feed on the next, so every time it grew or shrank one frame showed it
@@ -837,6 +849,14 @@ levels down), and make an install use a copy already found outside our store. Te
 backends from older versions or found from a key got a new id on every run. A fallback id for one
 run is a workaround, not a fix: give each saved provider backend its id once, at startup, before
 any session lock is held (`AiHub::ensure_session_id`), and test a restart keeps the same id.
+
+**A device check that launched the original.** The Android device check installed the build's
+APK, then launched, drove and read the crash log of the *target's* package (the original app's),
+so a rebuild under its own id was never opened: the original was replayed against its own map
+and scored 100%, whatever the build did. Found by reading the code while setting up a trial
+with distinct package ids; a self-compare trial (the same app as original and build) would have
+hidden it. What a check drives is the thing it built, named by what was built (the APK's own
+manifest), never by the target; and a trial of a check compares two different things.
 
 ## Agent tooling
 

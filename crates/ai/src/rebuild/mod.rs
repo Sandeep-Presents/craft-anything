@@ -41,6 +41,7 @@ use std::time::{Duration, Instant};
 pub mod activity;
 mod brief;
 mod check;
+pub mod device;
 pub mod feed;
 mod kept_check;
 pub mod kinds;
@@ -748,6 +749,21 @@ impl Worker {
         }
     }
 
+    /// The Kotlin stack builds with Gradle, which needs a JDK and the Android SDK: say so before
+    /// the first turn rather than after it.
+    fn check_android_tools(&self, stack: &str) -> Result<(), ToolError> {
+        if stack != kinds::AndroidAppKind::STACK {
+            return Ok(());
+        }
+        let settings = self.engine.session().settings.clone();
+        match kinds::android_homes(&settings) {
+            Some(_) => Ok(()),
+            None => Err(ToolError::new(ErrorCode::BadSettings, "Building an Android app needs a JDK (17 or newer) and the Android SDK, and one of them wasn't found.").with_remediation(
+                "Install them (a JDK, and the Android SDK with its command-line tools, platform 36 and build-tools), set JAVA_HOME and ANDROID_HOME or point Settings → Engines at javac and sdkmanager, then start again.",
+            )),
+        }
+    }
+
     /// How the builder's agent runs. Reads the session once: a lock taken twice in one statement
     /// is held by the first until the statement ends, and the second then waits forever. A saved
     /// Claude `--resume` that would continue the project's Deep session in Clean room is refused.
@@ -837,6 +853,7 @@ impl Worker {
         self.self_check = Some((kind.clone(), opts.good_enough));
         let kind = kind.as_ref();
         self.editor = self.find_editor(&ws.manifest.stack)?;
+        self.check_android_tools(&ws.manifest.stack)?;
         let api_resumed = api.as_ref().is_some_and(crate::agent::ApiConversation::resumed);
         let kept = KeptHistory { in_mode: kept_without_api.in_mode || api_resumed, elsewhere: kept_without_api.elsewhere };
         let carrying_on = is_carrying_on(opts, kept.in_mode);
