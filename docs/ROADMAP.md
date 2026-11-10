@@ -635,9 +635,25 @@ yet, and the quick start is how every new person begins.
 - [ ] A live Windows build whose check stalls (Codex, a Godot project, as in the reports): the
       feed names the check it is in, the builder's own checks stop at their 30-minute limit,
       Pause acts between checks and stops a running build step, and a caught bug leaves "Needs you"
-- [ ] A live chat run with a big comparison result, to see Claude Code page it with
-      `core_evidence_browse` (and whether 80 KB is the right size)
+- [x] A live chat run with a big comparison result, to see Claude Code page it with
+      `core_evidence_browse` (and whether 80 KB is the right size). On macOS with `chat --deep`,
+      Claude Code 2.1.322 and two arm64 builds of `cargo` (Rust 1.97.1 and 1.99.0, ~30 MB each),
+      whose `app_builds_line_up` page is 581 KB: Claude Code asked for `detail: summary` itself,
+      then paged with `core_evidence_browse` (`matching`, `fields`; 7–14 KB a page) and quoted the
+      rows; no result reached the budget (largest 25 KB) in 23 calls ($1.14). Without `detail`,
+      the server answered the 581 KB page summary-first (4.8 KB, `continue_with`). 80 KB holds: a
+      79.5 KB page (`limit: 15`) reached Claude Code whole as 37.7 KB of text, about 17k of its
+      25k-token tool limit, and it quoted the page's last row correctly
       — claimed: chordpli, branch test/r5.7-evidence-browse-live
+- [ ] Neither the line-up's summary nor `core_evidence_browse`'s error names the lists it can
+      page: Claude Code asked for `list: "changed"` (a `show` value), got "changed isn't a list of
+      records… Leave them out to page it as it is", and ran the 20 s line-up again with
+      `show: changed` before finding `list: "pairs"` with `matching`. Name the lists (`pairs`,
+      `ambiguous`, `only_left`, `only_right`) in both
+- [ ] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
+      v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
+      pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with
+      the crate hash left out
 - [ ] Live check on Windows: rebuild a project while its frozen pin runs, and the build isn't
       blocked
 
