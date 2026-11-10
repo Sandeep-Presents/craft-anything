@@ -1355,12 +1355,13 @@ mod launch_tests {
         assert!(text.contains("out-line") && text.contains("err-line"), "{text}");
     }
 
-    /// A program that prints far more than the cap keeps running to the end, and its log stays
-    /// small: the cut is ours, not something its own writes run into.
+    /// A program that prints far more than the cap keeps running to the end, and its log is cut
+    /// while it writes: the cut is ours, not something its own writes run into.
     #[test]
     fn a_launched_programs_log_is_cut_back_while_it_runs() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("run.log");
+        std::fs::write(dir.path().join("log-path"), log.display().to_string()).unwrap();
         std::fs::write(dir.path().join("log-writer"), b"go").unwrap();
         let l = Launch::new(std::env::current_exe().unwrap())
             .args(["--ignored", "--exact", "process::launch_tests::log_writer_stand_in"])
@@ -1371,16 +1372,23 @@ mod launch_tests {
             .unwrap();
         let ended = l.wait_timeout(Duration::from_secs(120)).expect("the writer ended");
         assert_eq!(ended.code, Some(0), "a cut never breaks the program's own writes");
-        let wrote: u64 = std::fs::read_to_string(dir.path().join("wrote")).unwrap().trim().parse().unwrap();
-        assert!(wrote > 4 * LOG_CAP, "the stand-in printed more than the cap: {wrote}");
+        let report = std::fs::read_to_string(dir.path().join("wrote")).unwrap();
+        let (wrote, cuts): (u64, u32) = {
+            let mut parts = report.split_whitespace();
+            (parts.next().unwrap().parse().unwrap(), parts.next().unwrap().parse().unwrap())
+        };
+        assert!(wrote > LOG_CAP, "the stand-in printed more than the cap: {wrote}");
+        // The stand-in waits for a cut and writes on past it, so this doesn't depend on how fast
+        // the cuts come: it printed more than the cap, saw the file shrink, and its later writes
+        // were accepted.
+        assert!(cuts >= 1, "the log was cut while the program ran: {report}");
         let kept = std::fs::metadata(&log).unwrap().len();
-        // A cut comes every couple of seconds, so the file can grow past the cap between cuts; what
-        // it can't do is keep everything the program printed.
-        assert!(kept <= 4 * LOG_CAP, "the log stayed under a few caps after {wrote} bytes: {kept}");
+        assert!(kept <= 2 * LOG_CAP, "the log stayed small after {wrote} bytes: {kept}");
     }
 
-    /// Prints 8 MiB in chunks over about four seconds, enough for several cuts, and says how much
-    /// it printed. Only runs when the test above leaves its guard file in the working directory.
+    /// Prints past the cap in chunks, waits to see its own log shrink, writes on to show the cut
+    /// left its writes alone, then says how much it printed and how many cuts it saw. Only runs
+    /// when the test above leaves its guard files in the working directory.
     #[test]
     #[ignore = "stand-in invoked by a_launched_programs_log_is_cut_back_while_it_runs"]
     fn log_writer_stand_in() {
@@ -1388,17 +1396,30 @@ mod launch_tests {
         if std::fs::read("log-writer").is_err() {
             return;
         }
+        let log = std::fs::read_to_string("log-path").unwrap().trim().to_string();
         let chunk = vec![b'x'; 64 * 1024];
         let mut out = std::io::stdout();
-        let mut wrote = 0u64;
-        for _ in 0..128 {
+        let (mut wrote, mut cuts, mut last) = (0u64, 0u32, 0u64);
+        // Enough chunks for a loaded machine: a cut comes every couple of seconds, and this goes on
+        // until it has seen one and written past it.
+        for _ in 0..4096 {
             out.write_all(&chunk).unwrap();
             out.write_all(b"\n").unwrap();
             out.flush().unwrap();
             wrote += chunk.len() as u64 + 1;
-            std::thread::sleep(Duration::from_millis(30));
+            let kept = std::fs::metadata(&log).map(|m| m.len()).unwrap_or(0);
+            if kept < last {
+                cuts += 1;
+            }
+            last = kept;
+            // A cut has been seen and the writes after it have filled the file again, which is the
+            // thing worth proving: the cut doesn't get in the program's way.
+            if cuts > 0 && kept > LOG_CAP / 2 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
         }
-        std::fs::write("wrote", wrote.to_string()).unwrap();
+        std::fs::write("wrote", format!("{wrote} {cuts}")).unwrap();
     }
 
     #[test]

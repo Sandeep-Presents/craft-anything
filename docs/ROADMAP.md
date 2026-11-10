@@ -1379,6 +1379,10 @@ to the project next.
       that file back to empty once it passes 1 MiB, so its writes never fail or block and a program
       that outlives us is untouched; past our exit the file grows again, as it did before.
       — claimed: muraa-p, branch bugfix/r2.10-cap-run-log
+- [x] The log-cap test assumed a cut lands within a few seconds of the stand-in's printing, so a
+      loaded machine could grow the file past the bound with nothing wrong. The stand-in now reads
+      its own log and stops once it has seen a cut and written past it
+      — claimed: muraa-p, branch test/r2.10-log-cap-waits-for-cut
 - [ ] Opening a pin that's already running brings its window to the front, instead of a message
 - [x] How much space pins take in Settings
       — claimed: Afloat16, branch feature/r2.10-pinned-copy-storage
