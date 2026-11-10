@@ -697,6 +697,8 @@ Owner: maintainers · Status: in progress
       environment variables, #669, [PR #726](https://github.com/storytold/craft-anything/pull/726))
       — claimed: riyaz, branch `bugfix/r1.6-windows-vs-cpp-tools`
 - [x] Turn off web and capture tools by default in restricted MCP mode (#856, #855).
+- [ ] Find a Unity Editor that was added to Unity Hub with "Locate" (#1077)
+      — claimed: justinjohn0306, branch `bugfix/r1.6-unity-located-editors`
 
 ---
 
