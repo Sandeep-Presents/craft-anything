@@ -202,6 +202,7 @@ Call the build done	Объявить сборку завершённой
 Called done. A new message carries on from here.	Объявлено завершённым. Новое сообщение продолжает отсюда.
 Cancel	Отмена
 Cancel: don't use this folder	Отмена: не использовать эту папку
+Capture a screen state	Захватить состояние экрана
 Capture a website for rebuilding	Захватить веб-сайт для пересборки
 Capture inventories	Захватить инвентари
 Capture menus, dialogs and tabs	Захватить меню, диалоги и вкладки
@@ -303,6 +304,7 @@ Craft Anything reads the original's code, files and page source with every tool 
 Craft Anything report.md	Craft Anything report.md
 Craft Anything's records, checks and anything it built in app/ are deleted. Your own files in the folder stay as they are.	Записи Craft Anything, проверки и всё, что он собрал в app/, удалены. Ваши собственные файлы в папке остаются как есть.
 Crash dump	Дамп сбоя
+Crashes of an app	Сбои приложения
 Create the project	Создать проект
 Critical	Критический
 Cross-reference: a place in the program that uses or calls the thing you're looking at.	Перекрёстная ссылка: место в программе, которое использует или вызывает объект, на который вы смотрите.
@@ -576,6 +578,11 @@ Jobs ({n})	Задания ({n})
 Just a question: nothing was changed. Answered by	Просто вопрос: ничего не изменилось. Отвечено:
 Just ask	Просто спросите
 Just look inside	Просто загляните внутрь
+Map an app's screens	Составить карту экранов приложения
+Press keys	Нажать клавиши
+Read the screen's controls	Читать элементы управления экрана
+Type text	Ввести текст
+Walk through an app's screens	Пройти по экранам приложения
 Work on my project	Работать над своим проектом
 Work on a project you already have	Работать над проектом, который у вас уже есть
 Pick its folder, say what you want, then press Start.	Выберите его папку, скажите, что хотите, затем нажмите «Старт».

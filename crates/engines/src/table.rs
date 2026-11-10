@@ -186,6 +186,32 @@ const fn linux_home(rel: &'static str) -> KnownPath {
 
 const NO_PATHS: &[KnownPath] = &[];
 
+/// A JDK: `JAVA_HOME`, else the usual folders.
+const JDK_PATHS: &[KnownPath] = &[
+    KnownPath { os: "linux", base: Base::Env("JAVA_HOME"), rel: "bin/javac" },
+    KnownPath { os: "macos", base: Base::Env("JAVA_HOME"), rel: "bin/javac" },
+    KnownPath { os: "windows", base: Base::Env("JAVA_HOME"), rel: "bin/javac.exe" },
+    linux("/usr/lib/jvm/default-java", "bin/javac"),
+    linux("/usr/lib/jvm/java-21-openjdk-amd64", "bin/javac"),
+    linux("/usr/lib/jvm/java-17-openjdk-amd64", "bin/javac"),
+    mac(Base::Dir("/opt/homebrew/opt/openjdk"), "bin/javac"),
+    mac(Base::Dir("/usr/local/opt/openjdk"), "bin/javac"),
+];
+
+/// The Android SDK's command-line tools: `ANDROID_HOME` or `ANDROID_SDK_ROOT`, else where Android
+/// Studio puts the SDK.
+const ANDROID_SDK_PATHS: &[KnownPath] = &[
+    KnownPath { os: "linux", base: Base::Env("ANDROID_HOME"), rel: "cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "linux", base: Base::Env("ANDROID_SDK_ROOT"), rel: "cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "linux", base: Base::Env("HOME"), rel: "Android/Sdk/cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "macos", base: Base::Env("ANDROID_HOME"), rel: "cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "macos", base: Base::Env("ANDROID_SDK_ROOT"), rel: "cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "macos", base: Base::Env("HOME"), rel: "Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager" },
+    KnownPath { os: "windows", base: Base::Env("ANDROID_HOME"), rel: "cmdline-tools/latest/bin/sdkmanager.bat" },
+    KnownPath { os: "windows", base: Base::Env("ANDROID_SDK_ROOT"), rel: "cmdline-tools/latest/bin/sdkmanager.bat" },
+    win("LOCALAPPDATA", "Android/Sdk/cmdline-tools/latest/bin/sdkmanager.bat"),
+];
+
 /// Linux packages put Ghidra in a folder of its own and only a start script on PATH (`/usr/bin/ghidra`):
 /// Arch and its derivatives in `/opt/ghidra`, Debian and Kali in `/usr/share/ghidra` (#85).
 const GHIDRA_PATHS: &[KnownPath] = &[linux("/opt/ghidra", "support/analyzeHeadless"), linux("/usr/share/ghidra", "support/analyzeHeadless")];
@@ -511,6 +537,29 @@ pub const ENGINES: &[ExternalEngine] = &[
         known_roots: NO_ROOTS,
         path_setting: true,
         install: Install::Pinned(VINEFLOWER_PINS),
+    },
+    // Building an Android app (R2.12): a JDK and the Android SDK, found where they are installed.
+    ExternalEngine {
+        id: "jdk",
+        name: "Java Development Kit (javac)",
+        needed_for: "Building Android apps (Gradle needs a JDK, 17 or newer)",
+        exes: &["javac"],
+        exes_windows: &["javac.exe"],
+        known_paths: JDK_PATHS,
+        known_roots: NO_ROOTS,
+        path_setting: true,
+        install: Install::Manual,
+    },
+    ExternalEngine {
+        id: "androidsdk",
+        name: "Android SDK (sdkmanager)",
+        needed_for: "Building Android apps (platforms and build tools)",
+        exes: &["sdkmanager"],
+        exes_windows: &["sdkmanager.bat"],
+        known_paths: ANDROID_SDK_PATHS,
+        known_roots: NO_ROOTS,
+        path_setting: true,
+        install: Install::Manual,
     },
 ];
 
