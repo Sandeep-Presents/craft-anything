@@ -1363,8 +1363,11 @@ to the project next.
 - [ ] Pin a website (a frozen copy of the built site, each served on its own port)
 - [ ] A pin started before the app restarted shows as running (keep its process id and start
       time in the pin, and check both), and can be stopped
-- [ ] Cap a run's log (`last-run.log`, `play.log`): it grows as long as the program prints
-      — in PR #218
+- [x] Cap a run's log (`last-run.log`, `play.log`): it grows as long as the program prints. The
+      program keeps writing straight to an append-only file, and while we are alive a watcher cuts
+      that file back to empty once it passes 1 MiB, so its writes never fail or block and a program
+      that outlives us is untouched; past our exit the file grows again, as it did before.
+      — claimed: muraa-p, branch bugfix/r2.10-cap-run-log
 - [ ] Opening a pin that's already running brings its window to the front, instead of a message
 - [x] How much space pins take in Settings
       — claimed: Afloat16, branch feature/r2.10-pinned-copy-storage
