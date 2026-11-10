@@ -1492,9 +1492,17 @@ Owner: open · Status: in progress
       (Deep only) reads it paged by lines with coverage, counts invalid bytes and cuts long lines;
       triage names it for a text file it doesn't otherwise recognise
       — claimed: chordpli, branch feature/r3.11-text-source-read
-- [ ] Live-check #539 in an agent chat (Codex, as reported, and Claude Code): the agent reaches
-      `core_text_read` from triage for a script or Markdown target, instead of searching bytes
+- [x] Live-check #539 in an agent chat (Codex, as reported, and Claude Code): the agent reaches
+      `core_text_read` for a script or Markdown target, instead of searching bytes. On macOS with
+      `chat --deep` and a `.md` or `.ps1` target: Claude Code 2.1.322 (`.md`) called triage and
+      `core_text_read` together; Codex 0.162.1 read the `.ps1` with `core_text_read` straight away,
+      and for the `.md` tried `core_overview_show` ("Unknown file magic"), then triage, then
+      `core_text_read`. All three quoted the file exactly; none used a byte or string search
       — claimed: chordpli, branch test/r3.11-text-read-live-chat
+- [ ] A text file is still "A file we don't recognise yet" everywhere but triage's answer: the
+      target's kind stays `unknown`, so `core_targets_list` and triage's `description` say so, and
+      Codex tried `core_overview_show` on a `.md` before triage. Give text its own target kind (or
+      description) so the list and the app call it text
 
 ### R3.12 Format parser correctness
 Owner: open · Status: in progress
