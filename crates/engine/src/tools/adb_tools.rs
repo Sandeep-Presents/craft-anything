@@ -2421,20 +2421,16 @@ mod tests {
         }
     }
 
-    /// The walkthrough and the map (R2.12) check every step and limit before adb is looked for,
-    /// run in Clean room, and leave a failed call's folder free.
+    /// The walkthrough and the map (R2.12) check every step and limit before adb is run, run in
+    /// Clean room, leave a failed call's folder free, and without adb say so, on a machine with
+    /// adb and on one without.
     #[test]
     fn walkthrough_and_map_check_their_input_first() {
-        let (e, _d) = engine_without_adb();
+        let (e, _d) = engine_with_stand_in_adb();
         for id in ["adb_ui_walkthrough_record", "adb_app_map"] {
             assert!(crate::clean_room::allows(id), "{id} watches from outside, so Clean room runs it");
             assert!(e.registry().get(id).unwrap().effects.needs_consent(), "{id} changes the device");
         }
-        let with_consent = |id: &str, params: Value| match e.call(id, params, CallOptions { consent: crate::Consent::Granted, ..CallOptions::new(Caller::Mcp) })
-        {
-            Ok(v) => panic!("{id} should fail, got {v:?}"),
-            Err(err) => err,
-        };
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("out").to_string_lossy().to_string();
         let bad = [
@@ -2448,15 +2444,13 @@ mod tests {
             ("adb_app_map", json!({"serial": "emulator-5554", "package": "not a package", "output_directory": out})),
         ];
         for (id, params) in bad {
-            let err = with_consent(id, params);
+            let err = refused(&e, id, params);
             assert_eq!(err.code, ErrorCode::BadInput, "{id} gave {:?}: {}", err.code, err.message);
             assert!(!dir.path().join("out").exists(), "{id}: a refused call made no folder");
         }
-        if adb_locatable(&e) {
-            return;
-        }
+        let e = engine_that_finds_no_adb();
         for id in ["adb_ui_walkthrough_record", "adb_app_map"] {
-            let err = with_consent(id, json!({"serial": "emulator-5554", "package": "com.example.tv", "steps": [{"keys": ["OK"]}], "output_directory": out}));
+            let err = refused(&e, id, json!({"serial": "emulator-5554", "package": "com.example.tv", "steps": [{"keys": ["OK"]}], "output_directory": out}));
             assert_eq!(err.code, ErrorCode::EngineMissing, "{id} gave {:?}", err.code);
             assert!(!dir.path().join("out").exists(), "{id}: no adb, no folder left behind");
         }
