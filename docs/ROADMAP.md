@@ -654,8 +654,12 @@ yet, and the quick start is how every new person begins.
       `kind: summary`) now has `lists`, name → length, for the names browse reaches a list with;
       browse's errors for a name that isn't a list name them too
       — claimed: chordpli, branch bugfix/r5.7-browse-list-names
-- [ ] Live-check the named lists in a Claude Code chat: the same two `cargo` builds, and the
-      agent pages `pairs` straight from the summary, without a wrong list or a second line-up
+- [x] Live-check the named lists in a Claude Code chat: the same two `cargo` builds, and the
+      agent pages `pairs` straight from the summary, without a wrong list or a second line-up.
+      Claude Code 2.1.322, same question: the summary carried `lists` (`pairs` 1448, `ambiguous`
+      612, `only_left` 29746, `only_right` 32342); it ran the line-up once and every browse
+      call asked for `pairs`, none failed (22 calls, $1.06)
+      — claimed: chordpli, branch bugfix/r5.7-browse-list-names
 - [ ] `app_builds_line_up` paired 1,448 of ~36,000 functions across two Rust toolchains: every
       v0 crate hash (`Cs<hash>_`) changed, so exact names rarely match, and some masked-bytes
       pairs are unrelated functions (`hex_encode` → `_git_oid_tostr`). Compare Rust names with
