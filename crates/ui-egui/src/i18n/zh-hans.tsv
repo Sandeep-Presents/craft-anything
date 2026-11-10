@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	（服务器说它不能看）
 (its server doesn't say: not shown pictures)	（服务器没说：不给看图片）
 (asked when a build starts: it's reached over SSH)	（构建开始时再问：它通过 SSH 连接）
+Auto (asked when a build starts: it's reached over SSH)	自动（构建开始时再问：它通过 SSH 连接）
 Set whether an AI sees pictures	设置 AI 是否能看图片

@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	(сервер говорит, что нет)
 (its server doesn't say: not shown pictures)	(сервер не говорит: изображения не показываются)
 (asked when a build starts: it's reached over SSH)	(спросим при начале сборки: он доступен по SSH)
+Auto (asked when a build starts: it's reached over SSH)	Авто (спросим при начале сборки: он доступен по SSH)
 Set whether an AI sees pictures	Задать, видит ли ИИ изображения

@@ -599,6 +599,8 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     let window = server.window.map(|w| crate::builders::token_count(w.tokens));
                                     match (saved, window) {
                                         (None, Some(window)) => Some(trf("Auto: {budget} tokens of the server's {window}", &[("budget", &budget), ("window", &window)])),
+                                        // Over SSH the server isn't asked here (a tunnel would be opened just for this).
+                                        (None, None) if b.over_ssh() => Some(tr("Auto (asked when a build starts: it's reached over SSH)")),
                                         (None, None) => Some(trf("Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)", &[("budget", &budget)])),
                                         (Some(n), Some(window)) if used < n => Some(trf("{budget} will be used: the server holds {window}", &[("budget", &budget), ("window", &window)])),
                                         (Some(_), Some(window)) => Some(trf("The server holds {window}", &[("window", &window)])),
@@ -641,6 +643,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     let works_out = match (server.lean_tools(tools, saved), server.lean_until_told(tools, saved)) {
                                         (false, _) => tr("(every tool)"),
                                         (true, false) => tr("(the lean list)"),
+                                        (true, true) if b.over_ssh() => tr("(asked when a build starts: it's reached over SSH)"),
                                         (true, true) => tr("(the lean list until its server says it holds more)"),
                                     };
                                     ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));

@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	(server říká, že ne)
 (its server doesn't say: not shown pictures)	(server nic neříká: bez obrázků)
 (asked when a build starts: it's reached over SSH)	(zeptá se, až začne sestavení: je připojen přes SSH)
+Auto (asked when a build starts: it's reached over SSH)	Automaticky (zeptá se, až začne sestavení: je připojen přes SSH)
 Set whether an AI sees pictures	Nastavit, zda AI vidí obrázky

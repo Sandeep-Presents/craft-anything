@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	(laut Server nicht)
 (its server doesn't say: not shown pictures)	(der Server sagt nichts: keine Bilder)
 (asked when a build starts: it's reached over SSH)	(wird gefragt, wenn ein Build startet: über SSH erreicht)
+Auto (asked when a build starts: it's reached over SSH)	Automatisch (wird gefragt, wenn ein Build startet: über SSH erreicht)
 Set whether an AI sees pictures	Festlegen, ob eine KI Bilder sieht

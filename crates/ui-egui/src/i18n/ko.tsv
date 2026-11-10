@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	(서버가 볼 수 없다고 함)
 (its server doesn't say: not shown pictures)	(서버가 알려주지 않음: 이미지 없음)
 (asked when a build starts: it's reached over SSH)	(빌드가 시작될 때 물어봄: SSH로 연결됨)
+Auto (asked when a build starts: it's reached over SSH)	자동 (빌드가 시작될 때 물어봄: SSH로 연결됨)
 Set whether an AI sees pictures	AI가 이미지를 보는지 설정

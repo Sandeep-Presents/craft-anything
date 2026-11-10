@@ -1515,4 +1515,5 @@ Whether a builder on this AI is shown pictures: the original's screenshots, your
 (its server says it doesn't)	(selle server ütleb, et ei näe)
 (its server doesn't say: not shown pictures)	(selle server ei ütle: pilte ei näidata)
 (asked when a build starts: it's reached over SSH)	(küsitakse ehituse alguses: see on SSH kaudu)
+Auto (asked when a build starts: it's reached over SSH)	Automaatne (küsitakse ehituse alguses: see on SSH kaudu)
 Set whether an AI sees pictures	Määra, kas AI näeb pilte
