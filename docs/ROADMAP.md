@@ -1423,8 +1423,8 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
-- [ ] Keep the live build activity and prompt box reachable when a long note is waiting for
-      the builder — claimed: jeffreylm, branch bugfix/r2.9-keep-build-activity-visible
+- [x] Let waiting notes scroll with the conversation so a long note leaves the live build
+      activity and prompt box reachable — claimed: jeffreylm, branch bugfix/r2.9-keep-build-activity-visible
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress

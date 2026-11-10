@@ -1788,7 +1788,7 @@ fn a_note_waiting_for_the_builder_can_be_taken_back_into_the_prompt_box() {
     h.state_mut().open_workspace(a.clone());
     h.state_mut().follow_up(Some("Add tags".into()));
     h.run_steps(2);
-    // Notes sent while it works wait under the conversation, not in it.
+    // Waiting notes only join the saved conversation once the builder reads them.
     for note in ["Make them blue", "And sortable"] {
         h.state_mut().state.project_input = note.into();
         h.state_mut().send_message();
@@ -2266,6 +2266,43 @@ fn a_running_build_says_what_it_is_on_and_opens_up_into_its_activity() {
     assert!(runs.finish(&ws.root));
     h.run_steps(3);
     h.get_by_label("What happened in this build");
+}
+
+#[test]
+fn a_long_waiting_note_leaves_the_live_activity_and_prompt_visible() {
+    use craft_anything_ai::{
+        AgentEvent,
+        rebuild::{RunEvent, StandIns},
+    };
+    use craft_anything_engine::workspace::{Step, TargetRef, Workspace};
+    let d = tempfile::tempdir().unwrap();
+    let ws = Workspace::create(d.path(), "Alpha", "A notes app", TargetRef::None).unwrap();
+    let runs = StandIns::new();
+    let (dir, r) = (d.path().to_path_buf(), runs.clone());
+    let size = egui::vec2(1280.0, 600.0);
+    let mut h = harness_sized(size, move || stand_in_app(dir, &r));
+    h.state_mut().open_workspace(ws.clone());
+    h.state_mut().follow_up(Some("Add tags".into()));
+    assert!(runs.send(&ws.root, RunEvent::Step { step: Step::Build, text: "Building the first version…".into() }));
+    assert!(runs.send(
+        &ws.root,
+        RunEvent::Agent(AgentEvent::ToolStarted { call_id: "test".into(), tool: "Bash".into(), input: serde_json::json!({"command": "cargo test --quiet"}) })
+    ));
+    h.run_steps(4);
+
+    let note = "Please make the notes sortable and keep the selected tags.\n".repeat(160);
+    h.state_mut().state.project_input = note.trim_end().into();
+    h.state_mut().send_message();
+    h.run_steps(4);
+
+    let prompt = h.get_by_label("Ask for a change").rect();
+    assert!(prompt.bottom() <= size.y, "the prompt box is on the screen");
+    let activity = h.query_all_by_label_contains("Now: Running cargo test --quiet").next().expect("the live activity is shown").rect();
+    assert!(activity.top() >= 0.0 && activity.bottom() < prompt.top(), "the live activity is visible above the prompt");
+    let details = h.get_by_label("More detail").rect();
+    assert!(details.top() >= 0.0 && details.bottom() < prompt.top(), "the activity log can be opened");
+    let send = h.get_by_label("Send now").rect();
+    assert!(send.top() >= 0.0 && send.bottom() < activity.top(), "the waiting note's controls are reachable");
 }
 
 #[test]

@@ -887,6 +887,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
             .frame(egui::Frame::new().fill(t.canvas).inner_margin(Margin::same(20)))
             .show(ui, |ui| egui::ScrollArea::vertical().show(ui, |ui| side(app, ui, &ws)));
     }
+    let waiting = app.open_run().filter(|r| r.is_running()).map(RebuildRun::waiting).unwrap_or_default();
     egui::CentralPanel::default().frame(egui::Frame::new().fill(t.canvas).inner_margin(chat::PANE_MARGIN)).show(ui, |ui| {
         let width = ui.available_width();
         let max_w = width.min(720.0);
@@ -910,7 +911,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
                                 .show(ui, |ui| side(app, ui, &ws));
                             ui.add_space(chat::MESSAGE_GAP);
                         }
-                        feed(app, ui, &ws);
+                        feed(app, ui, &ws, &waiting);
                     });
                 });
             });
@@ -918,7 +919,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(chat::COMPOSER_GAP);
         let r = ui.horizontal(|ui| {
             ui.add_space(pad);
-            ui.vertical(|ui| composer(app, ui, max_w, &t));
+            ui.vertical(|ui| composer(app, ui, max_w, &t, waiting.last()));
         });
         chat::remember_composer_height(ui, comp_id, comp_h, r.response.rect.height());
     });
@@ -1191,7 +1192,7 @@ fn stat_row(ui: &mut Ui, label: &str, value: &str) -> egui::Response {
     }
 }
 
-fn feed(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
+fn feed(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace, waiting: &[Note]) {
     let t = Tokens::get(ui.ctx());
     let ctx = ui.ctx().clone();
     let mut answers: Vec<(String, Answer, String)> = Vec::new();
@@ -1225,6 +1226,9 @@ fn feed(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
         });
         ui.add_space(10.0);
     }
+    // Waiting notes scroll with the conversation. The live activity comes after them so it
+    // stays visible when the feed follows the latest work.
+    waiting_notes(app, ui, waiting, &t);
     let items = &app.state.feed;
     // With a plan pinned below, it shows the work and the clock; one progress display, not two.
     let pinned = plan(items).is_some();
@@ -1744,7 +1748,38 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
     });
 }
 
-fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens) {
+/// Notes waiting for the builder's next step: each can be taken back, or all sent now.
+fn waiting_notes(app: &mut CraftApp, ui: &mut Ui, waiting: &[Note], t: &Tokens) {
+    let mut take_back = None;
+    for (i, note) in waiting.iter().enumerate() {
+        ui.push_id(("waiting-note", note.id), |ui| {
+            chat::user_bubble(ui, &note.shown, false);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if icons::button(ui, "x", 22.0, false, "Take back: puts it in the box again").clicked() {
+                    take_back = Some(note.id);
+                }
+                // Said once, under the last note.
+                if i + 1 == waiting.len() {
+                    if widgets::link(ui, "Send now").on_hover_text(tr("Stops the current step and sends your notes straight away.")).clicked() {
+                        app.pause();
+                    }
+                    let line = if waiting.len() == 1 {
+                        tr("Waiting: the builder reads it at its next step. Up arrow to edit.")
+                    } else {
+                        tr("Waiting: the builder reads these at its next step. Up arrow to edit the last.")
+                    };
+                    ui.label(RichText::new(line).color(t.text_dim).size(theme::SMALL));
+                }
+            });
+        });
+        ui.add_space(4.0);
+    }
+    if let Some(id) = take_back {
+        app.unsend(id);
+    }
+}
+
+fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens, last_waiting: Option<&Note>) {
     let running = app.running();
     if let Some(steps) = plan(&app.state.feed).filter(|p| running || p.iter().any(|s| s.status != PlanStatus::Done)) {
         let began = app.open_run().filter(|_| running).map(RebuildRun::started);
@@ -1773,36 +1808,6 @@ fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens) {
             ui.label(RichText::new(line).color(t.text_dim).size(theme::SMALL));
         });
         ui.add_space(4.0);
-    }
-    // Notes waiting for the builder's next step: each can be taken back, or all sent now.
-    let waiting = app.open_run().filter(|r| r.is_running()).map(RebuildRun::waiting).unwrap_or_default();
-    let mut take_back = None;
-    // As wide as the prompt box below, so they line up with it.
-    ui.allocate_ui(Vec2::new(width, 0.0), |ui| {
-        for (i, note) in waiting.iter().enumerate() {
-            chat::user_bubble(ui, &note.shown, false);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, "x", 22.0, false, "Take back: puts it in the box again").clicked() {
-                    take_back = Some(note.id);
-                }
-                // Said once, under the last note.
-                if i + 1 == waiting.len() {
-                    if widgets::link(ui, "Send now").on_hover_text(tr("Stops the current step and sends your notes straight away.")).clicked() {
-                        app.pause();
-                    }
-                    let line = if waiting.len() == 1 {
-                        tr("Waiting: the builder reads it at its next step. Up arrow to edit.")
-                    } else {
-                        tr("Waiting: the builder reads these at its next step. Up arrow to edit the last.")
-                    };
-                    ui.label(RichText::new(line).color(t.text_dim).size(theme::SMALL));
-                }
-            });
-            ui.add_space(4.0);
-        }
-    });
-    if let Some(id) = take_back {
-        app.unsend(id);
     }
     // Pause was pressed and the build hasn't stopped yet: the button says so until it does.
     let open_root = app.workspace.as_ref().map(|w| w.root.clone());
@@ -1841,14 +1846,14 @@ fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens) {
                 stop_button: running.then_some("Pause"),
                 stopping: pausing,
                 send: true,
-                recall: !waiting.is_empty(),
+                recall: last_waiting.is_some(),
                 history: Some(&history),
                 font_size: theme::BODY,
             },
         );
         // Like the x on a note: the last one waiting comes back into the box to be edited.
         if out.recall
-            && let Some(note) = waiting.last()
+            && let Some(note) = last_waiting
         {
             app.unsend(note.id);
         }
