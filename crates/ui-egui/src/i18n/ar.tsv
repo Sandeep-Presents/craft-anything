@@ -1463,3 +1463,6 @@ Couldn't change the approvals:	تعذّر تغيير الموافقات:
 What the builder may do without asking you, in this project.	ما يحق لوكيل البناء فعله دون سؤالك في هذا المشروع.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	الافتراضي يتبع الوضع التلقائي: عند تشغيله يمضي ما يمكن التراجع عنه ويُرفض الباقي، وعند إيقافه يستأذنك وكيل البناء.
 Connecting to {name}… {seconds} s	جارٍ الاتصال بـ {name}… {seconds} ث
+Stopped adding {name}.	أُوقفت إضافة {name}.
+It isn't there any more, so {program} runs in its place.	لم يعد موجودًا، لذا يعمل {program} مكانه.
+Use it	استخدامه

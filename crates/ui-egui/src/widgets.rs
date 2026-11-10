@@ -495,7 +495,8 @@ fn sweep(painter: &egui::Painter, bar: egui::Rect, now: f64, track: Color32, lit
     painter.rect_filled(bar, radius, track);
     let seg = bar.width() * 0.25;
     let x = bar.left() - seg + (bar.width() + seg) * ((now * 0.6).fract() as f32);
-    let part = egui::Rect::from_x_y_ranges(x.max(bar.left())..=(x + seg).min(bar.right()), bar.y_range());
+    // Measured left to right, then mirrored: right to left, it runs from the right.
+    let part = mirror(bar, egui::Rect::from_x_y_ranges(x.max(bar.left())..=(x + seg).min(bar.right()), bar.y_range()));
     if part.width() > 0.0 {
         painter.rect_filled(part, radius, lit);
     }
@@ -534,7 +535,7 @@ impl egui::Widget for ProgressBar {
         let (rect, response) = ui.allocate_exact_size(self.size, Sense::hover());
         let fraction = self.fraction.filter(|f| f.is_finite()).map(|f| f.clamp(0.0, 1.0));
         response.widget_info(|| {
-            let mut info = egui::WidgetInfo::new(egui::WidgetType::ProgressIndicator);
+            let mut info = egui::WidgetInfo::new(egui::Role::ProgressIndicator);
             info.value = fraction.map(|f| f64::from(f) * 100.0);
             info
         });
@@ -545,7 +546,7 @@ impl egui::Widget for ProgressBar {
                 Some(f) => {
                     let radius = rect.height() / 2.0;
                     ui.painter().rect_filled(rect, radius, track);
-                    let fill = egui::Rect::from_min_size(rect.min, Vec2::new(rect.width() * f, rect.height()));
+                    let fill = mirror(rect, egui::Rect::from_min_size(rect.min, Vec2::new(rect.width() * f, rect.height())));
                     if fill.width() > 0.0 {
                         ui.painter().rect_filled(fill, radius, color);
                     }

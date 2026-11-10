@@ -932,7 +932,8 @@ pub fn progress_bar(ui: &mut Ui, fraction: Option<f32>, message: &str) {
             ((x - 0.25).max(0.0), x)
         }
     };
-    ui.painter().rect_filled(egui::Rect::from_x_y_ranges(bar.left() + bar.width() * from..=bar.left() + bar.width() * to, bar.y_range()), 3.0, t.accent);
+    let done = egui::Rect::from_x_y_ranges(bar.left() + bar.width() * from..=bar.left() + bar.width() * to, bar.y_range());
+    ui.painter().rect_filled(widgets::mirror(bar, done), 3.0, t.accent);
     ui.add_space(4.0);
     let pct = fraction.map(|f| format!("{:.0}%  ·  ", f * 100.0)).unwrap_or_default();
     ui.label(RichText::new(format!("{pct}{message}")).font(theme::mono(12.5)).color(t.text_dim));
