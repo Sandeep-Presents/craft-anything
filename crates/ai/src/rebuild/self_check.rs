@@ -92,6 +92,23 @@ pub fn summary(checks: &[CheckResult], good_enough: f64) -> String {
     text
 }
 
+/// Whether this round's checks moved on from the last round's: a check that newly passes, or
+/// whose likeness rose by more than half a point. A builder turn that changed no file but made
+/// the build measurably better (a device check that reads more, a picture that looks more
+/// alike) is progress, not a stalled turn.
+pub fn moved(previous: &[CheckResult], now: &[CheckResult]) -> bool {
+    now.iter().any(|n| {
+        previous.iter().filter(|p| p.check == n.check).any(|p| {
+            (n.passed && !p.passed)
+                || match (n.similarity, p.similarity) {
+                    (Some(a), Some(b)) => a > b + 0.5,
+                    (Some(_), None) => true,
+                    _ => false,
+                }
+        })
+    })
+}
+
 /// What the builder is told about its own check: each result with its likeness and the bar,
 /// what's still unknown (the checks' and its own open questions), where its pictures are, and
 /// whether it would pass.
@@ -300,5 +317,21 @@ mod tests {
         assert!(building_here(&root));
         drop(mark);
         assert!(!building_here(&root));
+    }
+
+    #[test]
+    fn a_round_that_passes_or_looks_more_alike_has_moved() {
+        let was = [CheckResult { similarity: Some(60.0), ..CheckResult::new("device", 1, false, "") }, CheckResult::new(CheckResult::BUILD, 1, true, "")];
+        let same = [CheckResult { similarity: Some(60.3), ..CheckResult::new("device", 2, false, "") }, CheckResult::new(CheckResult::BUILD, 2, true, "")];
+        assert!(!moved(&was, &same), "a third of a point is noise");
+        let better = [CheckResult { similarity: Some(66.0), ..CheckResult::new("device", 2, false, "") }];
+        assert!(moved(&was, &better));
+        let passes = [CheckResult { similarity: Some(60.0), ..CheckResult::new("device", 2, true, "") }];
+        assert!(moved(&was, &passes), "newly passing is progress");
+        let worse = [CheckResult { similarity: Some(50.0), ..CheckResult::new("device", 2, false, "") }];
+        assert!(!moved(&was, &worse));
+        assert!(!moved(&[], &better), "nothing to compare with");
+        let other = [CheckResult { similarity: Some(99.0), ..CheckResult::new("web-visual", 2, false, "") }];
+        assert!(!moved(&was, &other), "a different check says nothing about this one");
     }
 }

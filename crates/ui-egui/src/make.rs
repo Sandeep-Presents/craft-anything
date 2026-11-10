@@ -12,6 +12,7 @@ use egui::{Margin, RichText, Sense, Ui, Vec2};
 const SUGGESTIONS_WEB: &[&str] = &["Recreate this website", "Recreate it with darker colours"];
 const SUGGESTIONS_APP: &[&str] = &["Make my own version of this app", "Recreate just its main feature"];
 const SUGGESTIONS_GAME: &[&str] = &["Make a game that plays like this", "Make a simpler version of this game"];
+const SUGGESTIONS_DEVICE: &[&str] = &["The same app for my TV", "The same app, screen for screen"];
 const SUGGESTIONS_NONE: &[&str] = &["A website for my bakery", "A simple snake game"];
 
 /// The first http(s) address in some text.
@@ -28,6 +29,12 @@ pub fn url_problem(typed: &str) -> Option<&'static str> {
     if t.is_empty() {
         return None;
     }
+    // An app on a phone or TV, typed in the same box.
+    if TargetRef::looks_like_device(t) {
+        return TargetRef::parse_device(t.trim_start_matches(TargetRef::DEVICE_PREFIX))
+            .is_err()
+            .then_some("Write an app on a device as adb:<serial>/<package>, like adb:192.168.1.20:5555/com.example.tv.");
+    }
     let url = normalize_url(t);
     let host = url.split("://").nth(1).unwrap_or_default().split(['/', '?', '#']).next().unwrap_or_default();
     let host = host.rsplit('@').next().unwrap_or_default().split(':').next().unwrap_or_default();
@@ -37,10 +44,11 @@ pub fn url_problem(typed: &str) -> Option<&'static str> {
     (!ok).then_some("Enter a full web address, like example.com or https://example.com/page.")
 }
 
-/// "example.com" → "https://example.com"; anything with a scheme is kept.
+/// "example.com" → "https://example.com"; anything with a scheme, and an app on a device
+/// (`adb:<serial>/<package>`), is kept.
 pub fn normalize_url(s: &str) -> String {
     let t = s.trim();
-    if t.is_empty() || t.contains("://") { t.to_string() } else { format!("https://{t}") }
+    if t.is_empty() || t.contains("://") || TargetRef::looks_like_device(t) { t.to_string() } else { format!("https://{t}") }
 }
 
 /// The target the draft will use: the picked one, the typed address, or an address in the request.
@@ -129,6 +137,7 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
             TargetRef::Local { .. } if d.game => "For example: the same game, with a high-score table",
             TargetRef::Local { .. } => "For example: the same app, but simpler",
             TargetRef::Website { .. } => "For example: recreate this website",
+            TargetRef::Device { .. } => "For example: the same app for my TV",
             TargetRef::None if d.editing_url || !d.url.is_empty() => "For example: recreate this website",
             TargetRef::None => "For example: a website for my bakery",
         };
@@ -456,6 +465,7 @@ fn suggestions(app: &mut CraftApp, ui: &mut Ui) {
         TargetRef::Website { .. } => SUGGESTIONS_WEB,
         TargetRef::Local { .. } if app.state.make.game => SUGGESTIONS_GAME,
         TargetRef::Local { .. } => SUGGESTIONS_APP,
+        TargetRef::Device { .. } => SUGGESTIONS_DEVICE,
         TargetRef::None => SUGGESTIONS_NONE,
     };
     ui.horizontal_wrapped(|ui| {
@@ -515,7 +525,7 @@ pub fn project_icon(m: &craft_anything_engine::workspace::Manifest) -> &'static 
     }
     match m.target {
         TargetRef::Website { .. } => "globe",
-        TargetRef::Local { .. } => "app-window",
+        TargetRef::Local { .. } | TargetRef::Device { .. } => "app-window",
         TargetRef::None => "sparkles",
     }
 }
@@ -529,6 +539,9 @@ mod tests {
         for ok in ["", "example.com", "https://a.b/c?d", "http://localhost:5173", "sub.example.co.uk/page"] {
             assert!(url_problem(ok).is_none(), "{ok}");
         }
+        assert!(url_problem("adb:192.168.1.20:5555/com.example.tv").is_none(), "an app on a device goes in the same box");
+        assert!(url_problem("adb:192.168.1.20:5555").is_some(), "without its package");
+        assert_eq!(normalize_url("adb:emulator-5554/com.example.tv"), "adb:emulator-5554/com.example.tv");
         for bad in ["example", "https://", "two words.com", "ftp://x.y", "https://.com", "x."] {
             assert!(url_problem(bad).is_some(), "{bad}");
         }
