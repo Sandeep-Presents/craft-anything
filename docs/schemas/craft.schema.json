@@ -393,6 +393,27 @@
           ]
         },
         {
+          "description": "An app installed on a phone or TV reached over adb: the device's serial (as\n`adb_devices_find` lists it) and the app's package name. Studied as a person uses it.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "device"
+            },
+            "package": {
+              "type": "string"
+            },
+            "serial": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "serial",
+            "package"
+          ]
+        },
+        {
           "description": "Only a description.",
           "type": "object",
           "properties": {

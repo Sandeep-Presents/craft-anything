@@ -41,6 +41,7 @@ use std::time::{Duration, Instant};
 pub mod activity;
 mod brief;
 mod check;
+pub mod device;
 pub mod feed;
 mod kept_check;
 pub mod kinds;
@@ -748,6 +749,41 @@ impl Worker {
         }
     }
 
+    /// The Android stacks build with Gradle, which needs a JDK and the Android SDK, and a Rust
+    /// core needs cargo-ndk and an NDK besides: say so before the first turn rather than after it.
+    fn check_android_tools(&self, stack: &str) -> Result<(), ToolError> {
+        if !kinds::AndroidAppKind::builds_android(stack) {
+            return Ok(());
+        }
+        let settings = self.engine.session().settings.clone();
+        let homes = match kinds::android_homes(&settings) {
+            Some(h) => h,
+            None => {
+                return Err(ToolError::new(ErrorCode::BadSettings, "Building an Android app needs a JDK (17 or newer) and the Android SDK, and one of them wasn't found.").with_remediation(
+                    "Install them (a JDK, and the Android SDK with its command-line tools, platform 36 and build-tools), set JAVA_HOME and ANDROID_HOME or point Settings → Engines at javac and sdkmanager, then start again.",
+                ));
+            }
+        };
+        if stack != kinds::AndroidAppKind::RUST_STACK {
+            return Ok(());
+        }
+        let ndk = std::env::var_os("ANDROID_NDK_HOME").map(PathBuf::from).filter(|p| p.is_dir()).or(homes.ndk_home);
+        match (kinds::cargo_ndk(&settings), ndk) {
+            (Some(_), Some(_)) => Ok(()),
+            (cargo_ndk, ndk) => {
+                let missing = match (cargo_ndk.is_some(), ndk.is_some()) {
+                    (false, false) => "neither cargo-ndk nor an NDK was found",
+                    (false, true) => "cargo-ndk wasn't found",
+                    _ => "no NDK was found",
+                };
+                Err(ToolError::new(ErrorCode::BadSettings, format!("Building a Rust core for an Android app needs cargo-ndk and an NDK, and {missing}."))
+                    .with_remediation(
+                        "Install cargo-ndk (`cargo install cargo-ndk`, or point Settings → Engines at it), an NDK (`sdkmanager \"ndk;28.2.13676358\"`, or set ANDROID_NDK_HOME) and the Rust targets (`rustup target add armv7-linux-androideabi aarch64-linux-android`), then start again.",
+                    ))
+            }
+        }
+    }
+
     /// How the builder's agent runs. Reads the session once: a lock taken twice in one statement
     /// is held by the first until the statement ends, and the second then waits forever. A saved
     /// Claude `--resume` that would continue the project's Deep session in Clean room is refused.
@@ -837,6 +873,7 @@ impl Worker {
         self.self_check = Some((kind.clone(), opts.good_enough));
         let kind = kind.as_ref();
         self.editor = self.find_editor(&ws.manifest.stack)?;
+        self.check_android_tools(&ws.manifest.stack)?;
         let api_resumed = api.as_ref().is_some_and(crate::agent::ApiConversation::resumed);
         let kept = KeptHistory { in_mode: kept_without_api.in_mode || api_resumed, elsewhere: kept_without_api.elsewhere };
         let carrying_on = is_carrying_on(opts, kept.in_mode);
@@ -1023,6 +1060,7 @@ impl Worker {
             round += 1;
             let checking = if ws.manifest.target == TargetRef::None { "Checking the build…" } else { "Checking the build against the original…" };
             self.step(ws, Step::Check, Status::Checking, checking)?;
+            let previous: Vec<CheckResult> = ws.manifest.checks.iter().filter(|c| c.round < round).cloned().collect();
             let checks = self.checks_with_a_retry(ws, kind, round)?;
             ws.manifest.checks.extend(checks.iter().cloned());
             ws.manifest.awaiting_check = false;
@@ -1046,6 +1084,14 @@ impl Worker {
             }
             let kind_checks = kind.checks(ws);
             let not_good = checks.iter().find(|c| !c.good(opts.good_enough) && kinds::can_refine(&kind_checks, c));
+            // A turn that changed no file but made the build measurably better (a check newly
+            // passes, its likeness rose) is progress while the round still isn't good enough:
+            // the unchanged-turn count starts again. A round that passes keeps its count, so
+            // Try again keeps the saved limit.
+            if not_good.is_some() && progress_available && self_check::moved(&previous, &checks) {
+                progress.reset();
+                progress.save(&ws.root)?;
+            }
             if not_good.is_some() && progress_available && progress.stalled() {
                 // A check-only resume skipped the builder's before-turn scan. A real edit
                 // while the project was closed (or during this check) still starts an attempt.

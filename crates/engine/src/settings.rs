@@ -65,7 +65,10 @@ macro_rules! tool_paths {
 }
 
 // Ghidra is not here: its folder is `GhidraSettings::install_dir`.
-tool_paths!(adb, jadx, apktool, chromium, frida, gdb, lldb, mitmdump, binwalk, unblob, ilspy, java, tshark, objdump, rizin, rtl433, vineflower);
+tool_paths!(
+    adb, jadx, apktool, chromium, frida, gdb, lldb, mitmdump, binwalk, unblob, ilspy, java, tshark, objdump, rizin, rtl433, vineflower, jdk, androidsdk,
+    cargondk
+);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -147,15 +150,61 @@ pub struct BuildSettings {
     /// Other pages of a website studied and checked besides the start page.
     pub max_pages: usize,
     /// When set, an app or game must look at least this alike (percent) to the person's pictures
-    /// (or the original running) to be good enough; unset, that likeness is only reported.
+    /// (or the original running) to be good enough, and an app on a device claims it for each
+    /// screen's picture against the original's, its likeness capped by the pictures' mean;
+    /// unset, that likeness is only reported.
     pub picture_good_enough: Option<f64>,
     /// Projects that may build at the same time; more wait their turn (at least 1).
     pub parallel: usize,
+    /// An app on a phone or TV (R2.12): the device a build is installed on and checked
+    /// (`adb_devices_find` serial); unset, the target's own device.
+    pub android_serial: Option<String>,
+    /// A second device the build is checked on once it is good enough on the first; unset, none.
+    pub android_gate_serial: Option<String>,
+    /// Most screens Study maps on the device (1..60).
+    pub android_max_states: usize,
+    /// Texts of screens Study leaves alone (case-insensitive): such a screen is a row with no
+    /// details, and the builder doesn't rebuild it.
+    pub android_skip_texts: Vec<String>,
+    /// Milliseconds to wait after each launch of the app before pressing keys.
+    pub android_launch_wait_ms: u32,
+    /// Milliseconds to wait after the last key before reading a screen.
+    pub android_wait_ms: u32,
+    /// Milliseconds the controls dump starts before the last key (0 = after the wait).
+    pub android_dump_lead_ms: u32,
+    /// Seconds the map may take (60..7200): every capture relaunches the app, so a real app
+    /// needs more than the tool's own default.
+    pub android_time_budget_s: u32,
+    /// Most key presses the map may make in all, replayed paths counted (1..5000).
+    pub android_max_presses: u32,
+    /// How far (dp) a control may sit from the original's and still match.
+    pub android_dp_tolerance: u32,
+    /// Pause after Study so the person can look at capture/ before the builder reads it (only
+    /// when questions are asked, not decided).
+    pub review_capture: bool,
 }
 
 impl Default for BuildSettings {
     fn default() -> Self {
-        BuildSettings { good_enough: 90.0, max_rounds: 6, web_widths: vec![1440, 768, 390], max_pages: 4, picture_good_enough: None, parallel: 2 }
+        BuildSettings {
+            good_enough: 90.0,
+            max_rounds: 6,
+            web_widths: vec![1440, 768, 390],
+            max_pages: 4,
+            picture_good_enough: None,
+            parallel: 2,
+            android_serial: None,
+            android_gate_serial: None,
+            android_max_states: 24,
+            android_skip_texts: Vec::new(),
+            android_launch_wait_ms: 4000,
+            android_wait_ms: 1500,
+            android_dump_lead_ms: 0,
+            android_time_budget_s: 1800,
+            android_max_presses: 400,
+            android_dp_tolerance: 1,
+            review_capture: false,
+        }
     }
 }
 
@@ -481,6 +530,20 @@ auto_mode = true
         .unwrap();
         assert_eq!(old.build, BuildSettings::default());
         assert_eq!(old.build.picture_good_enough, None, "picture likeness is only reported unless set");
+        assert_eq!((old.build.android_max_states, old.build.android_dp_tolerance, old.build.review_capture), (24, 1, false));
+        assert_eq!((old.build.android_time_budget_s, old.build.android_max_presses), (1800, 400), "the map's budget has the tool's defaults until set");
+        let device: Settings = toml::from_str(
+            "version = 1
+[build]
+android_serial = \"192.168.1.20:5555\"
+android_skip_texts = [\"About\", \"Sign in\"]
+review_capture = true
+",
+        )
+        .unwrap();
+        assert_eq!(device.build.android_serial.as_deref(), Some("192.168.1.20:5555"));
+        assert_eq!(device.build.android_skip_texts, ["About", "Sign in"]);
+        assert!(device.build.review_capture && device.build.android_gate_serial.is_none());
     }
 
     use super::*;
