@@ -1190,6 +1190,7 @@ Use the projects folder	Kasuta projektide kausta
 Use this	Kasuta seda
 Use {name}	Kasuta {name}
 Value flow	Väärtuste voog
+About	Teave
 Version	Versioon
 Waiting	Ootab
 Waiting for another build to finish: this one starts next.	Ootab teise ehituse lõppu: see algab järgmisena.
@@ -1444,6 +1445,7 @@ Zoom	Suumi
 Bring all to front	Too kõik ette
 Drag to give the plan more or less room; double-click to reset	Lohista, et anda plaanile rohkem või vähem ruumi; lähtestamiseks tee topeltklõps
 Copy the message	Kopeeri sõnum
+Copy the version	Kopeeri versioon
 Choose what the builder's approvals get	Määra ehitaja kinnituste käitumine
 Reading the web	Veebist lugemine
 Other commands	Muud käsud

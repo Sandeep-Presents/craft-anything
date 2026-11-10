@@ -1190,6 +1190,7 @@ Use the projects folder	Dùng thư mục dự án
 Use this	Dùng cái này
 Use {name}	Dùng {name}
 Value flow	Luồng giá trị
+About	Giới thiệu
 Version	Phiên bản
 Waiting	Đang chờ
 Waiting for another build to finish: this one starts next.	Đang chờ một bản dựng khác xong: bản này sẽ bắt đầu tiếp theo.
@@ -1444,6 +1445,7 @@ Zoom	Thu phóng
 Bring all to front	Đưa tất cả lên trước
 Drag to give the plan more or less room; double-click to reset	Kéo để mở rộng hoặc thu hẹp phần kế hoạch; nhấp đúp để đặt lại
 Copy the message	Sao chép tin nhắn
+Copy the version	Sao chép phiên bản
 Choose what the builder's approvals get	Chọn cách xử lý các phê duyệt của trình xây dựng
 Reading the web	Đọc web
 Other commands	Lệnh khác

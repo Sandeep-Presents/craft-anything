@@ -15,6 +15,7 @@ Close window	ფანჯრის დახურვა
 Command palette	ბრძანებების პალიტრა
 Context window	კონტექსტის ფანჯარა
 Copy the message	შეტყობინების კოპირება
+Copy the version	ვერსიის კოპირება
 Craft Anything on GitHub	Craft Anything GitHub-ზე
 Default	ნაგულისხმევი
 Drag to give the plan more or less room; double-click to reset	გადაათრიეთ, რომ გეგმას მეტი ან ნაკლები ადგილი დაუთმოთ; ორმაგი დაწკაპუნებით — ჩამოყრა
@@ -1206,6 +1207,7 @@ Use the projects folder	პროექტების საქაღალდ�
 Use this	ამის გამოყენება
 Use {name}	{name}-ის გამოყენება
 Value flow	მნიშვნელობების ნაკადი
+About	შესახებ
 Version	ვერსია
 View	ხედი
 Waiting	ელოდება

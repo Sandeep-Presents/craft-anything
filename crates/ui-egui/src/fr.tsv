@@ -324,6 +324,7 @@ Website address	Adresse du site web
 Open it	L'ouvrir
 Here's what I found on that page:	Voici ce que j'ai trouvé sur cette page :
 Open something	Ouvrir quelque chose
+About	À propos
 Version	Version
 Type your question after /btw.	Tapez votre question après /btw.
 There's no /{name} command. You can use {commands}.	Il n'y a pas de commande /{name}. Vous pouvez utiliser {commands}.
@@ -1443,6 +1444,7 @@ yesterday	hier
 … {} older	… {} plus anciens
 Drag to give the plan more or less room; double-click to reset	Faites glisser pour donner plus ou moins de place au plan ; double-cliquez pour rétablir
 Copy the message	Copier le message
+Copy the version	Copier la version
 Choose what the builder's approvals get	Choisir ce que reçoivent les autorisations du constructeur
 Reading the web	Lecture du web
 Other commands	Autres commandes

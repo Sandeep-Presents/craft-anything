@@ -331,6 +331,8 @@ pub enum SettingsTab {
     Builds,
     Plugins,
     Safety,
+    /// The app's name and version.
+    About,
 }
 
 /// A list or view that a tool fills.

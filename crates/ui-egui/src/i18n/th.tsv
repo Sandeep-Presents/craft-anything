@@ -1190,6 +1190,7 @@ Use the projects folder	ใช้โฟลเดอร์โปรเจกต�
 Use this	ใช้สิ่งนี้
 Use {name}	ใช้ {name}
 Value flow	การไหลของค่า
+About	เกี่ยวกับ
 Version	เวอร์ชัน
 Waiting	กำลังรอ
 Waiting for another build to finish: this one starts next.	รอบิลด์อื่นเสร็จ: บิลด์นี้จะเริ่มถัดไป
@@ -1444,6 +1445,7 @@ Zoom	ซูม
 Bring all to front	นำทั้งหมดมาไว้ข้างหน้า
 Drag to give the plan more or less room; double-click to reset	ลากเพื่อให้แผนมีที่มากขึ้นหรือน้อยลง ดับเบิลคลิกเพื่อรีเซ็ต
 Copy the message	คัดลอกข้อความ
+Copy the version	คัดลอกเวอร์ชัน
 Choose what the builder's approvals get	เลือกว่าการอนุมัติของผู้สร้างจะได้อะไร
 Reading the web	อ่านเว็บ
 Other commands	คำสั่งอื่น

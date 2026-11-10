@@ -1190,6 +1190,7 @@ Use the projects folder	Usar la carpeta de proyectos
 Use this	Usar esto
 Use {name}	Usar {name}
 Value flow	Flujo de valores
+About	Acerca de
 Version	Versión
 Waiting	Esperando
 Waiting for another build to finish: this one starts next.	Esperando a que termine otra construcción: esta empieza enseguida.
@@ -1444,6 +1445,7 @@ Zoom	Zoom
 Bring all to front	Traer todo al frente
 Drag to give the plan more or less room; double-click to reset	Arrastra para darle al plan más o menos espacio; doble clic para restablecer
 Copy the message	Copiar el mensaje
+Copy the version	Copiar la versión
 Choose what the builder's approvals get	Elegir qué reciben las aprobaciones del constructor
 Reading the web	Leer la web
 Other commands	Otros comandos

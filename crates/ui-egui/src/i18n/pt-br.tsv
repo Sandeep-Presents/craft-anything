@@ -1190,6 +1190,7 @@ Use the projects folder	Usar a pasta de projetos
 Use this	Usar esta opção
 Use {name}	Usar {name}
 Value flow	Fluxo de valores
+About	Sobre
 Version	Versão
 Waiting	Aguardando
 Waiting for another build to finish: this one starts next.	Aguardando outra criação terminar: esta será a próxima.
@@ -1443,6 +1444,7 @@ Zoom	Zoom
 Bring all to front	Trazer todas para a frente
 Drag to give the plan more or less room; double-click to reset	Arraste para ajustar o espaço do plano. Clique duas vezes para restaurar o tamanho original
 Copy the message	Copiar a mensagem
+Copy the version	Copiar a versão
 {n} · ${spent} of ${budget}	{n} · ${spent} de ${budget}
 Choose what the builder's approvals get	Escolha o comportamento das aprovações do agente
 Reading the web	Ler a web

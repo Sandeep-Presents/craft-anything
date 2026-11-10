@@ -1190,6 +1190,7 @@ Use the projects folder	프로젝트 폴더 사용
 Use this	이것 사용
 Use {name}	{name} 사용
 Value flow	값 흐름
+About	정보
 Version	버전
 Waiting	대기 중
 Waiting for another build to finish: this one starts next.	다른 빌드가 끝나기를 기다리는 중입니다. 이 빌드가 다음 차례입니다.
@@ -1444,6 +1445,7 @@ Zoom	확대/축소
 Bring all to front	모두 앞으로 가져오기
 Drag to give the plan more or less room; double-click to reset	끌어서 계획이 차지하는 공간을 조절하고, 두 번 클릭하면 원래대로 돌아갑니다
 Copy the message	메시지 복사
+Copy the version	버전 복사
 Choose what the builder's approvals get	빌더의 승인 요청을 어떻게 처리할지 고르기
 Reading the web	웹 읽기
 Other commands	그 밖의 명령

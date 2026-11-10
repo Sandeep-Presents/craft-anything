@@ -1192,6 +1192,7 @@ Use the projects folder	Usa la cartella dei progetti
 Use this	Usa questo
 Use {name}	Usa {name}
 Value flow	Flusso dei valori
+About	Informazioni
 Version	Versione
 Waiting	In attesa
 Waiting for another build to finish: this one starts next.	In attesa che finisca un'altra costruzione: questa parte dopo.
@@ -1445,6 +1446,7 @@ Full screen	Schermo intero
 Zoom	Zoom
 Bring all to front	Porta tutto in primo piano
 Copy the message	Copia il messaggio
+Copy the version	Copia la versione
 Drag to give the plan more or less room; double-click to reset	Trascina per dare al piano più o meno spazio; doppio clic per ripristinare
 Choose what the builder's approvals get	Scegli cosa ricevono le approvazioni del costruttore
 Reading the web	Leggere il web

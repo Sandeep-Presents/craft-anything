@@ -3177,3 +3177,27 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
     let start = h.get_by_label("Start").rect();
     assert!(start.left() >= 0.0 && start.right() <= content.right(), "Start ({start:?}) stays inside the window ({content:?})");
 }
+
+/// #1300: the app's version can be seen on every system, under Settings → About at the bottom of
+/// the tab list (only macOS has an About in its menu bar).
+#[test]
+fn settings_about_shows_the_apps_version() {
+    let mut h = harness(|| {
+        let mut a = demo::app(demo::engine(Mode::Beginner, true));
+        a.state.settings_open = true;
+        a
+    });
+    h.run_steps(3);
+    let safety = h.get_by_label("Safety").rect();
+    let about = h.get_by_label("About").rect();
+    assert!(about.top() > safety.bottom() + 40.0, "About sits apart at the bottom of the list");
+    h.get_by_label("About").click();
+    h.run_steps(3);
+    let version = format!("Version {}", env!("CARGO_PKG_VERSION"));
+    h.get_by_label(&version);
+    // A button copies it, so a keyboard can too (selectable labels aren't in egui's Tab order).
+    h.get_by_label("Copy the version").click();
+    h.step();
+    let copied = h.output().platform_output.commands.iter().any(|c| matches!(c, egui::OutputCommand::CopyText(t) if *t == version));
+    assert!(copied, "the button copies the version");
+}

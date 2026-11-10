@@ -1190,6 +1190,7 @@ Use the projects folder	Použít složku projektů
 Use this	Použít toto
 Use {name}	Použít {name}
 Value flow	Tok hodnot
+About	O aplikaci
 Version	Verze
 Waiting	Čeká
 Waiting for another build to finish: this one starts next.	Čeká na dokončení jiného sestavení: toto je další na řadě.
@@ -1444,6 +1445,7 @@ Zoom	Zvětšit
 Bring all to front	Vše do popředí
 Drag to give the plan more or less room; double-click to reset	Přetažením dáte plánu víc nebo míň místa; dvojklikem vrátíte výchozí výšku
 Copy the message	Zkopírovat zprávu
+Copy the version	Zkopírovat verzi
 Choose what the builder's approvals get	Vybrat, jak se naloží se schvalováním sestavovacího agenta
 Reading the web	Čtení webu
 Other commands	Ostatní příkazy

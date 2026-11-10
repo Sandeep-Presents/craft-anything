@@ -1190,6 +1190,7 @@ Use the projects folder	使用项目文件夹
 Use this	使用此项
 Use {name}	使用 {name}
 Value flow	值流向
+About	关于
 Version	版本
 Waiting	等待中
 Waiting for another build to finish: this one starts next.	等待另一个构建完成：接下来就会开始。
@@ -1444,6 +1445,7 @@ Zoom	缩放
 Bring all to front	前置全部窗口
 Drag to give the plan more or less room; double-click to reset	拖动以调整计划占用的空间；双击恢复默认
 Copy the message	复制这条消息
+Copy the version	复制版本号
 Choose what the builder's approvals get	选择如何处理构建助手的审批
 Reading the web	读取网页
 Other commands	其他命令

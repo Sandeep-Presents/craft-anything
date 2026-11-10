@@ -1373,6 +1373,13 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
+- [x] The app's version can be seen inside it on every system: only macOS's menu bar had an About,
+      and the About dialog in `home.rs` was never opened (#1300)
+      — claimed: jgt87, branch feature/r2.9-show-version — PR #1301
+- [ ] Settings fits a small window at high zoom: it's 680 points wide with a page up to 560 tall,
+      so at 2× zoom in the smallest window (760×520, 380×260 points) its tab list starts off the
+      left edge and the dialog runs off the bottom. Fit the dialog to the window, with the tab
+      list scrolling when it must (found in #1301's review)
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress
