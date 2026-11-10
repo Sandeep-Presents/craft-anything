@@ -120,7 +120,7 @@ The questions below matter for a paid offering, where we would be the party.
    (sales/partnerships) that orchestrating the user's own CLI this way is acceptable at scale**,
    especially for the planned managed-subscription tier.
 2. "Advertised usage limits for Pro and Max plans assume ordinary, individual usage." Rebuild
-   rounds are bounded (default: first build + up to 6 refinements in the app, 2 in the CLI; `--rounds` changes it) to keep
+   rounds are bounded (default: first build + up to `build.max_rounds` refinements, 6 unless changed; the CLI's `--rounds` overrides it for one run) to keep
    usage ordinary.
 3. The managed tier (we pay for model access) must use the Claude API with our own key under
    the Commercial Terms, never users' subscriptions.

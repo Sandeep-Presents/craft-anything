@@ -1,6 +1,7 @@
 //! `rebuild`: the whole study → build → check workflow, headless. Questions and approvals are
 //! answered on the terminal, or automatically with `--unattended` (first choice; approvals are
-//! refused, so nothing outside the project happens without a person).
+//! refused, so nothing outside the project happens without a person, except what `--allow`
+//! granted up front).
 
 use crate::{Cli, INTERRUPTED, make_engine};
 use clap::Args;
@@ -16,7 +17,8 @@ use std::time::Duration;
 
 #[derive(Debug, Args)]
 pub struct RebuildArgs {
-    /// A web address, an absolute path to an app, game or file, or `-` for none.
+    /// A web address, `adb:<serial>/<package>` for an app on a phone or TV, an absolute path to
+    /// an app, game or file, or `-` for none.
     pub target: String,
     /// What to make, in your words.
     pub request: String,
@@ -35,19 +37,27 @@ pub struct RebuildArgs {
     #[arg(long)]
     pub continue_in: Option<PathBuf>,
     /// With --continue-in: carry on where the project's last run stopped (paused, or the app or
-    /// the computer stopped); the request is ignored.
+    /// the computer stopped). A request given with it (anything but `-` or nothing) reaches the
+    /// builder as a follow-up message.
     #[arg(long, requires = "continue_in")]
     pub resume: bool,
     /// The coding agent to use (an enabled backend name from `ai list`, or an installed agent
     /// such as `Claude Code`).
     #[arg(long)]
     pub backend: Option<String>,
-    /// Refinement rounds after the first build.
-    #[arg(long, default_value_t = 2)]
-    pub rounds: u32,
-    /// Answer questions with the first choice and refuse approvals, without asking.
+    /// Refinement rounds after the first build (default: `build.max_rounds` from settings).
+    #[arg(long)]
+    pub rounds: Option<u32>,
+    /// Answer questions with the first choice and refuse approvals, without asking; what
+    /// `--allow` granted is still allowed.
     #[arg(long)]
     pub unattended: bool,
+    /// Allow a kind of action for this project without asking, as "always for this project"
+    /// would: `tool:<id>` for a craft-anything tool that runs code or changes a device
+    /// (`tool:adb_keys_press`), `bash:<program>` for a command the builder runs (`bash:gradle`).
+    /// Repeatable. Kept in the project (craft.json), so later runs have it too.
+    #[arg(long, value_name = "KIND")]
+    pub allow: Vec<String>,
     /// What to build with: an engine (unity, unreal, godot, rust) or a stack's full name.
     /// New projects only; otherwise it's chosen from the request and target.
     #[arg(long)]
@@ -70,6 +80,39 @@ pub fn rebuild(cli: &Cli, a: &RebuildArgs) -> u8 {
             1
         }
     }
+}
+
+/// The kinds `--allow` takes, checked: `tool:<id>` names a tool that needs consent (one that
+/// doesn't is pointless, one that doesn't exist a typo), `bash:<program>` a plain program name.
+fn allowed_kinds(given: &[String]) -> Result<Vec<String>, ToolError> {
+    let registry = craft_anything_engine::Registry::with_all_tools();
+    let mut out = Vec::new();
+    for g in given {
+        let kind = g.trim();
+        if let Some(id) = kind.strip_prefix("tool:") {
+            match registry.get(id) {
+                Some(spec) if spec.effects.needs_consent() => {}
+                Some(_) => {
+                    return Err(ToolError::invalid(format!("{id} never asks for consent, so --allow tool:{id} does nothing")).with_remediation("Leave it out."));
+                }
+                None => {
+                    return Err(ToolError::invalid(format!("no tool is called {id}")).with_remediation(
+                        "`craft-anything-cli commands` lists them; adb_keys_press, adb_app_install and adb_app_map are the usual ones for a device.",
+                    ));
+                }
+            }
+        } else if let Some(program) = kind.strip_prefix("bash:") {
+            if program.is_empty() || program.chars().any(|c| c.is_whitespace() || c == '/' || c == '\\') {
+                return Err(ToolError::invalid(format!("--allow bash:<program> takes a plain program name, not {program:?}")));
+            }
+        } else {
+            return Err(ToolError::invalid(format!("--allow takes tool:<id> or bash:<program>, not {kind:?}")));
+        }
+        if !out.contains(&kind.to_string()) {
+            out.push(kind.to_string());
+        }
+    }
+    Ok(out)
 }
 
 /// Add the agent app this run asks for, or the first one found when no enabled AI can build.
@@ -113,8 +156,9 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
     if let Some(name) = a.backend.as_deref() {
         rebuild::builder_backend(&hub.config(), Some(name))?;
     }
-    let (ws, message) = match &a.continue_in {
-        Some(dir) => (Workspace::open(&std::path::absolute(dir).map_err(|e| ToolError::io(dir.display(), e))?)?, (!a.resume).then(|| a.request.clone())),
+    let allow = allowed_kinds(&a.allow)?;
+    let (mut ws, message) = match &a.continue_in {
+        Some(dir) => (Workspace::open(&std::path::absolute(dir).map_err(|e| ToolError::io(dir.display(), e))?)?, follow_up_message(&a.request)),
         None => {
             use craft_anything_ai::rebuild::project::Place;
             use craft_anything_engine::workspace::ExistingFiles;
@@ -133,22 +177,35 @@ fn run(cli: &Cli, a: &RebuildArgs) -> Result<bool, ToolError> {
             (ws, None)
         }
     };
+    if !allow.is_empty() {
+        ws.set_person(|m| {
+            for kind in &allow {
+                if !m.allowed_actions.contains(kind) {
+                    m.allowed_actions.push(kind.clone());
+                }
+            }
+        })?;
+        println!("Allowed for this project: {}", allow.join(", "));
+    }
     println!("Project: {}", ws.root.display());
     // The saved builder may be off or gone; say who builds once the run has started, so a failed
     // start doesn't claim an AI that never ran.
     let replacement = rebuild::builder_replacement(&hub.config(), &ws, a.backend.as_deref());
     // A follow-up shows in the project's feed as the person typed it.
     let shown = message.clone();
-    let good_enough = engine.session().settings.build.good_enough;
+    let (good_enough, max_rounds, clean_room) = {
+        let s = engine.session();
+        (s.settings.build.good_enough, a.rounds.unwrap_or(s.settings.build.max_rounds), s.clean_room())
+    };
     let opts = RunOptions {
         backend: a.backend.clone(),
         message,
         shown,
         continuing: a.resume,
-        max_rounds: a.rounds,
+        max_rounds,
         good_enough,
         beginner: !cli.json,
-        clean_room: Some(engine.session().clean_room()),
+        clean_room: Some(clean_room),
         ..RunOptions::default()
     };
     let mut run = RebuildRun::start(&hub, ws, opts)?;
@@ -282,5 +339,60 @@ fn prompt_answer(r: &Request) -> Answer {
             let line = read_line().to_lowercase();
             Answer { allow: Some(line.starts_with('y') || line.starts_with('a')), always: line.starts_with('a'), ..Default::default() }
         }
+    }
+}
+
+/// The follow-up a continued project is asked for: the request as typed, unless there is none
+/// (`-`, or nothing). With `--resume` it used to be thrown away, and notes sent to a running
+/// rebuild that way reached the builder only because it read the CLI's command line with `ps`.
+fn follow_up_message(request: &str) -> Option<String> {
+    let r = request.trim();
+    (!r.is_empty() && r != "-").then(|| request.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser as _;
+
+    /// A message typed with --resume is a follow-up, not noise: only `-` or nothing is none.
+    #[test]
+    fn a_message_given_with_resume_is_kept() {
+        assert_eq!(follow_up_message("Port the core to Rust"), Some("Port the core to Rust".to_string()));
+        assert_eq!(follow_up_message("  "), None);
+        assert_eq!(follow_up_message("-"), None);
+        let cli = Cli::try_parse_from(["craft-anything-cli", "rebuild", "-", "Port the core to Rust", "--continue-in", "p", "--resume"]).unwrap();
+        let crate::Command::Rebuild(a) = cli.command else { panic!("not rebuild") };
+        assert!(a.resume && follow_up_message(&a.request).is_some());
+    }
+
+    #[test]
+    fn rounds_default_to_the_settings_and_allow_takes_consent_kinds() {
+        let cli = Cli::try_parse_from(["craft-anything-cli", "rebuild", "-", "A notes app"]).unwrap();
+        let crate::Command::Rebuild(a) = cli.command else { panic!("not rebuild") };
+        assert_eq!((a.rounds, a.allow.len()), (None, 0), "no --rounds: the settings decide");
+        let cli = Cli::try_parse_from([
+            "craft-anything-cli",
+            "rebuild",
+            "adb:192.168.1.20:5555/com.example.tv",
+            "The same app",
+            "--unattended",
+            "--rounds",
+            "8",
+            "--allow",
+            "tool:adb_keys_press",
+            "--allow",
+            "bash:gradle",
+            "--allow",
+            "tool:adb_keys_press",
+        ])
+        .unwrap();
+        let crate::Command::Rebuild(a) = cli.command else { panic!("not rebuild") };
+        assert_eq!(a.rounds, Some(8));
+        assert_eq!(allowed_kinds(&a.allow).unwrap(), ["tool:adb_keys_press", "bash:gradle"], "each kind once");
+        assert!(allowed_kinds(&["tool:adb_devices_find".into()]).is_err(), "a tool that never asks is refused");
+        assert!(allowed_kinds(&["tool:no_such_tool".into()]).is_err());
+        assert!(allowed_kinds(&["bash:/usr/bin/gradle".into()]).is_err(), "a program name, not a path");
+        assert!(allowed_kinds(&["web_fetch".into()]).is_err());
     }
 }
