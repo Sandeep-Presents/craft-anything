@@ -49,6 +49,10 @@ impl ChatModel for Paced {
     fn context_window(&self) -> Option<crate::window::Window> {
         self.inner.context_window()
     }
+
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        self.inner.sees_pictures()
+    }
 }
 
 #[cfg(test)]
@@ -70,6 +74,10 @@ mod tests {
         fn context_window(&self) -> Option<crate::window::Window> {
             Some(crate::window::Window { tokens: 32_768, source: "test" })
         }
+
+        fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+            Some(crate::sight::Sight { sees: true, source: "test" })
+        }
     }
 
     fn ask(backend: &str, gap: Duration, stop: &Stop) {
@@ -83,6 +91,12 @@ mod tests {
     fn the_servers_window_is_still_read_through_the_pacing() {
         let paced = Paced { inner: Box::new(Refuses), backend: "window".into(), gap: Duration::from_secs(60) };
         assert_eq!(paced.context_window().map(|w| w.tokens), Some(32_768));
+    }
+
+    #[test]
+    fn whether_it_sees_pictures_is_still_read_through_the_pacing() {
+        let paced = Paced { inner: Box::new(Refuses), backend: "sight".into(), gap: Duration::from_secs(60) };
+        assert_eq!(paced.sees_pictures().map(|s| s.sees), Some(true));
     }
 
     #[test]
