@@ -11,6 +11,8 @@
 //! effort = "high"
 //! # Conversation trimming budget; does not set the server's context window.
 //! context_tokens = 120000
+//! # For a service that limits requests: wait so that no more than this many are sent a minute.
+//! requests_per_minute = 60
 //!
 //! [ai.roles]
 //! lead = "Claude"
@@ -86,6 +88,10 @@ pub struct BackendOptions {
     /// local/cloud default; this does not change the model server's own context window.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_tokens: Option<u64>,
+    /// API backends: the most requests to send in a minute, for a service that limits them (120
+    /// for two a second). Requests wait their turn. Omitted or zero sends them as they come.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requests_per_minute: Option<u32>,
     /// Agent CLIs: the program to run instead of the default for `model`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
@@ -413,6 +419,7 @@ mod tests {
         a.options.effort = Some(Effort::High);
         a.options.fallbacks_enabled = Some(false);
         a.options.context_tokens = Some(120_000);
+        a.options.requests_per_minute = Some(60);
         c.upsert(a);
         c.upsert(entry("Local", BackendKind::OpenaiCompatible));
         c.roles.insert("reviewer".into(), "Local".into());
@@ -426,6 +433,7 @@ mod tests {
         assert!(text.contains("[[ai.backends]]"), "{text}");
         assert!(text.contains("effort = \"high\""), "{text}");
         assert!(text.contains("context_tokens = 120000"), "{text}");
+        assert!(text.contains("requests_per_minute = 60"), "{text}");
     }
 
     #[test]
