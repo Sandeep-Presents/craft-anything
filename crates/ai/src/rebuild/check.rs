@@ -171,6 +171,7 @@ pub(super) fn build_check(app: &Path, place: &str, stack: &str, editor: Option<&
                 (ok && !bad, out)
             })
         }
+        _ if site_dir(app).is_some() => Ok((true, "Build succeeded.".into())),
         _ if app.join("Cargo.toml").is_file() => run(Path::new("cargo"), &["build".into(), "--quiet".into()], 2 * 60),
         _ if app.join("package.json").is_file() => run(Path::new(if cfg!(windows) { "npm.cmd" } else { "npm" }), &["run".into(), "build".into()], 2 * 60),
         (None, _) => {
