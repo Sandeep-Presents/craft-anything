@@ -1,6 +1,6 @@
 # UI localisation
 
-The desktop app offers **Čeština** (`cs`), **Deutsch** (`de`), **Eesti** (`et`), **Español** (`es`), **Italiano** (`it`), **ქართული** (`ka`),
+The desktop app offers **العربية** (`ar`), **Čeština** (`cs`), **Deutsch** (`de`), **Eesti** (`et`), **Español** (`es`), **Italiano** (`it`), **ქართული** (`ka`),
 **한국어** (`ko`), **Русский** (`ru`), **Tiếng Việt** (`vi`), **Português (Brasil)** (`pt-br`), **Türkçe** (`tr`), **ไทย** (`th`), **简体中文** (`zh-hans`) and **繁體中文** (`zh-hant`), alongside
 English, French and Japanese, in **Settings → General → Language**. The choice is saved in the
 existing `language` setting. **System** uses the operating system's preferred
@@ -83,10 +83,23 @@ the title bar does. The glossary: *หลักฐาน* (Evidence), *สิ่
 It was drafted with an AI and not yet reviewed by a native speaker; corrections are welcome.
 Thai glyphs come from Noto Sans Thai in craft-fonts, which the script test in `theme.rs` checks.
 
+## Arabic
+
+**العربية** (`ar`) is Modern Standard Arabic and reads right to left. `ar`, `ar-IQ`, `ar-SA` and any other
+`ar-*` select it, as does the system language when it is Arabic. `crates/ui-egui/src/i18n/ar.tsv` has the
+same keys as the Chinese catalogs, written from the English source strings. It was drafted with an AI and
+read by a native speaker; corrections are welcome. Product and technology names, tool ids and
+shortcuts keep their Latin spelling. The kind detection also knows لعبة, موقع ويب, موقع الويب and صفحة ويب.
+
+The window is mirrored: storytold's egui fork lays Arabic text out in its right order and mirrors egui's own
+parts (`Style::right_to_left`), and the app's layout uses the helpers in `widgets` (`start_panel`, `to_end`,
+`down`, `reading`, `mirror`, `ltr`) rather than `ui.vertical`, `Panel::left` or `rect.left() + …`. Code,
+hex and egui's `Grid` stay left to right.
+
 ## Scope and format
 
-`crates/ui-egui/src/i18n/cs.tsv`, `de.tsv`, `es.tsv`, `et.tsv`, `it.tsv`, `ka.tsv`, `ko.tsv`, `pt-br.tsv`, `ru.tsv`, `th.tsv`, `tr.tsv`, `vi.tsv`, `zh-hans.tsv` and
-`zh-hant.tsv` contain original
+`crates/ui-egui/src/i18n/ar.tsv`, `cs.tsv`, `de.tsv`, `es.tsv`, `et.tsv`, `it.tsv`, `ka.tsv`, `ko.tsv`, `pt-br.tsv`, `ru.tsv`, `th.tsv`,
+`tr.tsv`, `vi.tsv`, `zh-hans.tsv` and `zh-hant.tsv` contain original
 translations under the repository's MIT OR Apache-2.0 licence. Each UTF-8 line
 has two columns: `English source<TAB>translation`. Comments begin with `#`;
 `\n` represents a newline. The language registry in `i18n.rs` embeds the catalogs.
@@ -102,12 +115,15 @@ descriptions, logs and exported reports retain their original text. The CLI,
 MCP, tool IDs, stored project data and the separate browser viewer are unchanged.
 
 Keep placeholders such as `{name}` and `{n}` intact, along with command IDs,
-shortcuts, escapes and trailing `…`. Update every catalog (`cs`, `de`, `es`, `et`, `it`, `ka`, `ko`, `pt-br`, `ru`, `th`, `tr`, `vi`, `zh-hans`, `zh-hant`)
+shortcuts, escapes and trailing `…`. Update every catalog (`ar`, `cs`, `de`, `es`, `et`, `it`, `ka`, `ko`, `pt-br`, `ru`, `th`, `tr`, `vi`, `zh-hans`, `zh-hant`)
 when English source keys change; the tests require matching key sets. Common terms include 净室 / 淨室 (Clean room), 深度 (Deep),
 构建 / 建置 (Build), 证据 / 證據 (Evidence), and 项目 / 專案 (Project).
 The Korean catalog `ko.tsv` uses 클린룸 (Clean room), 심층 (Deep), 분석 / 만들기 / 검사 / 완성
 (Study / Build / Check / Ready), 근거 (Evidence) and 프로젝트 (Project); short labels are nouns and
 sentences use the formal 합니다 style.
+The Arabic catalog `ar.tsv` uses الغرفة النظيفة (Clean room), المعمّق (Deep), دراسة / بناء / فحص / جاهز
+(Study / Build / Check / Ready), الأدلة (Evidence) and مشروع (Project); commands are verbal nouns (حفظ،
+تنزيل) and sentences use the imperative.
 
 ## Spanish
 
@@ -165,7 +181,7 @@ The existing snapshot example accepts any catalog code with `--lang`, such as
 cargo run -p craft-anything-ui-egui --example snapshot -- --lang zh-hant --only settings --out-dir target/snapshots/zh-hant
 ```
 
-Chinese, Korean and Georgian glyphs use the existing craft-fonts fallback, which release and CI builds
+Arabic, Chinese, Korean and Georgian glyphs use the existing craft-fonts fallback, which release and CI builds
 Spanish and Estonian are Latin script and need no extra glyphs. Chinese and Korean glyphs use the existing craft-fonts fallback, which release and CI builds
 Vietnamese needs craft-fonts too: the bundled DM Sans and egui's default fonts lack the letters with
 stacked marks (ạ, ả, ấ, ế, ơ, ư, ữ…), so a build without craft-fonts shows them as boxes. With

@@ -13,7 +13,9 @@ fn harness(make: impl FnOnce() -> CraftApp + 'static) -> Harness<'static, CraftA
 }
 
 fn harness_sized(size: egui::Vec2, make: impl FnOnce() -> CraftApp + 'static) -> Harness<'static, CraftApp> {
-    Harness::builder().with_size(size).with_max_steps(32).build_eframe(move |cc| {
+    // Tests build without craft-fonts (`CRAFT_FONTS_DIR`), so arrows, CJK and Arabic have no glyph
+    // in the app's own fonts; draw a box for them, as release builds never need to.
+    Harness::builder().allow_missing_glyphs().with_size(size).with_max_steps(32).build_eframe(move |cc| {
         CraftApp::setup_context(&cc.egui_ctx);
         make()
     })
@@ -772,7 +774,7 @@ fn approvals_are_chosen_from_the_prompt_box_and_its_menu() {
     // The menu under the box: one row per kind, and a click saves it.
     h.get_by_label("Approvals").click();
     h.run_steps(2);
-    assert!(egui::Popup::is_id_open(&h.ctx, egui::Id::new("project-approvals")), "the menu opened");
+    assert!(egui::Popup::is_id_open(&h.ctx, egui::Id::unique("project-approvals")), "the menu opened");
     h.get_by_label("Reading the web");
     h.get_by_label("Pushing and publishing");
     let refuse = h.get_all_by_label("Refuse").count();
@@ -930,6 +932,7 @@ fn mode_switch_and_deep_toggle() {
     assert!(wait(&mut h, |a| a.engine.try_session().is_some_and(|s| s.settings.deep_mode && !s.clean_room())));
     // No Ghidra in the store: Deep mode offers it first. (Hover first, as a mouse does: the
     // dialog's button only takes a click once the pointer has been over it for a frame.)
+    h.run_steps(2);
     h.get_by_label("Not now").hover();
     h.run_steps(2);
     h.get_by_label("Not now").click();
@@ -1102,6 +1105,8 @@ fn clean_room_asks_for_deep_mode_instead_of_opening_a_file() {
     h.state_mut().open_path(std::path::PathBuf::from("/samples/tool.exe"));
     assert!(wait(&mut h, |a| a.state.modal == Some(Modal::DeepMode)), "Clean room never opens the original");
     assert!(!h.state().state.toasts.iter().any(|(_, err)| *err), "no error, a question");
+    // A dialog's first frame only measures it; its content is there from the next.
+    h.run_steps(2);
     h.get_by_label("Looking inside needs Deep mode");
     // Hover first, as a mouse does: a dialog's button takes a click once the pointer was over it.
     h.get_by_label("Not now").hover();
@@ -1298,6 +1303,7 @@ fn the_command_palette_stays_where_it_was_scrolled() {
         delta: egui::vec2(0.0, -300.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Wheel,
     });
     h.run_steps(20);
     let after = h.get_by_label("Session status").rect();
@@ -1400,6 +1406,7 @@ fn an_ai_server_is_added_by_its_address() {
         delta: egui::vec2(0.0, -300.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Wheel,
     });
     h.run_steps(20);
     h.get_by_label("Add").click();
@@ -1479,7 +1486,7 @@ fn a_claude_ais_effort_is_set_in_settings() {
     h.state_mut().state.settings_open = true;
     h.state_mut().state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
     h.run_steps(2);
-    h.get_by_label("Effort:");
+    h.get_by_role_and_label(egui::Role::Label, "Effort:");
     assert!(h.state().backend_options.get("Claude Code").and_then(|o| o.effort).is_none(), "the usual level until one is chosen");
     // Chosen through the dropdown itself, which shows the level in use.
     h.get_by_value("high").click();

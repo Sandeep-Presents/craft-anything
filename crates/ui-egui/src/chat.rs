@@ -138,11 +138,18 @@ pub fn ask_screen(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let side_w = 300.0_f32.min(ui.available_width() * 0.3);
     // What's open sits on the right; the app's sidebar is on the left.
-    egui::Panel::right("ask-side").exact_size(side_w).resizable(false).frame(egui::Frame::new().fill(t.canvas).inner_margin(Margin::same(20))).show(ui, |ui| {
-        target_card(app, ui);
-    });
+    crate::widgets::end_panel("ask-side").exact_size(side_w).resizable(false).frame(egui::Frame::new().fill(t.canvas).inner_margin(Margin::same(20))).show(
+        ui,
+        |ui| {
+            crate::widgets::reading(ui, |ui| {
+                target_card(app, ui);
+            })
+        },
+    );
     egui::CentralPanel::default().frame(egui::Frame::new().fill(t.canvas).inner_margin(PANE_MARGIN)).show(ui, |ui| {
-        conversation(app, ui, false);
+        crate::widgets::reading(ui, |ui| {
+            conversation(app, ui, false);
+        })
     });
 }
 
@@ -156,7 +163,7 @@ fn target_card(app: &mut CraftApp, ui: &mut Ui) {
                     let (rect, _) = ui.allocate_exact_size(Vec2::splat(48.0), egui::Sense::hover());
                     ui.painter().rect_filled(rect, t.radius, t.accent_soft);
                     icons::paint(ui, rect, crate::kind_icon(target.kind), 26.0, t.accent_ink);
-                    ui.vertical(|ui| {
+                    ui.with_layout(crate::widgets::down(), |ui| {
                         ui.add(egui::Label::new(theme::heading(&target.name, theme::CARD)).truncate());
                         ui.label(RichText::new(crate::human_bytes(target.bytes.len())).color(t.text_faint).size(theme::CAPTION));
                     });
@@ -191,7 +198,7 @@ fn target_card(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(4.0);
         let kind = app.view.active_target().map(|t| t.kind);
         ui.spacing_mut().item_spacing.y = 6.0;
-        ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
+        ui.with_layout(crate::widgets::down_justified(), |ui| {
             for q in suggestions(kind) {
                 if widgets::suggestion(ui, q).clicked() {
                     app.send(&tr(q));
@@ -224,7 +231,7 @@ pub fn conversation(app: &mut CraftApp, ui: &mut Ui, dense: bool) {
     let pad = ((width - max_w) / 2.0).max(0.0);
     // The history gets exactly what the composer leaves (its height is measured last frame), so
     // a panel never grows to fit us.
-    let comp_id = ui.id().with(("composer-h", dense));
+    let comp_id = ui.scope_id().with(("composer-h", dense));
     // Before the first measure, a guess that isn't short: anything left over on that frame grows
     // the console's panel, and it keeps that size.
     let comp_h = ui.data(|d| d.get_temp::<f32>(comp_id)).unwrap_or(if dense { 125.0 } else { 70.0 });
@@ -232,7 +239,7 @@ pub fn conversation(app: &mut CraftApp, ui: &mut Ui, dense: bool) {
     // space given makes the agent console's panel grow by that much every frame, until it reaches
     // its maximum and the top of its tab strip is cut off.
     let rest = Vec2::new(width, (ui.available_height() - comp_h - COMPOSER_GAP - ui.spacing().item_spacing.y).max(40.0));
-    ui.allocate_ui_with_layout(rest, egui::Layout::top_down(egui::Align::Min), |ui| {
+    ui.allocate_ui_with_layout(rest, crate::widgets::down(), |ui| {
         ui.set_min_height(rest.y);
         history(app, ui, dense, pad, max_w)
     });
@@ -259,7 +266,7 @@ fn history(app: &mut CraftApp, ui: &mut Ui, dense: bool, pad: f32, max_w: f32) {
     egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.add_space(pad);
-            ui.vertical(|ui| {
+            ui.with_layout(crate::widgets::down(), |ui| {
                 ui.set_width(max_w);
                 if app.state.chat.is_empty() {
                     greeting(app, ui, dense);
@@ -381,8 +388,9 @@ pub(crate) fn bubble(t: &Tokens, user: bool, dense: bool) -> egui::Frame {
 /// A button at `at` that copies a whole message (#825: selecting text in the feed is
 /// unreliable). Shown while the pointer is over the message (`over`) or the button has keyboard
 /// focus; it's always laid out, so Tab reaches it.
+/// `at` is where the button goes left to right; right to left it's mirrored across `over`.
 fn copy_button(ui: &mut Ui, over: egui::Rect, at: egui::Pos2, text: &str) {
-    let at = egui::Rect::from_min_size(at, Vec2::splat(COPY));
+    let at = crate::widgets::mirror(over, egui::Rect::from_min_size(at, Vec2::splat(COPY)));
     let mut slot = ui.new_child(egui::UiBuilder::new().max_rect(at));
     if !(ui.rect_contains_pointer(over.union(at)) || ui.memory(|m| m.has_focus(slot.next_auto_id()))) {
         slot.set_opacity(0.0);
@@ -396,11 +404,11 @@ fn copy_button(ui: &mut Ui, over: egui::Rect, at: egui::Pos2, text: &str) {
 /// row don't wrap by themselves, so a long prompt would run off the side: wrap it inside the bubble.
 pub(crate) fn user_bubble(ui: &mut Ui, text: &str, dense: bool) {
     let t = Tokens::get(ui.ctx());
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+    ui.with_layout(crate::widgets::to_end(egui::Align::Min), |ui| {
         let shown = bubble(&t, true, dense).show(ui, |ui| {
             ui.set_max_width((ui.available_width() - COPY - 4.0).min(560.0));
             // The bubble sits on the right; its lines still read from the left.
-            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+            ui.with_layout(crate::widgets::down(), |ui| {
                 ui.add(egui::Label::new(RichText::new(text).color(t.text)).wrap());
             });
         });
@@ -415,7 +423,7 @@ pub(crate) fn answer_bubble(ui: &mut Ui, dense: bool, text: &str, content: impl 
     let t = Tokens::get(ui.ctx());
     let shown = bubble(&t, false, dense).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        ui.allocate_ui_with_layout(Vec2::new((ui.available_width() - COPY - 4.0).max(0.0), 0.0), egui::Layout::top_down(egui::Align::Min), content);
+        ui.allocate_ui_with_layout(Vec2::new((ui.available_width() - COPY - 4.0).max(0.0), 0.0), crate::widgets::down(), content);
     });
     let (r, m) = (shown.response.rect, margin(dense));
     copy_button(ui, r, egui::pos2(r.right() - f32::from(m.right) - COPY, r.top() + f32::from(m.top) - 1.0), text);
@@ -459,7 +467,7 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 egui::Frame::new().fill(t.raised).corner_radius(t.r_sm()).inner_margin(Margin::symmetric(10, 3)).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         icons::show(ui, icon, 13.0, col);
-                        ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
+                        ui.label(RichText::new(crate::evidence_ui::nice_operation(tool)).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                     });
                 });
                 if !summary.is_empty() {
@@ -544,7 +552,7 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     icons::show(ui, "sparkles", 20.0, t.accent_ink);
-                    ui.vertical(|ui| {
+                    ui.with_layout(crate::widgets::down(), |ui| {
                         ui.label(RichText::new(tr("Want answers in plain words?")).font(theme::semibold(theme::BODY)));
                         ui.label(
                             RichText::new(tr("Add an AI brain and I'll read this evidence for you, answer follow-up questions and point at the proof."))
@@ -717,7 +725,7 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
         let text = "Run `cargo build` in the app folder,\nthen open it.";
         for item in [ChatItem::User(text.into()), ChatItem::Assistant { text: text.into(), backend: None, streaming: false }] {
-            let mut h = Harness::builder().build_ui(move |ui| {
+            let mut h = Harness::builder().allow_missing_glyphs().build_ui(move |ui| {
                 theme::install_fonts(ui.ctx());
                 item_ui(ui, &item, false, false, false, &mut Vec::new());
             });

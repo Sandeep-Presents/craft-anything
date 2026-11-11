@@ -637,7 +637,7 @@ const PLAN_MIN: f32 = 48.0;
 fn plan_divider(ui: &mut Ui, t: &Tokens, height: &mut Option<f32>, shown: f32) {
     let hint = tr("Drag to give the plan more or less room; double-click to reset");
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 10.0), egui::Sense::click_and_drag());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, &hint));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Unknown, true, &hint));
     let resp = resp.on_hover_cursor(egui::CursorIcon::ResizeVertical).on_hover_text(&hint);
     let active = resp.hovered() || resp.dragged() || resp.has_focus();
     ui.painter().rect_filled(egui::Rect::from_center_size(rect.center(), Vec2::new(36.0, 3.0)), 2.0, if active { t.text_faint } else { t.card_border });
@@ -667,7 +667,7 @@ fn checklist(ui: &mut Ui, steps: &[PlanStep], t: &Tokens, began: Option<std::tim
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             widgets::caption(ui, "Plan");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 if fold && icons::button(ui, "x", 18.0, false, &tr("Fold the plan")).clicked() {
                     folded = true;
                 }
@@ -719,7 +719,7 @@ fn checklist(ui: &mut Ui, steps: &[PlanStep], t: &Tokens, began: Option<std::tim
                             // Sighted users get the warning marker above; screen readers
                             // get the status through the accessible label and the text.
                             let name = format!("{}: {}", s.text, tr("Stopped here"));
-                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &name));
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &name));
                             ui.label(RichText::new(tr("Stopped here")).size(theme::SMALL).color(t.warning));
                         }
                     });
@@ -881,47 +881,49 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     // feed; in a narrow window they fold into the top of the feed instead.
     let beside = ui.available_width() >= SIDE_BESIDE;
     if beside {
-        egui::Panel::right("project-side")
+        crate::widgets::end_panel("project-side")
             .exact_size(SIDE_W)
             .resizable(false)
             .frame(egui::Frame::new().fill(t.canvas).inner_margin(Margin::same(20)))
-            .show(ui, |ui| egui::ScrollArea::vertical().show(ui, |ui| side(app, ui, &ws)));
+            .show(ui, |ui| egui::ScrollArea::vertical().show(ui, |ui| crate::widgets::reading(ui, |ui| side(app, ui, &ws))));
     }
     let waiting = app.open_run().filter(|r| r.is_running()).map(RebuildRun::waiting).unwrap_or_default();
     egui::CentralPanel::default().frame(egui::Frame::new().fill(t.canvas).inner_margin(chat::PANE_MARGIN)).show(ui, |ui| {
-        let width = ui.available_width();
-        let max_w = width.min(720.0);
-        let pad = ((width - max_w) / 2.0).max(0.0);
-        // The feed gets what the prompt box leaves; the box grows with its text, so its height
-        // is measured each frame and used on the next.
-        let comp_id = ui.id().with("project-composer-h");
-        let comp_h = ui.data(|d| d.get_temp::<f32>(comp_id)).unwrap_or(110.0);
-        let rest = Vec2::new(width, (ui.available_height() - comp_h - chat::COMPOSER_GAP).max(40.0));
-        ui.allocate_ui_with_layout(rest, egui::Layout::top_down(egui::Align::Min), |ui| {
-            ui.set_min_height(rest.y);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.add_space(pad);
-                    ui.vertical(|ui| {
-                        ui.set_width(max_w);
-                        if !beside {
-                            egui::CollapsingHeader::new(RichText::new(tr("Project details")).font(theme::semibold(theme::BODY)))
-                                .id_salt("project-details")
-                                .icon(widgets::disclosure_icon)
-                                .show(ui, |ui| side(app, ui, &ws));
-                            ui.add_space(chat::MESSAGE_GAP);
-                        }
-                        feed(app, ui, &ws, &waiting);
+        crate::widgets::reading(ui, |ui| {
+            let width = ui.available_width();
+            let max_w = width.min(720.0);
+            let pad = ((width - max_w) / 2.0).max(0.0);
+            // The feed gets what the prompt box leaves; the box grows with its text, so its height
+            // is measured each frame and used on the next.
+            let comp_id = ui.scope_id().with("project-composer-h");
+            let comp_h = ui.data(|d| d.get_temp::<f32>(comp_id)).unwrap_or(110.0);
+            let rest = Vec2::new(width, (ui.available_height() - comp_h - chat::COMPOSER_GAP).max(40.0));
+            ui.allocate_ui_with_layout(rest, crate::widgets::down(), |ui| {
+                ui.set_min_height(rest.y);
+                egui::ScrollArea::vertical().auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add_space(pad);
+                        ui.with_layout(crate::widgets::down(), |ui| {
+                            ui.set_width(max_w);
+                            if !beside {
+                                egui::CollapsingHeader::new(RichText::new(tr("Project details")).font(theme::semibold(theme::BODY)))
+                                    .id_salt("project-details")
+                                    .icon(widgets::disclosure_icon)
+                                    .show(ui, |ui| side(app, ui, &ws));
+                                ui.add_space(chat::MESSAGE_GAP);
+                            }
+                            feed(app, ui, &ws, &waiting);
+                        });
                     });
                 });
             });
-        });
-        ui.add_space(chat::COMPOSER_GAP);
-        let r = ui.horizontal(|ui| {
-            ui.add_space(pad);
-            ui.vertical(|ui| composer(app, ui, max_w, &t, waiting.last()));
-        });
-        chat::remember_composer_height(ui, comp_id, comp_h, r.response.rect.height());
+            ui.add_space(chat::COMPOSER_GAP);
+            let r = ui.horizontal(|ui| {
+                ui.add_space(pad);
+                ui.with_layout(crate::widgets::down(), |ui| composer(app, ui, max_w, &t, waiting.last()));
+            });
+            chat::remember_composer_height(ui, comp_id, comp_h, r.response.rect.height());
+        })
     });
 }
 
@@ -935,7 +937,7 @@ fn side(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(48.0), egui::Sense::hover());
             ui.painter().rect_filled(rect, t.radius, t.accent_soft);
             icons::paint(ui, rect, make::project_icon(m), 24.0, t.accent_ink);
-            ui.vertical(|ui| {
+            ui.with_layout(crate::widgets::down(), |ui| {
                 ui.add(egui::Label::new(theme::heading(&m.name, theme::CARD)).truncate());
                 let (label, fg, bg) = make::status_shown(app, ws, &t);
                 widgets::pill(ui, label, fg, bg);
@@ -1076,7 +1078,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
                 None => (false, false, false),
             };
             let (row, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), row_h), egui::Sense::hover());
-            let marker = egui::Rect::from_min_size(egui::pos2(row.left(), row.center().y - 12.0), Vec2::splat(24.0));
+            let marker = widgets::mirror(row, egui::Rect::from_min_size(egui::pos2(row.left(), row.center().y - 12.0), Vec2::splat(24.0)));
             // The line to the next step: ink once this step is done, a hairline before that.
             if i + 1 < Step::ALL.len() {
                 let x = marker.center().x;
@@ -1109,7 +1111,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
                 let g = widgets::label_galley(ui, &number, 11.0, t.text_faint);
                 ui.painter().galley_with_override_text_color(marker.center() - g.size() / 2.0, g, t.text_faint);
             }
-            let x = marker.right() + 12.0;
+            let x = widgets::mirror_x(row, row.left() + marker.width() + 12.0);
             let (font, col) = if now || here {
                 (theme::semibold(theme::SMALL), t.text)
             } else if done {
@@ -1117,7 +1119,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
             } else {
                 (theme::medium(theme::SMALL), t.text_faint)
             };
-            ui.painter().text(egui::pos2(x, row.center().y), egui::Align2::LEFT_CENTER, tr(s.label()), font, col);
+            ui.painter().text(egui::pos2(x, row.center().y), widgets::start_anchor(egui::Align::Center), tr(s.label()), font, col);
             // State in words too, so it doesn't rely on colour.
             let state = if now {
                 tr("Now")
@@ -1130,12 +1132,12 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
             };
             // Painted, so named for screen readers: "Build: Now".
             let name = if state.is_empty() { tr(s.label()) } else { format!("{}: {state}", tr(s.label())) };
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &name));
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &name));
             if !state.is_empty() {
                 let ink = if now || here { t.accent_ink } else { t.text_faint };
                 let g = widgets::label_galley(ui, &state, theme::CAPTION, ink);
                 let pos = egui::pos2(row.right() - g.size().x, row.center().y - g.size().y / 2.0);
-                ui.painter().galley_with_override_text_color(pos, g, ink);
+                ui.painter().galley_with_override_text_color(widgets::mirror(row, egui::Rect::from_min_size(pos, g.size())).min, g, ink);
             }
         }
         // How long it has worked and what the AI has used, live while it builds.
@@ -1180,13 +1182,15 @@ fn stat_row(ui: &mut Ui, label: &str, value: &str) -> egui::Response {
     if caption_width + ui.spacing().item_spacing.x + value_width <= ui.available_width() {
         ui.horizontal(|ui| {
             widgets::caption(ui, label);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| ui.label(text));
+            ui.with_layout(widgets::to_end(egui::Align::Center), |ui| ui.label(text));
         })
         .response
     } else {
-        ui.vertical(|ui| {
+        // The value at the end of its own line: the right, or the left right to left.
+        let end = if widgets::rtl() { egui::Align::Min } else { egui::Align::Max };
+        ui.with_layout(widgets::down(), |ui| {
             widgets::caption(ui, label);
-            ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| ui.label(text));
+            ui.with_layout(egui::Layout::top_down(end), |ui| ui.label(text));
         })
         .response
     }
@@ -1217,11 +1221,11 @@ fn feed(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace, waiting: &[Note]) {
                 let (rect, _) = ui.allocate_exact_size(Vec2::splat(44.0), egui::Sense::hover());
                 ui.painter().rect_filled(rect, t.radius, t.accent_soft);
                 icons::paint(ui, rect, w.icon, 22.0, t.accent_ink);
-                ui.vertical(|ui| {
+                ui.with_layout(crate::widgets::down(), |ui| {
                     ui.label(theme::heading(tr(w.ready), theme::CARD));
                     ui.label(RichText::new(tr("Try it out, then ask below for any changes.")).color(t.text_dim));
                 });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| outcome_button(app, ui, ws, 44.0, 13.0));
+                ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| outcome_button(app, ui, ws, 44.0, 13.0));
             });
         });
         ui.add_space(10.0);
@@ -1703,7 +1707,7 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
         }
         claims_list(ui, c, &t);
         // Several pages: each one's likeness; clicking one shows its pictures below.
-        let picked_id = egui::Id::new(("check-page", c.round));
+        let picked_id = egui::Id::unique(("check-page", c.round));
         let mut picked: usize = ui.data(|d| d.get_temp(picked_id)).unwrap_or(0);
         if c.pages.len() > 1 {
             picked = picked.min(c.pages.len() - 1);
@@ -1727,7 +1731,7 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
             let w = (ui.available_width() - 12.0) / 2.0;
             ui.horizontal(|ui| {
                 for (label, thumb) in shots {
-                    ui.vertical(|ui| {
+                    ui.with_layout(crate::widgets::down(), |ui| {
                         ui.set_width(w);
                         widgets::caption(ui, label);
                         match thumb {
@@ -1754,7 +1758,7 @@ fn waiting_notes(app: &mut CraftApp, ui: &mut Ui, waiting: &[Note], t: &Tokens) 
     for (i, note) in waiting.iter().enumerate() {
         ui.push_id(("waiting-note", note.id), |ui| {
             chat::user_bubble(ui, &note.shown, false);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 if icons::button(ui, "x", 22.0, false, "Take back: puts it in the box again").clicked() {
                     take_back = Some(note.id);
                 }
@@ -1784,7 +1788,7 @@ fn composer(app: &mut CraftApp, ui: &mut Ui, width: f32, t: &Tokens, last_waitin
     if let Some(steps) = plan(&app.state.feed).filter(|p| running || p.iter().any(|s| s.status != PlanStatus::Done)) {
         let began = app.open_run().filter(|_| running).map(RebuildRun::started);
         let mut fold = false;
-        let shown_id = egui::Id::new("plan-steps-shown");
+        let shown_id = egui::Id::unique("plan-steps-shown");
         let mut height = app.state.plan_height;
         ui.allocate_ui(Vec2::new(width, 0.0), |ui| {
             let shown = ui.data(|d| d.get_temp::<f32>(shown_id)).unwrap_or(PLAN_HEIGHT);
@@ -1923,7 +1927,9 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
     let hint = |ui: &mut Ui| {
         ui.add(egui::Label::new(RichText::new(tr("or start with /btw to just ask")).color(t.text_faint).size(theme::SMALL)).truncate());
     };
-    let right = egui::Layout::right_to_left(egui::Align::Center);
+    let right = widgets::to_end(egui::Align::Center);
+    // The hint fills what's left from where reading starts.
+    let left = if widgets::rtl() { egui::Layout::right_to_left(egui::Align::Center) } else { egui::Layout::left_to_right(egui::Align::Center) };
     ui.horizontal(|ui| {
         // What sending does: ask for a change, or just ask about the build.
         if let Some(i) = widgets::segmented(ui, &sending, usize::from(app.state.just_ask), 24.0) {
@@ -1932,7 +1938,7 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
         if fits {
             ui.with_layout(right, |ui| {
                 questions_controls(app, ui, now, &root, &t);
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), hint);
+                ui.with_layout(left, hint);
             });
         } else {
             hint(ui);

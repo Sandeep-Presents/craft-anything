@@ -34,7 +34,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(40.0);
         ui.horizontal(|ui| {
             ui.add_space(pad);
-            ui.vertical(|ui| {
+            ui.with_layout(crate::widgets::down(), |ui| {
                 ui.set_width(w);
                 ui.label(theme::heading(tr("Game files"), theme::TITLE));
                 ui.add_space(4.0);
@@ -87,7 +87,7 @@ fn about(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         ui.horizontal(|ui| {
             icons::show(ui, "puzzle", 20.0, t.accent_ink);
             ui.label(theme::heading(g["engine"].as_str().unwrap_or_default(), theme::CARD));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 ask = widgets::primary_icon(ui, Some("message-square"), "Ask about this game", true).clicked();
             });
         });
@@ -156,14 +156,15 @@ fn archives(app: &mut CraftApp, ui: &mut Ui, w: f32) {
             t.card
         };
         ui.painter().rect_filled(rect, t.radius, fill);
-        let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.left() + 24.0, rect.center().y), Vec2::splat(20.0));
+        let icon_rect = widgets::mirror(rect, egui::Rect::from_center_size(egui::pos2(rect.left() + 24.0, rect.center().y), Vec2::splat(20.0)));
         icons::paint(ui, icon_rect, icon, 18.0, if selected { t.accent_ink } else { t.text_dim });
         let name = a["name"].as_str().unwrap_or(path);
-        ui.painter().text(egui::pos2(rect.left() + 46.0, rect.center().y), egui::Align2::LEFT_CENTER, name, theme::medium(theme::SMALL), t.text);
+        let name_at = egui::pos2(widgets::mirror_x(rect, rect.left() + 46.0), rect.center().y);
+        ui.painter().text(name_at, widgets::start_anchor(egui::Align::Center), name, theme::medium(theme::SMALL), t.text);
         let detail = format!("{} · {}", tr(label), crate::human_bytes(a["size"].as_u64().unwrap_or(0) as usize));
         ui.painter().text(
-            egui::pos2(rect.right() - 14.0, rect.center().y),
-            egui::Align2::RIGHT_CENTER,
+            egui::pos2(widgets::mirror_x(rect, rect.right() - 14.0), rect.center().y),
+            widgets::end_anchor(egui::Align::Center),
             detail,
             egui::FontId::proportional(theme::CAPTION),
             t.text_faint,
@@ -231,7 +232,7 @@ fn contents(app: &mut CraftApp, ui: &mut Ui) {
     for r in &rows {
         ui.horizontal(|ui| {
             ui.label(RichText::new(row_name(r)).size(theme::SMALL));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 if saves && widgets::secondary(ui, Some("download"), "Save picture").clicked() {
                     save = Some(r.clone());
                 }

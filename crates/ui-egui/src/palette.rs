@@ -109,74 +109,75 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
     let width = 620.0_f32.min(screen.width() - 40.0);
     let pos = egui::pos2(screen.center().x - width / 2.0, screen.top() + 80.0);
     // Scrim
-    ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new("palette-scrim"))).rect_filled(screen, 0.0, t.shadow.gamma_multiply(0.6));
-    let resp = egui::Area::new(egui::Id::new("palette")).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
-        egui::Frame::new()
-            .fill(t.card)
-            .stroke(egui::Stroke::new(1.0, t.card_border))
-            .corner_radius(t.r_lg())
-            .shadow(ui.visuals().window_shadow)
-            .inner_margin(Margin::same(10))
-            .show(ui, |ui| {
-                ui.set_width(width);
-                ui.horizontal(|ui| {
-                    icons::show(ui, "search", 18.0, t.text_faint);
-                    let r = ui.add(
-                        egui::TextEdit::singleline(&mut app.state.palette.query)
-                            .hint_text(tr("Type a command or tool…"))
-                            .frame(egui::Frame::NONE)
-                            .desired_width(f32::INFINITY)
-                            .font(egui::FontId::proportional(theme::BODY)),
-                    );
-                    r.request_focus();
-                    if r.changed() {
-                        app.state.palette.selected = 0;
-                        follow = true;
-                    }
-                });
-                ui.add_space(6.0);
-                ui.separator();
-                egui::ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
-                    if ranked.is_empty() {
-                        ui.label(RichText::new(tr("Nothing matches.")).color(t.text_faint));
-                    }
-                    for (i, (_, e)) in ranked.iter().enumerate() {
-                        let on = i == app.state.palette.selected;
-                        let (rect, r) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 40.0), egui::Sense::click());
-                        if on || r.hovered() {
-                            ui.painter().rect_filled(rect, t.radius_sm, if on { t.accent_soft } else { t.hover });
-                        }
-                        if on && follow {
-                            r.scroll_to_me(None);
-                        }
-                        let (icon, title, sub, tag) = match e {
-                            Entry::App(_, title, icon) => (*icon, tr(title), String::new(), tr("App")),
-                            Entry::Tool { id, title, summary, toolset } => ("wrench", tr(title), format!("{id} · {summary}"), tr(toolset)),
-                        };
-                        r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, &title));
-                        icons::paint(
-                            ui,
-                            egui::Rect::from_min_size(rect.min + Vec2::new(8.0, 12.0), Vec2::splat(16.0)),
-                            icon,
-                            16.0,
-                            if on { t.accent_ink } else { t.icon },
+    ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::unique("palette-scrim"))).rect_filled(screen, 0.0, t.shadow.gamma_multiply(0.6));
+    let resp = egui::Area::new(egui::Id::unique("palette")).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+        crate::widgets::reading(ui, |ui| {
+            egui::Frame::new()
+                .fill(t.card)
+                .stroke(egui::Stroke::new(1.0, t.card_border))
+                .corner_radius(t.r_lg())
+                .shadow(ui.visuals().window_shadow)
+                .inner_margin(Margin::same(10))
+                .show(ui, |ui| {
+                    ui.set_width(width);
+                    ui.horizontal(|ui| {
+                        icons::show(ui, "search", 18.0, t.text_faint);
+                        let r = ui.add(
+                            egui::TextEdit::singleline(&mut app.state.palette.query)
+                                .hint_text(tr("Type a command or tool…"))
+                                .frame(egui::Frame::NONE)
+                                .desired_width(f32::INFINITY)
+                                .font(egui::FontId::proportional(theme::BODY)),
                         );
-                        ui.painter().text(rect.min + Vec2::new(34.0, 5.0), egui::Align2::LEFT_TOP, title, theme::medium(theme::SMALL), t.text);
-                        let sub_g = ui.painter().layout_no_wrap(crate::evidence_ui::truncate(&sub, 90), egui::FontId::proportional(theme::TINY), t.text_faint);
-                        ui.painter().with_clip_rect(rect.shrink(2.0)).galley(rect.min + Vec2::new(34.0, 23.0), sub_g, t.text_faint);
-                        let tag_g = ui.painter().layout_no_wrap(tag, egui::FontId::proportional(theme::TINY), t.text_dim);
-                        let tr_ =
-                            egui::Rect::from_min_size(egui::pos2(rect.right() - tag_g.size().x - 18.0, rect.top() + 6.0), tag_g.size() + Vec2::new(10.0, 4.0));
-                        ui.painter().rect_filled(tr_, t.r_sm(), t.raised);
-                        ui.painter().galley(tr_.min + Vec2::new(5.0, 2.0), tag_g, t.text_dim);
-                        if r.clicked() {
-                            chosen = Some(i);
+                        r.request_focus();
+                        if r.changed() {
+                            app.state.palette.selected = 0;
+                            follow = true;
                         }
-                    }
+                    });
+                    ui.add_space(6.0);
+                    ui.separator();
+                    egui::ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
+                        if ranked.is_empty() {
+                            ui.label(RichText::new(tr("Nothing matches.")).color(t.text_faint));
+                        }
+                        for (i, (_, e)) in ranked.iter().enumerate() {
+                            let on = i == app.state.palette.selected;
+                            let (rect, r) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 40.0), egui::Sense::click());
+                            if on || r.hovered() {
+                                ui.painter().rect_filled(rect, t.radius_sm, if on { t.accent_soft } else { t.hover });
+                            }
+                            if on && follow {
+                                r.scroll_to_me(None);
+                            }
+                            let (icon, title, sub, tag) = match e {
+                                Entry::App(_, title, icon) => (*icon, tr(title), String::new(), tr("App")),
+                                Entry::Tool { id, title, summary, toolset } => ("wrench", tr(title), format!("{id} · {summary}"), tr(toolset)),
+                            };
+                            r.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, &title));
+                            // Laid out from the left, mirrored right to left.
+                            let at = |min: egui::Pos2, size: Vec2| crate::widgets::mirror(rect, egui::Rect::from_min_size(min, size));
+                            let icon_rect = at(rect.min + Vec2::new(8.0, 12.0), Vec2::splat(16.0));
+                            icons::paint(ui, icon_rect, icon, 16.0, if on { t.accent_ink } else { t.icon });
+                            let title_g = ui.painter().layout_no_wrap(title, theme::medium(theme::SMALL), t.text);
+                            ui.painter().galley(at(rect.min + Vec2::new(34.0, 5.0), title_g.size()).min, title_g, t.text);
+                            let sub_g =
+                                ui.painter().layout_no_wrap(crate::evidence_ui::truncate(&sub, 90), egui::FontId::proportional(theme::TINY), t.text_faint);
+                            let sub_at = at(rect.min + Vec2::new(34.0, 23.0), sub_g.size()).min;
+                            ui.painter().with_clip_rect(rect.shrink(2.0)).galley(sub_at, sub_g, t.text_faint);
+                            let tag_g = ui.painter().layout_no_wrap(tag, egui::FontId::proportional(theme::TINY), t.text_dim);
+                            let tr_ = at(egui::pos2(rect.right() - tag_g.size().x - 18.0, rect.top() + 6.0), tag_g.size() + Vec2::new(10.0, 4.0));
+                            ui.painter().rect_filled(tr_, t.r_sm(), t.raised);
+                            ui.painter().galley(tr_.min + Vec2::new(5.0, 2.0), tag_g, t.text_dim);
+                            if r.clicked() {
+                                chosen = Some(i);
+                            }
+                        }
+                    });
+                    ui.add_space(4.0);
+                    ui.label(RichText::new(tr("↑↓ to move · Enter to run · Esc to close")).color(t.text_faint).size(theme::TINY));
                 });
-                ui.add_space(4.0);
-                ui.label(RichText::new(tr("↑↓ to move · Enter to run · Esc to close")).color(t.text_faint).size(theme::TINY));
-            });
+        })
     });
     if enter && n > 0 {
         chosen = Some(app.state.palette.selected);
@@ -255,35 +256,37 @@ fn form(app: &mut CraftApp, ctx: &egui::Context, tool: &str) {
     let mut back = false;
     let mut open = true;
     egui::Window::new(RichText::new(tr(spec.title)).font(theme::semibold(theme::BODY)))
-        .id(egui::Id::new("tool-form"))
+        .id(egui::Id::unique("tool-form"))
         .open(&mut open)
         .collapsible(false)
         .resizable(true)
         .default_width(520.0)
         .anchor(egui::Align2::CENTER_TOP, Vec2::new(0.0, 80.0))
         .show(ctx, |ui| {
-            ui.label(RichText::new(spec.summary).color(t.text_dim));
-            ui.label(RichText::new(spec.id).font(theme::mono(theme::CAPTION)).color(t.text_faint));
-            if spec.effects.needs_consent() {
+            crate::widgets::reading(ui, |ui| {
+                ui.label(RichText::new(spec.summary).color(t.text_dim));
+                ui.label(RichText::new(spec.id).font(theme::mono(theme::CAPTION)).color(t.text_faint));
+                if spec.effects.needs_consent() {
+                    ui.horizontal(|ui| {
+                        icons::show(ui, "shield", 14.0, t.warning);
+                        ui.label(RichText::new(tr("This runs code from the target or changes a device. Clicking Run is your OK.")).color(t.warning));
+                    });
+                }
+                ui.add_space(8.0);
+                schema_form::show(ui, &fields, &mut app.state.palette.form);
+                if let Some(e) = &app.state.palette.form_error {
+                    ui.colored_label(t.danger, e);
+                }
+                ui.add_space(10.0);
                 ui.horizontal(|ui| {
-                    icons::show(ui, "shield", 14.0, t.warning);
-                    ui.label(RichText::new(tr("This runs code from the target or changes a device. Clicking Run is your OK.")).color(t.warning));
+                    if widgets::primary_icon(ui, Some("play"), "Run", true).clicked() {
+                        run = true;
+                    }
+                    if widgets::secondary(ui, None, "Back").clicked() {
+                        back = true;
+                    }
                 });
-            }
-            ui.add_space(8.0);
-            schema_form::show(ui, &fields, &mut app.state.palette.form);
-            if let Some(e) = &app.state.palette.form_error {
-                ui.colored_label(t.danger, e);
-            }
-            ui.add_space(10.0);
-            ui.horizontal(|ui| {
-                if widgets::primary_icon(ui, Some("play"), "Run", true).clicked() {
-                    run = true;
-                }
-                if widgets::secondary(ui, None, "Back").clicked() {
-                    back = true;
-                }
-            });
+            })
         });
     if !open {
         app.state.palette.open = false;

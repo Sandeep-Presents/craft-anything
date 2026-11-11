@@ -76,7 +76,7 @@ pub fn window_edge(ctx: &egui::Context) {
         return;
     }
     let t = Tokens::get(ctx);
-    ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("window-edge"))).rect_stroke(
+    ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("window-edge"))).rect_stroke(
         ctx.content_rect(),
         0.0,
         egui::Stroke::new(1.0, t.field_border),
@@ -121,7 +121,7 @@ fn window_button(ui: &mut Ui, icon: &str, tip: &str, close: bool) -> egui::Respo
     let col = if hot && close { egui::Color32::WHITE } else { t.icon };
     icons::paint(ui, egui::Rect::from_center_size(rect.center(), Vec2::splat(14.0)), icon, 14.0, col);
     widgets::focus_ring(ui, &resp, rect.shrink(3.0));
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tr(tip)));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tr(tip)));
     resp.on_hover_text(tr(tip))
 }
 
@@ -134,7 +134,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let bar = ui.max_rect();
     // Empty parts of the bar move the window and double-click maximises. This is registered
     // before the controls, so they get their own clicks.
-    let drag = ui.interact(bar, ui.id().with("titlebar-drag"), egui::Sense::click_and_drag());
+    let drag = ui.interact(bar, ui.scope_id().with("titlebar-drag"), egui::Sense::click_and_drag());
     if edge_at(&ctx).is_none() && drag.drag_started_by(egui::PointerButton::Primary) {
         ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
     }
@@ -145,8 +145,8 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     // A download anywhere in the app fills the bottom edge of the bar, on every screen.
     let download = crate::engine_ui::global_download(app);
     if let Some((_, Some(f), _)) = &download {
-        let x = bar.left() + bar.width() * f.clamp(0.0, 1.0);
-        ui.painter().line_segment([egui::pos2(bar.left(), bar.bottom() - s), egui::pos2(x, bar.bottom() - s)], egui::Stroke::new(2.0 * s, t.accent));
+        let (from, x) = (widgets::mirror_x(bar, bar.left()), widgets::mirror_x(bar, bar.left() + bar.width() * f.clamp(0.0, 1.0)));
+        ui.painter().line_segment([egui::pos2(from, bar.bottom() - s), egui::pos2(x, bar.bottom() - s)], egui::Stroke::new(2.0 * s, t.accent));
     }
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = 10.0 * s;
@@ -173,7 +173,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
             icons::show(ui, crate::kind_icon(kind), 14.0 * s, t.icon);
             ui.add(egui::Label::new(RichText::new(name).font(theme::mono(theme::CAPTION * s)).color(t.text)).truncate()).on_hover_text(tr(kind.plain()));
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             if !NATIVE_FRAME {
                 if window_button(ui, "x", "Close", true).clicked() {
@@ -242,7 +242,7 @@ fn usage_pill(app: &CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let text = if u.priced { crate::usage::cost_short(u) } else { crate::usage::tokens_words(u.tokens()) };
     let r = widgets::pill_sized(ui, &text, t.text_dim, t.raised, label(11.0, scale(ui.ctx())));
-    r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &text));
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, &text));
     r.on_hover_ui(|ui| {
         ui.label(RichText::new(tr("AI use this session")).font(theme::semibold(theme::SMALL)));
         ui.label(crate::usage::explain(u, "Since Craft Anything opened."));
@@ -262,15 +262,18 @@ fn download_pill(ui: &mut Ui, title: &str, fraction: Option<f32>) -> egui::Respo
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let h = widgets::hover_t(ui, &resp);
     ui.painter().rect(rect, t.radius, crate::theme::mix(t.raised, t.hover, h), egui::Stroke::new(s, t.card_border), egui::StrokeKind::Inside);
-    icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.left() + 14.0 * s, rect.center().y), Vec2::splat(14.0 * s)), "download", 14.0 * s, t.accent);
-    ui.painter().galley_with_override_text_color(egui::pos2(rect.left() + 26.0 * s, rect.center().y - g.size().y / 2.0), g, t.text);
-    let track = egui::Rect::from_min_size(egui::pos2(rect.right() - 48.0 * s, rect.center().y - 1.5 * s), Vec2::new(38.0, 3.0) * s);
+    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.left() + 14.0 * s, rect.center().y), Vec2::splat(14.0 * s));
+    icons::paint(ui, widgets::mirror(rect, icon_rect), "download", 14.0 * s, t.accent);
+    let at = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.left() + 26.0 * s, rect.center().y - g.size().y / 2.0), g.size()));
+    ui.painter().galley_with_override_text_color(at.min, g, t.text);
+    let track = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.right() - 48.0 * s, rect.center().y - 1.5 * s), Vec2::new(38.0, 3.0) * s));
     ui.painter().rect_filled(track, 1.5 * s, t.separator);
     let f = fraction.unwrap_or_else(|| (ui.input(|i| i.time) * 0.6).fract() as f32).clamp(0.0, 1.0);
-    ui.painter().rect_filled(egui::Rect::from_min_size(track.min, Vec2::new(track.width() * f, track.height())), 1.5 * s, t.accent);
+    let done = egui::Rect::from_min_size(track.min, Vec2::new(track.width() * f, track.height()));
+    ui.painter().rect_filled(widgets::mirror(track, done), 1.5 * s, t.accent);
     widgets::focus_ring(ui, &resp, rect);
     widgets::animate(ui, std::time::Duration::from_millis(250));
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, text.clone()));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, text.clone()));
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -286,18 +289,19 @@ fn deep_toggle(app: &mut CraftApp, ui: &mut Ui) {
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let fill = if resp.hovered() { t.hover } else { egui::Color32::TRANSPARENT };
     ui.painter().rect(rect, t.radius, fill, egui::Stroke::new(s, t.card_border), egui::StrokeKind::Inside);
-    let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.left() + 16.0 * s, rect.center().y), Vec2::splat(16.0 * s));
+    let icon_rect = widgets::mirror(rect, egui::Rect::from_center_size(egui::pos2(rect.left() + 16.0 * s, rect.center().y), Vec2::splat(16.0 * s)));
     let (icon, col) = if deep { ("microscope", t.accent) } else { ("shield-check", t.success) };
     icons::paint(ui, icon_rect, icon, 15.0 * s, col);
-    ui.painter().galley_with_override_text_color(egui::pos2(rect.left() + 30.0 * s, rect.center().y - g.size().y / 2.0), g, t.text);
+    let at = widgets::mirror(rect, egui::Rect::from_min_size(egui::pos2(rect.left() + 30.0 * s, rect.center().y - g.size().y / 2.0), g.size()));
+    ui.painter().galley_with_override_text_color(at.min, g, t.text);
     // The little switch.
-    let sw = egui::Rect::from_center_size(egui::pos2(rect.right() - 18.0 * s, rect.center().y), Vec2::new(22.0, 12.0) * s);
+    let sw = widgets::mirror(rect, egui::Rect::from_center_size(egui::pos2(rect.right() - 18.0 * s, rect.center().y), Vec2::new(22.0, 12.0) * s));
     let how = ui.ctx().animate_bool(resp.id, deep);
     ui.painter().rect_filled(sw, 6.0 * s, if deep { t.accent } else { t.pressed });
-    let knob_x = egui::lerp(sw.left() + 6.0 * s..=sw.right() - 6.0 * s, how);
+    let knob_x = widgets::mirror_x(sw, egui::lerp(sw.left() + 6.0 * s..=sw.right() - 6.0 * s, how));
     ui.painter().circle_filled(egui::pos2(knob_x, sw.center().y), 4.5 * s, egui::Color32::WHITE);
     widgets::focus_ring(ui, &resp, rect);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, !deep, tr("Clean room")));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, !deep, tr("Clean room")));
     let resp = resp.on_hover_ui(|ui| {
         ui.label(RichText::new(tr("Clean room or Deep")).font(theme::semibold(theme::SMALL)));
         ui.label(tr(
@@ -327,7 +331,7 @@ fn backend_picker(app: &mut CraftApp, ui: &mut Ui) {
         spacing.button_padding *= s;
         spacing.icon_width *= s;
         spacing.icon_spacing *= s;
-        egui::ComboBox::from_id_salt("backend-picker")
+        let r = egui::ComboBox::from_id_salt("backend-picker")
             .selected_text(theme::label_text(&current, label(12.0, s)).color(if app.state.backend.is_some() { t.text } else { t.text_dim }))
             .icon(move |ui, rect, _, _| icons::paint(ui, rect.expand(2.0 * s), "chevron-down", 14.0 * s, Tokens::get(ui.ctx()).icon))
             .width(190.0 * s)
@@ -348,6 +352,7 @@ fn backend_picker(app: &mut CraftApp, ui: &mut Ui) {
             })
             .response
             .on_hover_text(tr("Which AI answers your questions"));
+        widgets::named(r, "AI");
     });
     if let Some(c) = choice {
         app.choose_backend(c);

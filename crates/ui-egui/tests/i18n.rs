@@ -11,7 +11,7 @@ fn harness(mut settings: Settings, dir: &Path) -> Harness<'static, CraftApp> {
     // Keep every engine path under the test directory, including after a saved-settings reload.
     settings.engines.store_dir = Some(dir.join("engines"));
     settings.projects_dir = Some(dir.join("projects"));
-    Harness::builder().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
+    Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1280.0, 1120.0)).with_max_steps(32).build_eframe(move |cc| {
         CraftApp::setup_context(&cc.egui_ctx);
         let engine = demo::engine(Mode::Beginner, true);
         {
@@ -47,7 +47,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         // Startup must apply the saved locale itself, rather than relying on a manual call to
         // set_language after app construction. Check both lookup and a rendered settings row.
         assert_eq!(i18n::language(), initial);
-        h.get_by_label(translated_language);
+        h.get_by_role_and_label(egui::Role::Label, translated_language);
         assert_eq!(i18n::trf("Opened {name}", &[("name", "sample.exe")]), translated_open);
         assert_eq!(i18n::tr("A deliberately uncatalogued message"), "A deliberately uncatalogued message");
         assert_eq!(i18n::trf("Uncatalogued {name}", &[("name", "sample.exe")]), "Uncatalogued sample.exe");
@@ -95,7 +95,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         restored.run_steps(3);
         assert_eq!(i18n::language(), other);
         restored.get_by_value(other_native);
-        restored.get_by_label(if other == "zh-hans" { "语言" } else { "語言" });
+        restored.get_by_role_and_label(egui::Role::Label, if other == "zh-hans" { "语言" } else { "語言" });
 
         // English remains available from either Chinese catalog and takes effect immediately.
         restored.get_by_value(other_native).click();
@@ -107,7 +107,7 @@ fn chinese_startup_language_menu_and_saved_selection() {
         assert_eq!(i18n::language(), "en");
         assert_eq!(restored.state().settings.language, "en");
         assert_eq!(restored.state().engine.session().settings.language, "en");
-        restored.get_by_label("Language");
+        restored.get_by_role_and_label(egui::Role::Label, "Language");
         assert!(restored.query_by_label("语言").is_none());
         assert!(restored.query_by_label("語言").is_none());
 
@@ -129,14 +129,52 @@ fn chinese_startup_language_menu_and_saved_selection() {
         ("ka", "ქართული", "ენა"),
         ("ko", "한국어", "언어"),
         ("vi", "Tiếng Việt", "Ngôn ngữ"),
+        ("ar", "العربية", "اللغة"),
     ] {
         let settings = Settings { mode: Mode::Beginner, first_run_done: true, language: code.into(), ..Default::default() };
         let mut existing = harness(settings, &temp.path().join(code));
         existing.run_steps(3);
         assert_eq!(i18n::language(), code);
-        existing.get_by_label(label);
+        existing.get_by_role_and_label(egui::Role::Label, label);
         existing.get_by_value(native);
     }
+    // Arabic reads right to left: the sidebar moves to the right, and egui's own parts follow.
+    for (code, new_project) in [("ar", "مشروع جديد"), ("en", "New project")] {
+        let settings = Settings { mode: Mode::Beginner, first_run_done: true, language: code.into(), ..Default::default() };
+        let mut h = harness(settings, &temp.path().join(format!("mirror-{code}")));
+        h.state_mut().state.settings_open = false;
+        h.run_steps(3);
+        let rtl = code == "ar";
+        assert_eq!(i18n::is_rtl(), rtl);
+        assert_eq!(h.ctx.global_style().right_to_left, rtl);
+        let x = h.get_by_label(new_project).rect().center().x;
+        assert_eq!(x > 640.0, rtl, "{code}: New project at x = {x}");
+        // A found AI's card: Add at the end, the reason wrapped beside it where reading starts.
+        let reason = "Found the claude command on this computer, in a folder that another account's settings also point at.";
+        let suggestion = craft_anything_ai::BackendConfig {
+            name: "Claude Code".into(),
+            kind: craft_anything_ai::BackendKind::AgentCli,
+            model: "claude-code".into(),
+            base_url: None,
+            ssh_host: None,
+            enabled: true,
+        };
+        let app = h.state_mut();
+        app.backends.clear();
+        app.detected = Some(vec![craft_anything_ai::Detected { suggestion, reason: reason.into(), needs_key: false }]);
+        app.detecting = true;
+        app.state.settings_open = true;
+        app.state.settings_tab = craft_anything_ui_egui::state::SettingsTab::Ai;
+        h.run_steps(4);
+        let text = h.get_by_label(reason).rect();
+        let add = h.query_all_by_label(&i18n::tr("Add")).map(|n| n.rect()).find(|r| r.top() < text.bottom() && r.bottom() > text.top() - 30.0);
+        let add = add.expect("the card has an Add button beside its text");
+        let beside = if rtl { add.right() <= text.left() } else { text.right() <= add.left() };
+        assert!(beside, "{code}: the reason ({text:?}) is beside the Add button ({add:?}) where reading starts");
+    }
+    // Evidence cards and the agent's tool chips name a tool by its translated title.
+    i18n::set_language("ar");
+    assert_eq!(craft_anything_ui_egui::evidence_ui::nice_operation("native_strings_browse"), "عرض السلاسل النصية");
     i18n::set_language("unsupported-locale");
     assert_eq!(i18n::language(), "en");
     assert_eq!(i18n::tr("Settings"), "Settings");

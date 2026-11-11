@@ -143,7 +143,7 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         ui.add_space(16.0);
         ui.horizontal(|ui| {
             crate::builders::built_by(app, ui);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 let ready = !app.state.make.request.trim().is_empty() && url_problem(&app.state.make.url).is_none() && app.creating.is_none();
                 let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, 50.0, 14.0);
                 let start = if ready { start } else { start.on_disabled_hover_text(tr("Say what you want first.")) };
@@ -204,7 +204,7 @@ fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         ui.add_space(16.0);
         ui.horizontal(|ui| {
             crate::builders::built_by(app, ui);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 let said = !app.state.make.request.trim().is_empty();
                 let ready = folder.is_some() && said && app.creating.is_none();
                 let start = widgets::primary_sized(ui, Some("sparkles"), "Start", ready, 50.0, 14.0);

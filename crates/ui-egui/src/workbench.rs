@@ -95,17 +95,17 @@ fn row_text(v: &Value) -> String {
 
 pub fn show(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    egui::Panel::left("wb-rail-icons")
+    crate::widgets::start_panel("wb-rail-icons")
         .exact_size(48.0)
         .resizable(false)
         .frame(egui::Frame::new().fill(t.chrome).inner_margin(Margin::symmetric(6, 10)))
         .show(ui, |ui| rail_icons(app, ui));
-    egui::Panel::left("wb-rail")
+    crate::widgets::start_panel("wb-rail")
         .default_size(290.0)
         .size_range(200.0..=520.0)
         .frame(egui::Frame::new().fill(t.chrome).inner_margin(Margin { left: 4, right: 8, top: 10, bottom: 8 }))
         .show(ui, |ui| crate::guard_ui(ui, "rail", |ui| rail(app, ui)));
-    egui::Panel::right("wb-right")
+    crate::widgets::end_panel("wb-right")
         .default_size(330.0)
         .size_range(240.0..=560.0)
         .frame(egui::Frame::new().fill(t.chrome).inner_margin(Margin { left: 8, right: 10, top: 10, bottom: 8 }))
@@ -197,7 +197,7 @@ fn rail_list(app: &mut CraftApp, ui: &mut Ui, kind: RailKind, fill: &Fill) {
     };
     ui.horizontal(|ui| {
         panel_title(ui, kind.title(), matches!(fill, Fill::Ready(_) | Fill::Value(_)).then_some(all.len()));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
             if icons::button(ui, "refresh-cw", 24.0, false, "Reload").clicked() {
                 app.load_rail(kind);
             }
@@ -279,7 +279,7 @@ fn list_row(ui: &mut Ui, r: &Value, selected: bool, h: f32) -> bool {
     }
     let name = row_name(r).unwrap_or_else(|| truncate(&r.to_string(), 80));
     let addr = row_address(r);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, &name));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, selected, &name));
     let x = rect.left() + 8.0;
     if let Some(a) = &addr {
         let g = ui.painter().layout_no_wrap(a.clone(), theme::mono(11.0), if selected { t.accent_ink } else { t.text_faint });
@@ -311,7 +311,7 @@ fn targets_list(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         panel_title(ui, "Targets", Some(app.view.targets.len()));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
             if icons::button(ui, "plus", 24.0, false, "Open another target").clicked() {
                 app.pick(Pick::OpenFile);
             }
@@ -365,7 +365,7 @@ fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usiz
             let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
             let w = g.size().x + if icon.is_empty() { 22.0 } else { 42.0 };
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, on, tr(title)));
             if !on {
                 let h = widgets::hover_t(ui, &resp);
                 ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
@@ -480,12 +480,12 @@ fn tool_view(app: &mut CraftApp, ui: &mut Ui, tab: CenterTab) {
         Fill::Ready(e) => {
             ui.horizontal(|ui| {
                 widgets::confidence_badge(ui, Some(e.confidence));
-                ui.label(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim));
+                ui.add(egui::Label::new(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim)).truncate());
             });
             ui.add_space(6.0);
-            render_result(ui, &e.result, tab);
+            widgets::ltr(ui, |ui| render_result(ui, &e.result, tab));
         }
-        Fill::Value(v) => render_result(ui, &v, tab),
+        Fill::Value(v) => widgets::ltr(ui, |ui| render_result(ui, &v, tab)),
     }
 }
 
@@ -627,12 +627,12 @@ fn hex_view(app: &mut CraftApp, ui: &mut Ui) {
         widgets::empty_state(ui, "folder", "A folder has no bytes of its own", "Open one of the files inside it to see its bytes.");
         return;
     }
-    let goto_id = ui.id().with("hex-goto");
+    let goto_id = ui.scope_id().with("hex-goto");
     let mut goto: String = ui.data_mut(|d| d.get_temp::<String>(goto_id).unwrap_or_default());
     let mut scroll_to: Option<usize> = None;
     ui.horizontal(|ui| {
         ui.label(RichText::new(format!("{} · {}", target.name, crate::human_bytes(bytes.len()))).font(theme::medium(theme::CAPTION)));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
             let r = ui.add(
                 egui::TextEdit::singleline(&mut goto)
                     .hint_text(tr("Go to offset (0x…)"))
@@ -652,37 +652,39 @@ fn hex_view(app: &mut CraftApp, ui: &mut Ui) {
     ui.add_space(6.0);
     let rows = bytes.len().div_ceil(16);
     let row_h = 18.0;
-    egui::Frame::new().fill(t.code_bg).corner_radius(t.r()).inner_margin(Margin::same(8)).show(ui, |ui| {
-        let mut area = egui::ScrollArea::both().auto_shrink([false, false]);
-        if let Some(r) = scroll_to {
-            area = area.vertical_scroll_offset(r as f32 * (row_h + ui.spacing().item_spacing.y));
-        }
-        area.show_rows(ui, row_h, rows, |ui, range| {
-            for row in range {
-                let start = row * 16;
-                let Some(chunk) = bytes.get(start..(start + 16).min(bytes.len())) else { continue };
-                let mut job = egui::text::LayoutJob::default();
-                let f = theme::mono(12.5);
-                job.append(&format!("{start:08x}  "), 0.0, egui::TextFormat { font_id: f.clone(), color: t.text_faint, ..Default::default() });
-                for (i, b) in chunk.iter().enumerate() {
-                    let col = if *b == 0 {
-                        t.text_faint
-                    } else if b.is_ascii_graphic() {
-                        t.text
-                    } else {
-                        t.accent_ink
-                    };
-                    let sep = if i == 7 { "  " } else { " " };
-                    job.append(&format!("{b:02x}{sep}"), 0.0, egui::TextFormat { font_id: f.clone(), color: col, ..Default::default() });
-                }
-                for i in chunk.len()..16 {
-                    job.append(if i == 7 { "    " } else { "   " }, 0.0, egui::TextFormat { font_id: f.clone(), color: t.text, ..Default::default() });
-                }
-                let ascii: String = chunk.iter().map(|b| if b.is_ascii_graphic() || *b == b' ' { *b as char } else { '·' }).collect();
-                job.append(&format!(" {ascii}"), 0.0, egui::TextFormat { font_id: f.clone(), color: t.text_dim, ..Default::default() });
-                ui.label(job);
+    widgets::ltr(ui, |ui| {
+        egui::Frame::new().fill(t.code_bg).corner_radius(t.r()).inner_margin(Margin::same(8)).show(ui, |ui| {
+            let mut area = egui::ScrollArea::both().auto_shrink([false, false]);
+            if let Some(r) = scroll_to {
+                area = area.vertical_scroll_offset(r as f32 * (row_h + ui.spacing().item_spacing.y));
             }
-        });
+            area.show_rows(ui, row_h, rows, |ui, range| {
+                for row in range {
+                    let start = row * 16;
+                    let Some(chunk) = bytes.get(start..(start + 16).min(bytes.len())) else { continue };
+                    let mut job = egui::text::LayoutJob::default();
+                    let f = theme::mono(12.5);
+                    job.append(&format!("{start:08x}  "), 0.0, egui::TextFormat { font_id: f.clone(), color: t.text_faint, ..Default::default() });
+                    for (i, b) in chunk.iter().enumerate() {
+                        let col = if *b == 0 {
+                            t.text_faint
+                        } else if b.is_ascii_graphic() {
+                            t.text
+                        } else {
+                            t.accent_ink
+                        };
+                        let sep = if i == 7 { "  " } else { " " };
+                        job.append(&format!("{b:02x}{sep}"), 0.0, egui::TextFormat { font_id: f.clone(), color: col, ..Default::default() });
+                    }
+                    for i in chunk.len()..16 {
+                        job.append(if i == 7 { "    " } else { "   " }, 0.0, egui::TextFormat { font_id: f.clone(), color: t.text, ..Default::default() });
+                    }
+                    let ascii: String = chunk.iter().map(|b| if b.is_ascii_graphic() || *b == b' ' { *b as char } else { '·' }).collect();
+                    job.append(&format!(" {ascii}"), 0.0, egui::TextFormat { font_id: f.clone(), color: t.text_dim, ..Default::default() });
+                    ui.label(job);
+                }
+            });
+        })
     });
 }
 
@@ -701,7 +703,7 @@ fn result_view(app: &mut CraftApp, ui: &mut Ui) {
         (Some(Fill::Blocked(m, r)), _) => widgets::empty_state(ui, "lock", &m, r.as_deref().unwrap_or("")),
         (Some(Fill::DeepNeeded), _) => crate::engine_ui::deep_needed(app, ui),
         (Some(Fill::Value(v)), None) => {
-            egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| json_tree(ui, "result", &v, 0));
+            widgets::ltr(ui, |ui| egui::ScrollArea::both().auto_shrink([false, false]).show(ui, |ui| json_tree(ui, "result", &v, 0)));
         }
         (_, Some(e)) => evidence_view(ui, &e, &t),
         (Some(Fill::Ready(e)), None) => evidence_view(ui, &e, &t),
@@ -759,12 +761,14 @@ fn inspector(app: &mut CraftApp, ui: &mut Ui) {
                 widgets::caption(ui, "Selection");
                 ui.label(RichText::new(row_name(&sel).unwrap_or_else(|| "—".into())).font(theme::semibold(theme::BODY)));
                 ui.add_space(4.0);
-                egui::Grid::new("sel-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
-                    if let Value::Object(m) = &sel {
-                        for (k, v) in m.iter().take(30) {
-                            kv(ui, k, &scalar(v).unwrap_or_else(|| truncate(&v.to_string(), 200)), &t);
+                widgets::ltr(ui, |ui| {
+                    egui::Grid::new("sel-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
+                        if let Value::Object(m) = &sel {
+                            for (k, v) in m.iter().take(30) {
+                                kv(ui, k, &scalar(v).unwrap_or_else(|| truncate(&v.to_string(), 200)), &t);
+                            }
                         }
-                    }
+                    })
                 });
                 ui.add_space(6.0);
                 if widgets::secondary(ui, Some("message-square"), "Ask the agent about this").clicked() {
@@ -787,12 +791,14 @@ fn inspector(app: &mut CraftApp, ui: &mut Ui) {
                     });
                     ui.label(RichText::new(tr(tgt.kind.plain())).color(t.text_dim));
                     ui.add_space(4.0);
-                    egui::Grid::new("tgt-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
-                        kv(ui, "Kind", &tgt.kind.id(), &t);
-                        kv(ui, "Size", &crate::human_bytes(tgt.bytes.len()), &t);
-                        kv(ui, "SHA-256", tgt.sha256.get(..16).unwrap_or(&tgt.sha256), &t);
-                        kv(ui, "Path", &tgt.path.display().to_string(), &t);
-                        kv(ui, "Mode", if app.view.clean_room { "Clean room" } else { "Deep" }, &t);
+                    widgets::ltr(ui, |ui| {
+                        egui::Grid::new("tgt-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
+                            kv(ui, "Kind", &tgt.kind.id(), &t);
+                            kv(ui, "Size", &crate::human_bytes(tgt.bytes.len()), &t);
+                            kv(ui, "SHA-256", tgt.sha256.get(..16).unwrap_or(&tgt.sha256), &t);
+                            kv(ui, "Path", &tgt.path.display().to_string(), &t);
+                            kv(ui, "Mode", &tr(if app.view.clean_room { "Clean room" } else { "Deep" }), &t);
+                        })
                     });
                 });
             }
@@ -903,7 +909,7 @@ fn bottom(app: &mut CraftApp, ui: &mut Ui) {
         if let Some(i) = tab_strip(ui, &tabs, sel) {
             app.state.bottom = [BottomTab::Agent, BottomTab::Jobs, BottomTab::Log].get(i).copied().unwrap_or_default();
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
             if icons::button(ui, "chevron-down", 24.0, false, "Hide the console").clicked() {
                 app.state.bottom_open = false;
             }

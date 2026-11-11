@@ -9,7 +9,7 @@ use egui_kittest::kittest::Queryable;
 
 #[test]
 fn a_stuck_lock_is_shown_with_a_way_out() {
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 820.0)).with_max_steps(32).build_eframe(move |cc| {
+    let mut h = Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1280.0, 820.0)).with_max_steps(32).build_eframe(move |cc| {
         craft_anything_ui_egui::CraftApp::setup_context(&cc.egui_ctx);
         demo::app(demo::engine(Mode::Beginner, true))
     });

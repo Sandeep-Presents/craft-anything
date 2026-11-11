@@ -70,7 +70,7 @@ fn step(before: Watch, events: &[egui::Event], held: egui::Modifiers) -> Watch {
 /// (maybe a picture). The same answer for every call in a pass; call it on every pass a box that
 /// takes pictures shows, so no key's press or release is missed.
 pub fn picture_wanted(ctx: &egui::Context) -> bool {
-    let id = egui::Id::new("paste-watch");
+    let id = egui::Id::unique("paste-watch");
     let pass = ctx.cumulative_pass_nr();
     let before: Watch = ctx.data(|d| d.get_temp(id)).unwrap_or_default();
     if before.pass == pass && pass != 0 {
@@ -186,7 +186,7 @@ mod tests {
 
     /// A prompt box shown each frame; `.1` counts the frames it asked for a pasted picture.
     fn prompt_box(attach: bool) -> egui_kittest::Harness<'static, (String, usize)> {
-        egui_kittest::Harness::new_ui_state(
+        egui_kittest::Harness::builder().allow_missing_glyphs().build_ui_state(
             move |ui, (text, pastes): &mut (String, usize)| {
                 let b = crate::prompt_box::PromptBox {
                     name: "Ask for a change",

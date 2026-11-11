@@ -98,7 +98,13 @@ impl TargetKind for GameKind {
                 " oyunun ",
                 " oyunlar",
                 "เกม",
+                "لعبة",
+                "لعبه",
+                "ألعاب",
             ])
+            // "Games" without its hamza ends a word (العاب, الالعاب, والعاب), vowel marks aside: it
+            // also starts العابرة ("passing").
+            || cx.words.split(' ').any(|w| w.chars().filter(|c| !('\u{64B}'..='\u{652}').contains(c)).collect::<String>().ends_with("العاب"))
             || says_game_in_spanish(cx)
             || says_game_in_estonian(cx)
         {

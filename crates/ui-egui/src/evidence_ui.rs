@@ -24,7 +24,7 @@ pub fn proof_card(ui: &mut Ui, e: &Evidence, dense: bool, open: bool) {
         ui.horizontal(|ui| {
             widgets::confidence_badge(ui, Some(e.confidence));
             ui.label(RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)).color(t.text_dim));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                 if e.environment.clean_room {
                     widgets::pill(ui, "Clean room", t.success, t.raised).on_hover_text(tr("Made without looking inside the original."));
                 } else {
@@ -36,7 +36,7 @@ pub fn proof_card(ui: &mut Ui, e: &Evidence, dense: bool, open: bool) {
         if !e.summary.is_empty() {
             ui.label(RichText::new(&e.summary).size(if dense { theme::SMALL } else { theme::BODY }));
         }
-        let id = ui.id().with(("proof", &e.id));
+        let id = ui.scope_id().with(("proof", &e.id));
         egui::CollapsingHeader::new(RichText::new(tr("Show me the proof")).color(t.accent_ink).font(theme::medium(theme::SMALL)))
             .id_salt(id)
             .default_open(open)
@@ -117,8 +117,13 @@ fn details(ui: &mut Ui, e: &Evidence, t: &Tokens) {
         });
 }
 
+/// A built-in tool's translated title; any other operation spelled out,
 /// `native_strings_browse` → "Native strings browse".
 pub fn nice_operation(op: &str) -> String {
+    static TOOLS: std::sync::OnceLock<craft_anything_engine::Registry> = std::sync::OnceLock::new();
+    if let Some(spec) = TOOLS.get_or_init(craft_anything_engine::Registry::with_all_tools).get(op) {
+        return tr(spec.title);
+    }
     let s = op.replace(['_', '.'], " ");
     let mut c = s.chars();
     match c.next() {
@@ -141,7 +146,7 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
     match v {
         Value::Object(m) => {
             egui::CollapsingHeader::new(key_text.clone().append_text(format!("  {{{}}}", m.len()), &t))
-                .id_salt(ui.id().with((key, depth)))
+                .id_salt(ui.scope_id().with((key, depth)))
                 .default_open(depth < 2)
                 .icon(widgets::disclosure_icon)
                 .show(ui, |ui| {
@@ -155,7 +160,7 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
         }
         Value::Array(a) => {
             egui::CollapsingHeader::new(key_text.append_text(format!("  [{}]", a.len()), &t))
-                .id_salt(ui.id().with((key, depth)))
+                .id_salt(ui.scope_id().with((key, depth)))
                 .default_open(depth < 1 && a.len() <= 20)
                 .icon(widgets::disclosure_icon)
                 .show(ui, |ui| {
@@ -177,7 +182,11 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
                     Value::Bool(b) => (b.to_string(), theme::WORKED_OUT),
                     other => (other.to_string(), theme::SEEN_IT),
                 };
-                ui.add(egui::Label::new(RichText::new(text).font(theme::mono(12.0)).color(col)).wrap());
+                // Data reads left to right in every language, so an Arabic value can't move its
+                // quotes and numbers around it; the Arabic inside keeps its own order.
+                let mut job = egui::text::LayoutJob::single_section(text, egui::TextFormat::simple(theme::mono(12.0), col));
+                job.direction = egui::epaint::text::TextDirection::LeftToRight;
+                ui.add(egui::Label::new(job).wrap());
             });
         }
     }
@@ -214,7 +223,7 @@ pub fn ledger_row(ui: &mut Ui, e: &Evidence, selected: bool) -> bool {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
                 ui.painter().circle_filled(r.center(), 3.5, col);
                 ui.label(RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.with_layout(crate::widgets::to_end(egui::Align::Center), |ui| {
                     ui.label(RichText::new(tr(crate::theme::confidence_label(Some(e.confidence)))).size(theme::TINY).color(col));
                 });
             });
@@ -234,7 +243,9 @@ mod tests {
 
     #[test]
     fn operation_names_read_nicely() {
-        assert_eq!(nice_operation("native_strings_browse"), "Native strings browse");
+        let tool = craft_anything_engine::Registry::with_all_tools().get("native_strings_browse").map(|s| s.title);
+        assert_eq!(Some(nice_operation("native_strings_browse").as_str()), tool, "a tool reads as its title");
+        assert_eq!(nice_operation("made_up_operation"), "Made up operation");
         assert_eq!(nice_operation(""), "");
         assert_eq!(truncate("héllo", 2), "hé…");
     }

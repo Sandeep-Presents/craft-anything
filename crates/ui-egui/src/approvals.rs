@@ -132,25 +132,30 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
     let button = widgets::link(ui, "Approvals").on_hover_text(tr("What the builder may do without asking you, in this project."));
     let mut picked = None;
     // A named id, so tests (and anything else) can tell whether it's open.
-    let popup = egui::Popup::from_toggle_button_response(&button).id(egui::Id::new("project-approvals"));
+    let popup = egui::Popup::from_toggle_button_response(&button).id(egui::Id::unique("project-approvals"));
     popup.close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
-        egui::Grid::new("approvals").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-            for row in ACTION_KINDS {
-                ui.label(RichText::new(tr(label(row.kind))).size(theme::SMALL));
-                let now = chosen.get(&row.kind).copied();
-                let sel = CHOICES.iter().position(|(_, c)| *c == now).unwrap_or(0);
-                // Every row has the same labels, which `segmented` makes its ids from.
-                ui.push_id(row.name, |ui| {
-                    if let Some(c) = widgets::segmented(ui, &names, sel, 24.0).and_then(|i| CHOICES.get(i)) {
-                        picked = Some((row.kind, c.1));
+        widgets::reading(ui, |ui| {
+            // egui's Grid has no right-to-left layout.
+            widgets::ltr(ui, |ui| {
+                egui::Grid::new("approvals").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
+                    for row in ACTION_KINDS {
+                        ui.label(RichText::new(tr(label(row.kind))).size(theme::SMALL));
+                        let now = chosen.get(&row.kind).copied();
+                        let sel = CHOICES.iter().position(|(_, c)| *c == now).unwrap_or(0);
+                        // Every row has the same labels, which `segmented` makes its ids from.
+                        ui.push_id(row.name, |ui| {
+                            if let Some(c) = widgets::segmented(ui, &names, sel, 24.0).and_then(|i| CHOICES.get(i)) {
+                                picked = Some((row.kind, c.1));
+                            }
+                        });
+                        ui.end_row();
                     }
                 });
-                ui.end_row();
-            }
+            });
+            ui.add_space(4.0);
+            let note = tr("Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.");
+            ui.add(egui::Label::new(RichText::new(note).size(theme::SMALL).color(t.text_faint)).wrap());
         });
-        ui.add_space(4.0);
-        let note = tr("Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.");
-        ui.add(egui::Label::new(RichText::new(note).size(theme::SMALL).color(t.text_faint)).wrap());
     });
     if let Some((kind, choice)) = picked {
         app.set_approval(root, kind, choice);

@@ -36,10 +36,10 @@ bitflags = { version = "2", features = ["serde"] }
 schemars = "1"
 log = "0.4"
 toml = "0.9"
-eframe = { version = "0.36", default-features = false }
-egui = "0.36"
-egui_extras = { version = "0.36", default-features = false }
-egui_kittest = "0.36"
+eframe = { version = "0.37", default-features = false }
+egui = "0.37"
+egui_extras = { version = "0.37", default-features = false }
+egui_kittest = "0.37"
 rfd = "0.17"
 # Pictures pasted from the clipboard (egui only receives pasted text); egui-winit already uses it.
 arboard = { version = "3.6", default-features = false, features = ["image-data"] }
@@ -97,3 +97,18 @@ panic = "abort"
 # Remove this once the upstream wgpu release picks a Metal version the compiler accepts. See vendor/wgpu-hal/CRAFT_ANYTHING.md.
 [patch.crates-io]
 wgpu-hal = { path = "vendor/wgpu-hal" }
+# The egui family on storytold's fork, as the other Crafting Apps use it: it lays out right-to-left
+# text in its right order (Unicode bidi; crates.io egui 0.36 shaped each Arabic word but placed the
+# words left to right) and mirrors egui's own parts with `Style::right_to_left`, for the Arabic UI.
+ecolor ={ git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-winit = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_glow = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_extras = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+eframe = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }

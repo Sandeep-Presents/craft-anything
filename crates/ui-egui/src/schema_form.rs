@@ -130,68 +130,71 @@ pub fn show(ui: &mut Ui, fields: &[Field], values: &mut BTreeMap<String, String>
         ui.label(RichText::new(tr("This tool takes no settings.")).color(t.text_dim));
         return;
     }
-    egui::Grid::new("schema-form").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
-        for f in fields {
-            ui.vertical(|ui| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(&f.name).font(theme::mono(12.5)));
-                    if f.required {
-                        ui.label(RichText::new("*").color(t.accent));
-                    }
+    widgets::ltr(ui, |ui| {
+        egui::Grid::new("schema-form").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
+            for f in fields {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(&f.name).font(theme::mono(12.5)));
+                        if f.required {
+                            ui.label(RichText::new("*").color(t.accent));
+                        }
+                    });
                 });
-            });
-            let v = values.entry(f.name.clone()).or_default();
-            ui.vertical(|ui| {
-                match f.kind {
-                    FieldKind::Bool => {
-                        let mut b = v == "true";
-                        if widgets::toggle(ui, &mut b, "").changed() {
-                            *v = b.to_string();
+                let v = values.entry(f.name.clone()).or_default();
+                ui.vertical(|ui| {
+                    match f.kind {
+                        FieldKind::Bool => {
+                            let mut b = v == "true";
+                            if widgets::toggle(ui, &mut b, "").changed() {
+                                *v = b.to_string();
+                            }
+                        }
+                        _ if !f.choices.is_empty() => {
+                            let r = egui::ComboBox::from_id_salt(("choice", &f.name))
+                                .icon(widgets::combo_icon)
+                                .selected_text(if v.is_empty() { "—".to_string() } else { v.clone() })
+                                .show_ui(ui, |ui| {
+                                    if !f.required {
+                                        ui.selectable_value(v, String::new(), "—");
+                                    }
+                                    for c in &f.choices {
+                                        ui.selectable_value(v, c.clone(), c);
+                                    }
+                                });
+                            widgets::named(r.response, &f.name);
+                        }
+                        FieldKind::Json => {
+                            ui.add(
+                                egui::TextEdit::multiline(v)
+                                    .font(theme::mono(12.0))
+                                    .desired_rows(2)
+                                    .desired_width(320.0)
+                                    .hint_text("JSON")
+                                    .frame(widgets::text_field_frame_compact(&Tokens::get(ui.ctx()))),
+                            );
+                        }
+                        _ => {
+                            let hint = match f.kind {
+                                FieldKind::Integer => "0x… or number",
+                                FieldKind::Number => "number",
+                                _ => "",
+                            };
+                            ui.add(
+                                egui::TextEdit::singleline(v)
+                                    .desired_width(320.0)
+                                    .hint_text(tr(hint))
+                                    .frame(widgets::text_field_frame_compact(&Tokens::get(ui.ctx()))),
+                            );
                         }
                     }
-                    _ if !f.choices.is_empty() => {
-                        egui::ComboBox::from_id_salt(("choice", &f.name))
-                            .icon(widgets::combo_icon)
-                            .selected_text(if v.is_empty() { "—".to_string() } else { v.clone() })
-                            .show_ui(ui, |ui| {
-                                if !f.required {
-                                    ui.selectable_value(v, String::new(), "—");
-                                }
-                                for c in &f.choices {
-                                    ui.selectable_value(v, c.clone(), c);
-                                }
-                            });
+                    if !f.description.is_empty() {
+                        ui.add(egui::Label::new(RichText::new(&f.description).color(t.text_faint).size(theme::CAPTION)).wrap());
                     }
-                    FieldKind::Json => {
-                        ui.add(
-                            egui::TextEdit::multiline(v)
-                                .font(theme::mono(12.0))
-                                .desired_rows(2)
-                                .desired_width(320.0)
-                                .hint_text("JSON")
-                                .frame(widgets::text_field_frame_compact(&Tokens::get(ui.ctx()))),
-                        );
-                    }
-                    _ => {
-                        let hint = match f.kind {
-                            FieldKind::Integer => "0x… or number",
-                            FieldKind::Number => "number",
-                            _ => "",
-                        };
-                        ui.add(
-                            egui::TextEdit::singleline(v)
-                                .desired_width(320.0)
-                                .hint_text(tr(hint))
-                                .frame(widgets::text_field_frame_compact(&Tokens::get(ui.ctx()))),
-                        );
-                    }
-                }
-                if !f.description.is_empty() {
-                    ui.add(egui::Label::new(RichText::new(&f.description).color(t.text_faint).size(theme::CAPTION)).wrap());
-                }
-            });
-            ui.end_row();
-        }
+                });
+                ui.end_row();
+            }
+        })
     });
 }
 
