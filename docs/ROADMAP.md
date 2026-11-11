@@ -86,6 +86,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
 | 3 | R1.5 | — | Small leftovers |
 | Any | M3: R3.3, R3.9, R3.11 | — | Open lane |
+| Any | R3.14 Read-only scene bundles | — | Bounded headless inspection and a thin experimental viewport |
 | Later | R4.1 macOS CLI, R4.2 Managed tier | **decision** | Not before M5 |
 
 ---
@@ -2458,6 +2459,14 @@ Owner: open · Status: in progress
       template only real calendar dates in API paths (#602–#605, by Afloat16)
 - [x] Preserve empty query pairs when matching older stand-in recordings, without treating raw
       query separators as pairs — claimed: Afloat16, branch `bugfix/r3.13-preserve-empty-query-pairs-20261103`
+
+---
+
+### R3.14 Read-only scene bundles
+Owner: open · Status: in progress
+- [ ] Add a bounded versioned scene-bundle reader and headless inspection/picking tools, with a native experimental viewport for orbit, pan, zoom, resource selection and hide/isolate. Preserve unknown units, axes and materials in the result. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Independently verify native units, axes and visual parity before presenting engineering measurements or claiming general source-format compatibility.
+- [ ] Add validated time-based appearance and cost evaluation as separate follow-up slices after the static viewer is verified.
 
 ---
 
