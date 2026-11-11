@@ -1688,7 +1688,7 @@ fn claims_list(ui: &mut Ui, c: &CheckResult, t: &Tokens) {
         });
     };
     for claim in c.claims.iter().filter(|x| !x.passed) {
-        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{} — {}", claim.title, claim.detail) };
+        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{}: {}", claim.title, claim.detail) };
         row(ui, "triangle-alert", t.warning, text);
     }
     for u in &c.unknowns {
@@ -1938,8 +1938,16 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
     let title = title + approvals;
     // Side by side when both switches fit, else one under the other (a longer language, a narrow window).
     let fits = widgets::segmented_width(ui, &sending) + widgets::segmented_width(ui, &asking) + title + gaps <= ui.available_width();
-    let hint = |ui: &mut Ui| {
-        ui.add(egui::Label::new(RichText::new(tr("or start with /btw to just ask")).color(t.text_faint).size(theme::SMALL)).truncate());
+    // Shown whole, never cut short ("or start with /b…" names no command): beside the switches
+    // when it fits, else on a line of its own under them.
+    let hint = RichText::new(tr("or start with /btw to just ask")).color(t.text_faint).size(theme::SMALL);
+    let hint_width = widgets::label_galley(ui, hint.text(), theme::SMALL, t.text_faint).size().x + ui.spacing().item_spacing.x;
+    let mut hint_shown = false;
+    let mut beside = |ui: &mut Ui| {
+        if hint_width <= ui.available_width() {
+            ui.label(hint.clone());
+            hint_shown = true;
+        }
     };
     let right = egui::Layout::right_to_left(egui::Align::Center);
     ui.horizontal(|ui| {
@@ -1950,15 +1958,18 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
         if fits {
             ui.with_layout(right, |ui| {
                 questions_controls(app, ui, now, &root, &t);
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), hint);
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| beside(ui));
             });
         } else {
-            hint(ui);
+            beside(ui);
         }
     });
     if !fits {
         ui.add_space(4.0);
         ui.horizontal(|ui| ui.with_layout(right, |ui| questions_controls(app, ui, now, &root, &t)));
+    }
+    if !hint_shown {
+        ui.add(egui::Label::new(hint).wrap());
     }
 }
 

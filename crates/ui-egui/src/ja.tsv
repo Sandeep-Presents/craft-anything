@@ -422,7 +422,6 @@ Not now	後で
 Nothing allowed yet.	まだ何も許可されていません。
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	まだビルドできません。Claude Code をインストールして一度サインインするか、下で API キーを使って AI を追加してください。
 Nothing found	何も見つかりません
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	まだ見つかっていません。API キー、ローカルのモデルサーバー(Ollama、LM Studio)、すでにあるエージェントアプリを探します。別のポートや別のコンピュータにあるサーバーは、下でアドレスを指定して追加できます。
 Craft Anything reads its code and files with every tool it has. For your private use.	Craft Anything が持つすべてのツールで、コードとファイルを読みます。私的利用のためのモードです。
 Nothing inside it is read.	中身は一切読みません。
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	中身は読みません。見えるものから Craft Anything が作業し、あなたの版には独自のアートを使います。
@@ -435,7 +434,7 @@ Nothing open yet	まだ何も開いていません
 Nothing selected	何も選択されていません
 Nothing to show	表示するものがありません
 Nothing uses it until it's on again; it keeps its key.	再びオンにするまで何も使いません。キーは保持されます。
-Nothing — start fresh	なし — 新規に始める
+Start fresh	新規に始める
 Now	実行中
 Now: {what} ({time})	実行中: {what} ({time})
 Of this, {cost} was charged to an API key.	このうち {cost} が API キーに請求されました。
@@ -622,7 +621,6 @@ Show the console	コンソールを表示
 Show the ones that are met	満たされた項目を表示
 Show the sidebar	サイドバーを表示
 Show the welcome again	ようこそ画面を再度表示
-Showing	表示中
 Sign in and add the Unity Editor	サインインして Unity Editor を追加
 Sign in and install Unreal Engine	サインインして Unreal Engine をインストール
 Simple	シンプル
@@ -795,7 +793,6 @@ Working out how much space a copy takes…	コピーの容量を計算してい�
 Working…	実行中…
 Working… ({n} steps so far)	実行中…(これまで {n} ステップ)
 You answered: {a}	あなたの回答: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Claude、ChatGPT、OpenRouter のキー、ローカルモデル(Ollama、LM Studio)、すでに使っているエージェントは、後から 設定 → AI で追加できます。
 You chose:	あなたの選択:
 You're all set	準備が整いました
 Your brains	登録済みの AI
@@ -848,7 +845,7 @@ your files there are the app, edited in place	そこにあるファイルがア�
 {n} step(s) didn't work and were retried or skipped.	{n} ステップが失敗し、再試行またはスキップされました。
 {n} tokens	{n} トークン
 {tool} finished	{tool} が完了
-— use the filter to find the rest.	— 残りは絞り込みで探してください。
+Showing {n}. Use the filter to find the rest.	{n} 件を表示中。残りは絞り込みで探してください。
 ← Back	← 戻る
 ↑↓ to move · Enter to run · Esc to close	↑↓ で移動 · Enter で実行 · Esc で閉じる
 Providers	プロバイダ
@@ -947,3 +944,51 @@ yesterday	昨日
 … {n} more	… ほか {n} 件
 … {n} older	… 古いもの {n} 件
 Connecting to {name}… {seconds} s	{name} に接続中… {seconds} 秒
+Custom endpoint	カスタムエンドポイント
+Custom LLM endpoint	カスタム LLM エンドポイント
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	OpenAI API を話せる任意のエンジン(llama.cpp など)、またはキー付きのホスト型サービス。
+Service	サービス
+Name	名前
+Address	アドレス
+API key	API キー
+Model	モデル
+e.g. Home server	例: 自宅サーバー
+e.g. http://192.168.1.20:8080/v1	例: http://192.168.1.20:8080/v1
+if it needs one	必要な場合
+model name	モデル名
+Custom model	別のモデル
+Custom model or alias…	別のモデルまたはエイリアス…
+Looking for models…	モデルを探しています…
+{n} models found	{n} 件のモデルが見つかりました
+1 model found	モデルが 1 件見つかりました
+It lists no models yet.	まだモデルが一覧にありません。
+Testing… a model that isn't loaded yet can take a minute	テスト中… まだ読み込まれていないモデルは 1 分ほどかかることがあります
+Answered in {seconds} s	{seconds} 秒で応答しました
+Answered in {seconds} s: {reply}	{seconds} 秒で応答しました: {reply}
+Installed: {reply}	インストール済み: {reply}
+Test	テスト
+Testing…	テスト中…
+Test an AI	AI をテスト
+Anthropic API	Anthropic API
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Gemini API	Gemini API
+Coding agent	コーディングエージェント
+Server address	サーバーのアドレス
+AI name	AI の名前
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	まだ見つかっていません。API キー、ローカルのモデルサーバー(llama.cpp、LM Studio)、すでにあるエージェントアプリを探します。別のポートや別のコンピュータにあるサーバーは、「カスタムエンドポイント」タブで追加できます。
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Claude、ChatGPT、OpenRouter のキー、ローカルモデル(llama.cpp、LM Studio)、すでに使っているエージェントは、後から 設定 → AI で追加できます。アドレスで指定するサーバーは「カスタムエンドポイント」タブに追加します。
+Checkpoint	チェックポイント
+Workflow	ワークフロー
+ComfyUI address	ComfyUI のアドレス
+ComfyUI workflow	ComfyUI のワークフロー
+e.g. http://192.168.1.20:8188	例: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 形式のワークフロー JSON（任意）
+on your server	お使いのサーバーで
+No key needed; pictures are made on your server.	キーは不要です。画像はお使いのサーバーで作られます。
+List ComfyUI's checkpoints	ComfyUI のチェックポイントを一覧表示
+Test ComfyUI	ComfyUI をテスト
+Check a ComfyUI server	ComfyUI サーバーを確認
+Looking for checkpoints…	チェックポイントを探しています…
+{n} checkpoints found	{n} 件のチェックポイントが見つかりました
+1 checkpoint found	チェックポイントが 1 件見つかりました

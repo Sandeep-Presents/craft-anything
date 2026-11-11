@@ -431,6 +431,10 @@ fn the_assets_note_reads_prices_from_the_asset_table() {
     assert_eq!(assets_note(&ws, Some("no-such-model")), before, "an unknown model quotes the default's prices");
     let schnell = assets_note(&ws, Some("flux-schnell"));
     assert!(schnell.contains("(about $0.50 each)") && schnell.contains("a picture (under $0.01)"), "{schnell}");
+    let comfy = assets_note(&ws, Some("comfyui"));
+    assert!(comfy.starts_with("Realistic assets: pictures come from the person's own ComfyUI server at no cost;"), "{comfy}");
+    assert!(comfy.contains("a picture on that server (free)") && comfy.contains("ComfyUI for pictures, fal.ai for 3D models."), "{comfy}");
+    assert!(!comfy.contains("as made with fal.ai"), "{comfy}");
 }
 
 #[test]
@@ -2771,6 +2775,28 @@ fn a_saved_asset_key_gets_an_api_builders_tool_past_the_key_check() {
     worker.load_asset_keys(&store);
     assert_eq!(call(&worker).code, ErrorCode::NoPermission);
     assert!(worker.assets, "the brief and the tools go by the same read");
+}
+
+/// The person's own ComfyUI server makes pictures with no key, so a run with only that set up
+/// offers assets in its brief; an address with another picture model, or no checkpoint, doesn't.
+#[test]
+fn a_comfyui_server_alone_gives_a_run_its_assets() {
+    if std::env::var_os("FAL_KEY").is_some() {
+        return; // a real key in the environment answers yes on its own
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let ws = Workspace::create(dir.path(), "x", "Make a game", TargetRef::None).unwrap();
+    let mut worker = check_worker(&ws, false);
+    let store = crate::KeyStore::file_only(dir.path().join("keys.toml"));
+    worker.engine.session().settings.assets.comfyui.address = "http://192.168.1.20:8188".into();
+    worker.load_asset_keys(&store);
+    assert!(!worker.assets, "an address alone, with another picture model");
+    worker.engine.session().settings.assets.image_model = Some(craft_anything_engines::assets::comfyui::ID.into());
+    worker.load_asset_keys(&store);
+    assert!(!worker.assets, "no checkpoint, so the asset tools would refuse every picture");
+    worker.engine.session().settings.assets.comfyui.checkpoint = "sd_xl_base_1.0.safetensors".into();
+    worker.load_asset_keys(&store);
+    assert!(worker.assets, "ComfyUI picked, with its address and checkpoint, and no key anywhere");
 }
 
 /// A worker over a test session and the workspace's feed, for check tests.

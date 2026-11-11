@@ -377,3 +377,22 @@ fn mcp_restricted_mode_cli() {
     let err_obj: Value = serde_json::from_str(call_res["content"][0]["text"].as_str().unwrap()).unwrap();
     assert!(err_obj["error"]["message"].as_str().unwrap().contains("turned off in restricted mode"));
 }
+
+/// `ai models` and `ai test` without a name try a service that isn't added: a closed local port and
+/// a bad address both fail with a reason, and nothing is saved.
+#[test]
+fn ai_models_and_unsaved_test_fail_plainly_and_save_nothing() {
+    let cfg = tempfile::tempdir().unwrap();
+    let closed = cli(&["ai", "models", "--kind", "openai_compatible", "--base-url", "http://127.0.0.1:9/v1"], cfg.path());
+    assert!(!closed.success);
+    assert!(String::from_utf8_lossy(&closed.stdout).contains("Check the address"), "{}", String::from_utf8_lossy(&closed.stdout));
+    assert!(!cli(&["ai", "models", "--kind", "openai_compatible", "--base-url", "192.168.1.20:8080"], cfg.path()).success, "not a web address");
+    assert_eq!(cli(&["ai", "models", "--kind", "nonsense"], cfg.path()).code, Some(2));
+    assert_eq!(cli(&["ai", "test"], cfg.path()).code, Some(2), "a name or a kind is needed");
+    assert_eq!(cli(&["ai", "test", "--kind", "openai_compatible"], cfg.path()).code, Some(2), "a server needs its address");
+    let t = cli(&["ai", "test", "--kind", "openai_compatible", "--base-url", "http://127.0.0.1:9/v1", "--model", "m"], cfg.path());
+    assert!(!t.success);
+    let list = cli(&["ai", "list", "--format", "json"], cfg.path());
+    let v: Value = serde_json::from_slice(&list.stdout).unwrap();
+    assert_eq!(v.as_array().map(Vec::len), Some(0), "nothing was added");
+}

@@ -741,7 +741,6 @@ Not now	나중에
 Nothing allowed yet.	아직 허용한 것이 없습니다.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	아직 만들 수 있는 것이 없습니다. Claude Code를 설치하고 한 번 로그인하거나, 아래에서 API 키로 AI를 추가하세요.
 Nothing found	찾은 것 없음
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	아직 찾은 것이 없습니다. API 키, 로컬 모델 서버(Ollama, LM Studio), 이미 있는 에이전트 앱을 찾습니다. 다른 포트나 다른 컴퓨터에 있는 서버는 아래에서 주소로 추가할 수 있습니다.
 Nothing inside it is read.	안의 내용은 읽지 않습니다.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	안의 내용은 읽지 않습니다. Craft Anything은 눈에 보이는 것만으로 작업합니다. 내가 만드는 버전에는 따로 그린 그림이 들어갑니다.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	원본의 안쪽은 읽지 않습니다. 코드, 파일, 페이지 소스 모두 마찬가지입니다. Craft Anything은 눈에 보이는 것으로 작업합니다. 그림, 방문자가 보는 페이지, 실행하는 모습을 봅니다.
@@ -754,7 +753,7 @@ Nothing open yet	아직 열린 것 없음
 Nothing selected	선택한 것 없음
 Nothing to show	보여 줄 것 없음
 Nothing uses it until it's on again; it keeps its key.	다시 켤 때까지 어디에서도 쓰지 않습니다. 키는 그대로 남습니다.
-Nothing — start fresh	없음 — 처음부터 시작
+Start fresh	처음부터 시작
 Now	진행 중
 Now: {what} ({time})	진행 중: {what} ({time})
 Objective-C classes	Objective-C 클래스
@@ -1032,7 +1031,6 @@ Show the folder	폴더 보기
 Show the ones that are met	충족한 항목 보기
 Show the sidebar	사이드바 보기
 Show the welcome again	환영 화면 다시 보기
-Showing	보이는 항목
 Sign in and add the Unity Editor	로그인하고 Unity Editor 추가
 Sign in and install Unreal Engine	로그인하고 Unreal Engine 설치
 Simple	간단
@@ -1290,7 +1288,6 @@ Write the brief	개요 쓰기
 Write the handoff	인계 문서 쓰기
 Wrote {what} to {}	{what} 저장 위치: {}
 You answered: {a}	내 답: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Claude, ChatGPT, OpenRouter 키나 로컬 모델(Ollama, LM Studio), 이미 쓰는 에이전트는 나중에 설정 → AI에서 추가할 수 있습니다.
 You chose:	고른 항목:
 You're all set	준비를 마쳤습니다
 Your app is ready	앱이 완성되었습니다
@@ -1407,7 +1404,7 @@ your files there are the app, edited in place	그 파일이 곧 앱이며 그 �
 {}: {state}	{}: {state}
 {}h {:02}m	{}시간 {:02}분
 {}m {:02}s	{}분 {:02}초
-— use the filter to find the rest.	— 나머지는 필터로 찾을 수 있습니다.
+Showing {n}. Use the filter to find the rest.	{n}개 표시 중. 나머지는 필터로 찾을 수 있습니다.
 … {n} more	… 외 {n}개
 … {n} older	… 이전 항목 {n}개
 … {} more	… 외 {}개
@@ -1467,3 +1464,48 @@ Connecting to {name}… {seconds} s	{name}에 연결하는 중… {seconds}초
 Stopped adding {name}.	{name} 추가를 멈췄습니다.
 It isn't there any more, so {program} runs in its place.	더 이상 그곳에 없어서 대신 {program}이(가) 실행됩니다.
 Use it	이것 사용
+Custom endpoint	사용자 지정 엔드포인트
+Custom LLM endpoint	사용자 지정 LLM 엔드포인트
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	OpenAI API를 쓰는 모든 엔진(예: llama.cpp) 또는 키가 있는 호스팅 서비스.
+Service	서비스
+Name	이름
+Address	주소
+e.g. Home server	예: 홈 서버
+e.g. http://192.168.1.20:8080/v1	예: http://192.168.1.20:8080/v1
+if it needs one	필요한 경우
+model name	모델 이름
+Custom model	다른 모델
+Custom model or alias…	다른 모델 또는 별칭…
+Looking for models…	모델을 찾는 중…
+{n} models found	모델 {n}개를 찾았습니다
+1 model found	모델 1개를 찾았습니다
+It lists no models yet.	아직 나열된 모델이 없습니다.
+Testing… a model that isn't loaded yet can take a minute	테스트 중… 아직 불러오지 않은 모델은 1분쯤 걸릴 수 있습니다
+Answered in {seconds} s	{seconds}초 만에 응답했습니다
+Answered in {seconds} s: {reply}	{seconds}초 만에 응답했습니다: {reply}
+Installed: {reply}	설치됨: {reply}
+Test	테스트
+Testing…	테스트 중…
+Test an AI	AI 테스트
+Anthropic API	Anthropic API
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Gemini API	Gemini API
+Coding agent	코딩 에이전트
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	아직 찾은 것이 없습니다. API 키, 로컬 모델 서버(llama.cpp, LM Studio), 이미 있는 에이전트 앱을 찾습니다. 다른 포트나 다른 컴퓨터에 있는 서버는 사용자 지정 엔드포인트 탭에서 추가할 수 있습니다.
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Claude, ChatGPT, OpenRouter 키나 로컬 모델(llama.cpp, LM Studio), 이미 쓰는 에이전트는 나중에 설정 → AI에서 추가할 수 있습니다. 주소로 지정하는 서버는 사용자 지정 엔드포인트 탭에 추가합니다.
+Checkpoint	체크포인트
+Workflow	워크플로
+ComfyUI address	ComfyUI 주소
+ComfyUI workflow	ComfyUI 워크플로
+e.g. http://192.168.1.20:8188	예: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 형식 워크플로 JSON, 선택 사항
+on your server	내 서버에서
+No key needed; pictures are made on your server.	키가 필요 없습니다. 그림은 내 서버에서 만들어집니다.
+List ComfyUI's checkpoints	ComfyUI 체크포인트 목록
+Test ComfyUI	ComfyUI 테스트
+Check a ComfyUI server	ComfyUI 서버 확인
+Looking for checkpoints…	체크포인트를 찾는 중…
+{n} checkpoints found	체크포인트 {n}개를 찾았습니다
+1 checkpoint found	체크포인트 1개를 찾았습니다
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	설정 → 빌드에 ComfyUI 주소와 체크포인트가 필요합니다. 그전까지는 게임을 이것 없이 만듭니다.

@@ -2,7 +2,7 @@
 //! inside one, and save pictures as PNG files, after the person confirms they may unpack the game.
 //! Everything runs through the engine's `game_*` tools; this screen only shows and asks.
 
-use crate::i18n::tr;
+use crate::i18n::{tr, trf};
 use crate::state::{GameFiles, Modal, PendingPicture};
 use crate::theme::{self, Tokens};
 use crate::{CraftApp, Pick, icons, widgets};
@@ -243,7 +243,7 @@ fn contents(app: &mut CraftApp, ui: &mut Ui) {
     let total = app.state.game.rows.len();
     if total > rows.len() && needle.is_empty() {
         ui.label(
-            RichText::new(format!("{} {} {}", tr("Showing"), rows.len(), tr("— use the filter to find the rest."))).color(t.text_faint).size(theme::CAPTION),
+            RichText::new(trf("Showing {n}. Use the filter to find the rest.", &[("n", &rows.len().to_string())])).color(t.text_faint).size(theme::CAPTION),
         );
     }
     if let Some(item) = save {

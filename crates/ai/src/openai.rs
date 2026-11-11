@@ -38,14 +38,18 @@ pub fn is_opencode_go(base: &str) -> bool {
     https_host_path(base).is_some_and(|(host, path)| host.eq_ignore_ascii_case("opencode.ai") && (path == "inference/go" || path.starts_with("inference/go/")))
 }
 
-/// An https address's host (without user or port) and path; `None` for any other scheme.
+/// An https address's host (without user or port) and path; `None` for any other scheme. The host
+/// ends where an HTTP client's does (`/`, `?`, `#` or `\`), so an `@` after any of them can't
+/// make another host look like it: a key picked by host goes only where the request goes.
 pub(crate) fn https_host_path(base: &str) -> Option<(&str, &str)> {
     let base = base.trim().trim_end_matches('/');
     let (scheme, rest) = base.split_once("://")?;
     if !scheme.eq_ignore_ascii_case("https") {
         return None;
     }
-    let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
+    let end = rest.find(['/', '?', '#', '\\']).unwrap_or(rest.len());
+    let (host, tail) = (rest.get(..end).unwrap_or(rest), rest.get(end..).unwrap_or(""));
+    let path = tail.strip_prefix('/').unwrap_or("").split(['?', '#']).next().unwrap_or("");
     let host = host.rsplit('@').next().unwrap_or(host).split(':').next().unwrap_or(host);
     Some((host, path))
 }

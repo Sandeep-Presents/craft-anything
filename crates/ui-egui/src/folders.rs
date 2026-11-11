@@ -8,7 +8,7 @@ use crate::theme::{self, Tokens};
 use crate::{CraftApp, Pick, widgets};
 use craft_anything_ai::rebuild::stacks;
 use craft_anything_engine::workspace::{self, ExistingFiles, FolderState, Workspace};
-use egui::{RichText, Ui, Vec2};
+use egui::{RichText, Ui};
 use std::path::PathBuf;
 
 /// The Make screen's "Saved in" line: the folder the project will be in, and a way to pick another.
@@ -160,31 +160,24 @@ pub fn existing_modal(app: &mut CraftApp, ui: &mut Ui, close: &mut bool) {
     ui.label(RichText::new(tr("How should the builder use them?")).color(t.text));
     ui.add_space(12.0);
     let current = app.state.make.existing;
-    let size = Vec2::new(268.0, 168.0);
+    let tiles = [
+        widgets::Tile {
+            icon: "code",
+            label: "They're my app: edit them in place",
+            blurb: "The builder works on these files directly and keeps what works. Craft Anything adds a few records of its own beside them.",
+            on: current == Some(ExistingFiles::Edit),
+        },
+        widgets::Tile {
+            icon: "layers",
+            label: "Start from them",
+            blurb: "The builder reads them (code, notes, pictures) and builds the app in a new app folder beside them. Your files stay as they are.",
+            on: current == Some(ExistingFiles::StartFrom),
+        },
+    ];
     let mut chosen = None;
-    ui.horizontal(|ui| {
-        let edit = widgets::choice_tile(
-            ui,
-            size,
-            "code",
-            "They're my app: edit them in place",
-            "The builder works on these files directly and keeps what works. Craft Anything adds a few records of its own beside them.",
-            current == Some(ExistingFiles::Edit),
-        );
-        if edit.clicked() {
-            chosen = Some(ExistingFiles::Edit);
-        }
-        let start = widgets::choice_tile(
-            ui,
-            size,
-            "layers",
-            "Start from them",
-            "The builder reads them (code, notes, pictures) and builds the app in a new app folder beside them. Your files stay as they are.",
-            current == Some(ExistingFiles::StartFrom),
-        );
-        if start.clicked() {
-            chosen = Some(ExistingFiles::StartFrom);
-        }
+    ui.scope(|ui| {
+        ui.set_max_width(546.0);
+        chosen = widgets::choice_tiles(ui, &tiles, 2, 72.0).map(|i| if i == 0 { ExistingFiles::Edit } else { ExistingFiles::StartFrom });
     });
     ui.add_space(12.0);
     let mut remember = app.state.make.remember_existing;

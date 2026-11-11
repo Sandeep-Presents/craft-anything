@@ -358,40 +358,69 @@ fn targets_list(app: &mut CraftApp, ui: &mut Ui) {
 fn tab_strip(ui: &mut Ui, tabs: &[(&str, &str)], selected: usize) -> Option<usize> {
     let t = Tokens::get(ui.ctx());
     let mut picked = None;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        for (i, (icon, title)) in tabs.iter().enumerate() {
-            let on = i == selected;
-            let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
-            let w = g.size().x + if icon.is_empty() { 22.0 } else { 42.0 };
-            let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
-            if !on {
-                let h = widgets::hover_t(ui, &resp);
-                ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
+    // Every title or none: when they don't all fit, every tab shows only its icon (the title on
+    // hover), so no tab is cut off at the panel's edge.
+    let width = |ui: &Ui, title: &str, icon: &str| widgets::label_galley(ui, &tr(title), 11.0, t.text).size().x + if icon.is_empty() { 22.0 } else { 42.0 };
+    let needed: f32 = tabs.iter().map(|(icon, title)| width(ui, title, icon) + 2.0).sum();
+    let icons_only = needed > ui.available_width() && tabs.iter().all(|(icon, _)| !icon.is_empty());
+    // Narrower than even the icons: the strip scrolls, so the last tabs can still be reached.
+    let scrolls = icons_only && tabs.len() as f32 * 36.0 > ui.available_width();
+    let mut row = |ui: &mut Ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            for (i, (icon, title)) in tabs.iter().enumerate() {
+                let on = i == selected;
+                let g = widgets::label_galley(ui, &tr(title), 11.0, t.text);
+                let w = if icons_only { 34.0 } else { width(ui, title, icon) };
+                let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 32.0), egui::Sense::click());
+                resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, tr(title)));
+                let resp = if icons_only {
+                    // The title on hover, and while the tab has keyboard focus (its ring is showing), so
+                    // a keyboard user can read which tab it is.
+                    if resp.has_focus() && !resp.hovered() {
+                        resp.show_tooltip_text(tr(title));
+                    }
+                    if scrolls && resp.gained_focus() {
+                        resp.scroll_to_me(None);
+                    }
+                    resp.on_hover_text(tr(title))
+                } else {
+                    resp
+                };
+                if !on {
+                    let h = widgets::hover_t(ui, &resp);
+                    ui.painter().rect_filled(rect.shrink2(Vec2::new(0.0, 3.0)), t.radius_sm, theme::mix(egui::Color32::TRANSPARENT, t.hover, h));
+                }
+                widgets::focus_ring(ui, &resp, rect.shrink2(Vec2::new(0.0, 3.0)));
+                let col = if on { t.text } else { t.text_dim };
+                let mut x = rect.left() + 10.0;
+                if !icon.is_empty() {
+                    icons::paint(
+                        ui,
+                        egui::Rect::from_min_size(egui::pos2(x, rect.center().y - 7.0), Vec2::splat(14.0)),
+                        icon,
+                        14.0,
+                        if on { t.accent } else { t.text_faint },
+                    );
+                    x += 20.0;
+                }
+                if !icons_only {
+                    ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
+                }
+                if on {
+                    ui.painter().hline(rect.x_range().shrink(6.0), rect.bottom() - 1.0, egui::Stroke::new(2.0, t.accent));
+                }
+                if resp.clicked() && !on {
+                    picked = Some(i);
+                }
             }
-            widgets::focus_ring(ui, &resp, rect.shrink2(Vec2::new(0.0, 3.0)));
-            let col = if on { t.text } else { t.text_dim };
-            let mut x = rect.left() + 10.0;
-            if !icon.is_empty() {
-                icons::paint(
-                    ui,
-                    egui::Rect::from_min_size(egui::pos2(x, rect.center().y - 7.0), Vec2::splat(14.0)),
-                    icon,
-                    14.0,
-                    if on { t.accent } else { t.text_faint },
-                );
-                x += 20.0;
-            }
-            ui.painter().galley_with_override_text_color(egui::pos2(x, rect.center().y - g.size().y / 2.0), g, col);
-            if on {
-                ui.painter().hline(rect.x_range().shrink(6.0), rect.bottom() - 1.0, egui::Stroke::new(2.0, t.accent));
-            }
-            if resp.clicked() && !on {
-                picked = Some(i);
-            }
-        }
-    });
+        });
+    };
+    if scrolls {
+        egui::ScrollArea::horizontal().id_salt("tab_strip").show(ui, |ui| row(ui));
+    } else {
+        row(ui);
+    }
     picked
 }
 
@@ -478,9 +507,10 @@ fn tool_view(app: &mut CraftApp, ui: &mut Ui, tab: CenterTab) {
         Fill::DeepNeeded => crate::engine_ui::deep_needed(app, ui),
         Fill::Error(msg, rem) => widgets::empty_state(ui, "triangle-alert", &msg, rem.as_deref().unwrap_or("")),
         Fill::Ready(e) => {
-            ui.horizontal(|ui| {
+            // The summary wraps beside its badge rather than running off the panel's edge.
+            ui.horizontal_top(|ui| {
                 widgets::confidence_badge(ui, Some(e.confidence));
-                ui.label(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim));
+                ui.add(egui::Label::new(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim)).wrap());
             });
             ui.add_space(6.0);
             render_result(ui, &e.result, tab);
@@ -988,6 +1018,62 @@ fn log_view(app: &CraftApp, ui: &mut Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A narrow strip shows only icons; the focused tab shows its title without the pointer on it.
+    #[test]
+    fn an_icon_only_tab_shows_its_title_while_it_has_focus() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let tabs = [("search", "Inspector"), ("shield-check", "Evidence"), ("circle-help", "Unknowns")];
+        // Fonts installed in a pass bind from the next one: draw from the second pass.
+        let mut fonts = false;
+        let mut h = Harness::builder().with_size(egui::vec2(120.0, 80.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut fonts, true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            tab_strip(ui, &tabs, 0);
+        });
+        assert_eq!(h.query_all_by_label("Evidence").count(), 1, "the tab alone, no title shown yet");
+        h.get_by_label("Evidence").focus();
+        h.run_steps(3);
+        assert_eq!(h.query_all_by_label("Evidence").count(), 2, "the tab and its title");
+    }
+
+    /// Narrower than even the icons, the strip scrolls: a tab past the edge comes into view and can be picked.
+    #[test]
+    fn a_strip_narrower_than_its_icons_still_reaches_the_last_tab() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let tabs = [
+            ("search", "Inspector"),
+            ("shield-check", "Evidence"),
+            ("circle-help", "Unknowns"),
+            ("search", "One"),
+            ("search", "Two"),
+            ("search", "Three"),
+            ("search", "Last"),
+        ];
+        let picked = std::rc::Rc::new(std::cell::Cell::new(None));
+        let seen = picked.clone();
+        let mut fonts = false;
+        let mut h = Harness::builder().with_size(egui::vec2(150.0, 80.0)).build_ui(move |ui| {
+            if !std::mem::replace(&mut fonts, true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            if let Some(i) = tab_strip(ui, &tabs, 0) {
+                seen.set(Some(i));
+            }
+        });
+        assert!(h.get_by_label("Last").rect().left() >= 150.0, "the last tab starts past the edge");
+        h.get_by_label("Last").focus();
+        h.run_steps(3);
+        // The focused tab also shows its title, so take the tab: it comes first.
+        let tab = || h.query_all_by_label("Last").next().expect("the tab");
+        assert!(tab().rect().right() <= 150.0, "focus scrolls it into view");
+        tab().click();
+        h.run_steps(2);
+        assert_eq!(picked.get(), Some(6));
+    }
 
     #[test]
     fn recorded_findings_render_even_without_evidence_rows() {

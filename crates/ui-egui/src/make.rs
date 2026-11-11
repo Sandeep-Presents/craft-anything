@@ -123,7 +123,7 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         step_title(ui, 2, "Say what you want");
         ui.add_space(12.0);
         // The example matches the tile picked above (a "recreate this website" hint under
-        // "Nothing — start fresh" contradicts the choice).
+        // "Start fresh" contradicts the choice).
         let d = &app.state.make;
         let hint = match &d.target {
             TargetRef::Local { .. } if d.game => "For example: the same game, with a high-score table",
@@ -280,20 +280,17 @@ fn look(app: &mut CraftApp, ui: &mut Ui, w: f32) {
             crate::engine_ui::deep_needed(app, ui);
             return;
         }
-        let size = Vec2::new(ui.available_width(), 72.0);
-        ui.spacing_mut().item_spacing.y = 10.0;
-        if widgets::choice_tile(ui, size, "app-window", "An app or a file", "See how a program works: what it does, what it talks to, what's inside.", false)
-            .clicked()
-        {
-            app.pick(Pick::OpenFile);
-        }
-        if widgets::choice_tile(ui, size, "globe", "A website", "See how a page is built: its layout, styles, scripts and the requests it makes.", false)
-            .clicked()
-        {
-            app.state.modal = Some(crate::state::Modal::Website);
-        }
-        if widgets::choice_tile(ui, size, "package", "A game's files", "See what a game packs, and save its pictures as PNG files.", false).clicked() {
-            app.state.screen = crate::state::Screen::GameFiles;
+        let tile = |icon, label, blurb| widgets::Tile { icon, label, blurb, on: false };
+        let tiles = [
+            tile("app-window", "An app or a file", "See how a program works: what it does, what it talks to, what's inside."),
+            tile("globe", "A website", "See how a page is built: its layout, styles, scripts and the requests it makes."),
+            tile("package", "A game's files", "See what a game packs, and save its pictures as PNG files."),
+        ];
+        match widgets::choice_tiles(ui, &tiles, 1, 72.0) {
+            Some(0) => app.pick(Pick::OpenFile),
+            Some(1) => app.state.modal = Some(crate::state::Modal::Website),
+            Some(_) => app.state.screen = crate::state::Screen::GameFiles,
+            None => {}
         }
     });
 }
@@ -317,27 +314,14 @@ fn choose_target(app: &mut CraftApp, ui: &mut Ui) {
     let local = matches!(d.target, TargetRef::Local { .. }).then_some(d.game);
     let website = local.is_none() && (d.editing_url || !d.url.is_empty());
     let scratch = local.is_none() && !website;
-    let gap = 10.0;
-    let cols = if ui.available_width() > 760.0 { 4 } else { 2 };
-    let tile_w = ((ui.available_width() - gap * (cols as f32 - 1.0)) / cols as f32).floor();
-    let size = Vec2::new(tile_w, 60.0);
-    let mut pick = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = Vec2::splat(gap);
-        for (i, (icon, label, on)) in [
-            ("globe", "A website", website),
-            ("app-window", "An app", local == Some(false)),
-            ("puzzle", "A game", local == Some(true)),
-            ("sparkles", "Nothing — start fresh", scratch),
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            if widgets::choice_tile(ui, size, icon, label, "", on).clicked() {
-                pick = Some(i);
-            }
-        }
-    });
+    let tile = |icon, label, on| widgets::Tile { icon, label, blurb: "", on };
+    let tiles = [
+        tile("globe", "A website", website),
+        tile("app-window", "An app", local == Some(false)),
+        tile("puzzle", "A game", local == Some(true)),
+        tile("sparkles", "Start fresh", scratch),
+    ];
+    let pick = widgets::choice_tiles(ui, &tiles, 4, 60.0);
     let m = &mut app.state.make;
     if matches!(pick, Some(0) | Some(3)) {
         // A different kind of start: forget the last game's engine and the engine picked for it.
@@ -405,20 +389,21 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
     });
     ui.add_space(6.0);
     let deep = app.settings.deep_mode;
-    let gap = 10.0;
-    let size = Vec2::new(((ui.available_width() - gap) / 2.0).floor(), 72.0);
-    let mut pick = None;
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = gap;
-        for (on, icon, label, blurb) in [
-            (false, "shield-check", "Clean room", "Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art."),
-            (true, "microscope", "Deep", "Craft Anything reads its code and files with every tool it has. For your private use."),
-        ] {
-            if widgets::choice_tile(ui, size, icon, label, blurb, deep == on).clicked() {
-                pick = Some(on);
-            }
-        }
-    });
+    let tiles = [
+        widgets::Tile {
+            icon: "shield-check",
+            label: "Clean room",
+            blurb: "Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.",
+            on: !deep,
+        },
+        widgets::Tile {
+            icon: "microscope",
+            label: "Deep",
+            blurb: "Craft Anything reads its code and files with every tool it has. For your private use.",
+            on: deep,
+        },
+    ];
+    let pick = widgets::choice_tiles(ui, &tiles, 2, 72.0).map(|i| i == 1);
     if let Some(on) = pick {
         app.set_deep(on);
     }
