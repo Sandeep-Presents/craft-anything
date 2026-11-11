@@ -615,11 +615,17 @@ Golden rule 3: the result is evidence. Each fix needs a Mac to test on.
 Owner: open · Status: todo
 The code for each of these is done; what's left is to run it for real and record the result in
 STATUS.md. A failure becomes a new line under its item. Grouped by what the run needs. Start with
-the Clean room build and the README quick start: Clean room is the default and has no live build
-yet, and the quick start is how every new person begins.
+the Clean room build and the README quick start: Clean room is the default and has had one live
+build, a website's, and the quick start is how every new person begins.
 
 **A signed-in coding agent:**
-- [ ] A live Clean room build of a website and of an app, checked end to end
+- [x] A live Clean room build of a website, checked end to end (Linux, 2026-11-06; STATUS)
+      — claimed: scks1 (website half), branch docs/r5.7-clean-room-website-live-run
+- [ ] A live Clean room build of an app, checked end to end: Study sees an app only through
+      pictures of its window, so this needs Windows or macOS (R2.4)
+- [ ] Ubuntu: the browser found is `/usr/bin/chromium-browser`, the script that runs the Chromium
+      snap, so its profile goes in /tmp, which the snap can't share, and Study stops after 90 s;
+      the build works once Settings → Engines names `/snap/bin/chromium` (#1054)
 - [ ] A live build in a picked folder each way (edit in place, start from), checked end to end
 - [ ] Thresholds under pressure: a clone that's off by a few pixels (a page with fluid type or
       `clamp()` spacing) to see whether 4 / 2 / 8 px is too strict

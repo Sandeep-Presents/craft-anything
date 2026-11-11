@@ -583,6 +583,17 @@ launch or preview was run for this documentation correction.
   at 96% likeness in 1.5 min; a small desktop app rebuilt in Rust + egui reached Ready in 9 min (checked
   only by building); a game rebuild in Rust reached Build and was stopped before Check. The
   website case is an opt-in test: `CRAFT_E2E=1 cargo test -p craft-anything-cli --test live_rebuild`.
+- Live Clean room website build (2026-11-06, Ubuntu 26.04.1 x86-64, the published 0.5.0 CLI,
+  Claude Code 2.1.318, the Chromium 157 snap, a new config folder): `--clean-room rebuild <site>
+  "Recreate this website" --backend "Claude Code" --rounds 1 --unattended` on a one-page static site
+  with one serverless function reached Ready in 4 min 47 s, 100% alike at 1440, 768 and 390 px
+  (round 1's screenshots are identical to the capture's), 4 of 4 claims. The capture held
+  screenshots, design tokens, the layout and the visible text, and no HTML, CSS, scripts or requests;
+  the builder's session shows it read only the capture. One question stayed open: what the page's
+  button shows, because Clean room's state capture never clicks ordinary buttons. The run needed
+  `engines.tools.chromium = "/snap/bin/chromium"`: with nothing set, the browser found was
+  `/usr/bin/chromium-browser` and Study stopped after 90 s (R5.7). Not checked: an app, a larger
+  site, another agent, Windows and macOS.
 - Approvals differ by agent (roadmap R2.2): Claude Code asks our approval tool; OpenCode's builder
   runs with `--auto`; Hermes's `-z` turns its approvals off on every run, chats included, so a Hermes
   chat isn't limited to analysing and Clean room's approval rule doesn't reach it. Hermes is opt-in
