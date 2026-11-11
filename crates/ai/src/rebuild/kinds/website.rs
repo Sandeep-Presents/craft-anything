@@ -674,6 +674,15 @@ pub fn pair_states<'a>(original: &'a Value, built: &'a Value) -> Vec<(&'a Value,
     rows(original).map(|o| (o, rows(built).find(|b| key(b) == key(o)))).collect()
 }
 
+/// The study used a saved profile and detected no password page (`capture.json`'s typed
+/// `signed_in` and `sign_in_page`, #1178). This does not establish authentication: a rejected
+/// session may lead to a public page or a passwordless sign-in step instead.
+pub fn captured_signed_in(ws: &Workspace) -> bool {
+    let Some(c) = read_json(&ws.capture_dir().join("capture.json")) else { return false };
+    let yes = |k: &str| c.get(k).and_then(Value::as_bool).unwrap_or(false);
+    yes("signed_in") && !yes("sign_in_page")
+}
+
 /// Read a JSON file, or None.
 fn read_json(path: &Path) -> Option<Value> {
     std::fs::read(path).ok().and_then(|b| serde_json::from_slice(&b).ok())
@@ -717,7 +726,7 @@ fn states_note(cx: &CheckCx, base: &str, out: &Path, dir: &str, unknowns: &mut V
         return Ok(None);
     }
     let ours = out.join(dir);
-    cx.call("web_site_open", json!({"url": base, "settle_ms": 1200}))?;
+    cx.call("web_site_open", json!({"url": base, "settle_ms": 1200, "signed_in": false}))?;
     // More than the study opened, so the same controls are found even when the build orders them differently.
     let width = original.get("width").and_then(Value::as_u64).unwrap_or(1440);
     if let Err(e) = cx.call("web_page_states_capture", json!({"output_directory": ours.display().to_string(), "max_states": 8, "width": width})) {
@@ -802,7 +811,7 @@ impl Check for WebVisualCheck {
             if let Some(parent) = built.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| ToolError::io(parent.display(), e))?;
             }
-            cx.call("web_site_open", json!({"url": url, "settle_ms": 1200}))?;
+            cx.call("web_site_open", json!({"url": url, "settle_ms": 1200, "signed_in": false}))?;
             cx.call("web_site_capture", json!({"output_directory": built.display().to_string(), "include_html": false, "widths": widths}))?;
             let mut per_width = Vec::new();
             for &w in &widths {

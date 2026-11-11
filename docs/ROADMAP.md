@@ -1463,6 +1463,28 @@ Gaps found while using the app for real projects.
       — claimed: NeuTroNBZh, branch bugfix/r2.9-rebuild-check-mark-race
 - [ ] Find why a builder's own check stayed on "game-self-test" for over 20 minutes on Windows,
       past the run's 90 s limit on the game's run (seen three times with a Unity 6000.6 build)
+- [x] A website study can see what the person sees when signed in: the person signs
+      in once in a visible window (`web_site_sign_in`), the saved sign-in is reused by later opens of
+      that exact site (copied into the private profile, never changed by a capture), and
+      `web_site_sign_out` forgets it; the builder is told when the capture was signed in. Addresses
+      #1178. Live with Chromium on Linux against a local test site (virtual display, scripted
+      sign-in); a confined Snap or Flatpak browser and a real site were not run
+      — claimed: execsumo, branch feature/r2.9-signed-in-website-study
+      Review fixes: saved profiles use normalized host and effective port; browser reuse also
+      checks the saved revision, and explicit `signed_in: false` always starts fresh. Builder
+      guidance treats saved-profile use as unverified authentication, even without a password page.
+      The interactive sign-in runs without holding the engine session lock; same-site profile
+      operations fail fast while reserved, without blocking other sites or explicitly fresh opens.
+- [ ] A "Sign in to this site" button in the Make screen for website targets (`web_site_sign_in`
+      is reachable only as a tool, from the CLI, MCP or the agent, today)
+- [ ] Study with the person's own already-running browser through its debugging endpoint, as an
+      alternative to a saved sign-in
+- [ ] Sign in once with `web_site_sign_in` on a real site behind a login (and with the Ubuntu
+      Snap Chromium, whose launcher couldn't start in the test shell) and rebuild it signed in
+- [ ] Refresh a saved sign-in from a capture session when the site renews it, so it lasts longer
+      than the first sign-in's cookies
+- [ ] Before the builder starts on a signed-in study, show the person the study's first
+      screenshots and ask them to confirm it's the signed-in app (Make screen and an inbox approval)
 - [x] Let waiting notes scroll with the conversation so a long note leaves the live build
       activity and prompt box reachable — claimed: jeffreylm, branch bugfix/r2.9-keep-build-activity-visible
 - [x] Re-running at a folder that already holds a project keeps its saved builder, asset budget,
