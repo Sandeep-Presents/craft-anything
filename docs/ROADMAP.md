@@ -1090,6 +1090,7 @@ Owner: open · Status: in progress
       persisted unknowns and an explicit usable-build summary; no builder retries for a missing oracle
 - [ ] Give console run comparisons a numeric-output oracle when needed: word likeness drops
       single-character tokens, so bare `4.5` and `9.0` both compare as empty output
+      — claimed: muraa-p, branch bugfix/r2.5-numbers-only-output
 - [x] Compare console output's numeric spelling and order at positions stable across two
       original runs, and explain when varying numbers or unavailable repeats limit comparison
       — claimed: Afloat16, branch bugfix/r2.5-console-numeric-results-20261111
