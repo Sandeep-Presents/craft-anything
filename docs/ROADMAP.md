@@ -2471,8 +2471,9 @@ Owner: open · Status: in progress (experimental 3D/4D/5D available; parity expa
 - [x] Add conservative camera-frustum culling and measured large-scene rendering budgets, preserving picking filters and recoverable errors. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
 - [x] Add admitted Install/Maintain intervals, calendar-derived dates and explicit custom-Install interval preview, with focus/playback and unresolved appearance. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
 - [x] Add independently controlled Material Fixed/PerUnit cost evaluation, source quantities, working-time rates, separate direct budgets and unresolved actual costs. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Extend native appearance parity to inherited colours, textures, directional growth and transparency after independent controls; the current interval preview explicitly omits these effects.
-- [ ] Independently validate engineering mesh quantities, further resource cost kinds, currency/unit conversion and additional source versions before admitting them.
+- [ ] Extend native appearance parity to inherited colours, textures, directional growth and transparency after independent controls; the current interval preview explicitly omits these effects. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Independently validate engineering mesh quantities, further resource cost kinds and currency/unit conversion before admitting them. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Validate the available independent project corpus and additional source versions; admit only observed layouts and report unsupported inputs explicitly. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
 
 ---
 
