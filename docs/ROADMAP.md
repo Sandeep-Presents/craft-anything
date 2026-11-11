@@ -79,11 +79,14 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 1 | R2.2 Every builder gets the same tools (that group), and Approvals | **decision** for Approvals | Agents other than Claude Code start but can't do the job, and Clean room's rule doesn't reach them |
 | 1 | R5.5 API-key builds fail in words people can use | — | This path has never been run live, and its errors say nothing |
 | 1 | R5.6 Tools report only what they saw | — | Confirmed false successes on macOS; golden rule 3 |
+| 1 | R5.8 The Claude API and 9router can be picked | — | People with a Claude key can't choose it without an environment variable; 9router isn't known |
 | 2 Proof | R5.7 Live checks owed | — | Built but never run for real; each can reopen work above. Lines run when the machine or key they need is at hand, Clean room and the quick start first |
 | 3 Depth | The rest of R2.2 | — | Detection waits for reports from 0.3.0 or later; ACP after the adapters work |
 | 3 | R2.4 Runtime study, R2.5 Behaviour checks | scripted input (R2.4) before R2.5's sheet check | Makes "ready" mean more for apps and games |
 | 3 | R2.7, R2.8 | — | Small gaps left in finished work |
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
+| 3 Depth | R2.11 Providers as data | R5.8 | Each new provider becomes one row instead of six edits |
+| 3 | R2.12 More providers | R2.11 | Small additions once the table exists |
 | 3 | R1.5 | — | Small leftovers |
 | Any | M3: R3.3, R3.9, R3.11 | — | Open lane |
 | Later | R4.1 macOS CLI, R4.2 Managed tier | **decision** | Not before M5 |
@@ -707,6 +710,42 @@ yet, and the quick start is how every new person begins.
 - [ ] Stand-in backend: a browser-made HAR and a real front end talking to it (only a hand-written
       HAR so far); GraphQL and tRPC on real bundles (only hand-written minified shapes)
 - [ ] Check the Kimi Code, Factory Droid and WorkBuddy registrations in the real apps
+- [ ] The Claude API added in Settings with no environment variable: chat with a tool call, cost
+      against the console, cached tokens on turn two; then a small build to Ready
+- [ ] 9router 0.5.112 or later: found without a key and with `REQUIRE_API_KEY=true`; a `cc/` model
+      and a combo chat; a tool call; a build to Ready; the no-provider error; token saver off in its
+      request log
+
+### R5.8 The Claude API and 9router can be picked
+Owner: open · Status: todo
+The Claude API is offered only when `ANTHROPIC_API_KEY` is already set (`detect.rs`), and Settings
+shows only what Detect found, so a person with a key can't choose it; the first run promises a key
+field that isn't there. 9router (a local gateway on port 20128) is unknown, and added by address it
+would count as a local model (24k context, lean tools, $0). Decided by the maintainers on
+2026-11-07: no environment variable for 9router's key
+(keychain or the key file only); one neutral line in docs/9router.md about subscription accounts
+behind a gateway, nothing in the UI; Gemini and Kimi stay in Detect's list; no native Gemini API.
+- [ ] Provider offers (`ai_providers_list`) and headless set-up tools (`ai_backend_add`,
+      `ai_backend_key_set`, `ai_backend_remove`, `ai_backends_list`, `ai_backends_detect`,
+      `ai_backend_test`), a key checked before it's saved, CLI `ai providers`, `ai add --provider`,
+      `ai key`; `ai` in `registry::AREAS`; `--kind` help names `gemini`
+- [ ] "Add a provider" in Settings → AI and the first run, and "Change key" on a saved API backend;
+      the first run's promise text matches
+- [ ] Claude client: fallback beta header only for api.anthropic.com, model info from `/v1/models`
+      (paged, bounded), effort and thinking only where the model has them,
+      `model_context_window_exceeded` refits like a context error, a spend-limit 429 is billing,
+      Sonnet 5.5 cache-read price
+- [ ] `anthropic-version` 2023-06-01 → 2026-10-21 after one live run (decided: move after a live
+      run; the body never sends `temperature`, `top_p` or `top_k`) — waits for the live check
+- [ ] A gateway on this computer is not a local model: `Locality` (local model / gateway / hosted)
+      sets the context budget, the tool list and the cost; Worker's default takes a local model only
+- [ ] 9router: found at 127.0.0.1:20128 with or without its key (a 401 asks for one; one that
+      answers without a key gets a security hint), its models with tool and combo flags, its errors
+      with a dashboard link; any local server that answers 401 is offered with a key field
+- [ ] 9router token savers off (`X-9Router-Token-Saver: off`), allowed per backend with
+      `token_saver = true` (decided: off by default, with a per-backend option)
+- [ ] Cap streamed tool arguments (4 MiB) and answer text (32 MiB) from OpenAI-compatible servers
+- [ ] docs/9router.md, STATUS rows (not run live), file-formats.md says SETTINGS_VERSION 3
 
 ---
 
@@ -1498,6 +1537,37 @@ to the project next.
 - [ ] Opening a pin that's already running brings its window to the front, instead of a message
 - [x] How much space pins take in Settings
       — claimed: Afloat16, branch feature/r2.10-pinned-copy-storage
+
+### R2.11 Providers as data
+Owner: open · Status: todo
+Provider facts live in six places (`BackendKind` arms, `keys::env_var`, `detect::env_keys`,
+`PROVIDERS`, `LOCAL_SERVERS`, `AiHub`'s matches); `catalog_id` is never read.
+- [ ] One embedded `providers.toml` (versioned) for every built-in provider, local server and
+      gateway; `GOOGLE_API_KEY` for Gemini too
+- [ ] One build, list and reach path per protocol from the row; a `ProviderAdapter` seam for
+      non-Bearer auth; `provider` on each saved backend, filled when read
+- [ ] Your own providers in `[[ai.providers]]` (UI, CLI, `ai_provider_add`), settings version 4,
+      a JSON schema
+- [ ] Settings version 4 lands together with `[[ai.providers]]` (decided: bump with
+      `[[ai.providers]]`, not for the `provider` field alone)
+- [ ] Model capabilities (context, tools, combo) in pickers and as the default context budget
+- [ ] Prices by provider and model (1-hour cache writes, Haiku 5.5's long-prompt tier); gateways and
+      subscriptions show unknown or estimated cost
+- [ ] Provider-specific remediation table keyed on status and provider code; 402 isn't bad input
+- [ ] A cached models.dev catalogue, refreshed only on request (`ai_catalog_refresh`, never at
+      start-up; a versioned file; used only for fields that are unknown) (decided: yes, opt-in only)
+
+### R2.12 More providers
+Owner: open · Status: todo
+- [ ] Cerebras, NVIDIA, Hugging Face, SambaNova, Cohere rows
+- [ ] LiteLLM proxy (port 4000, gateway) and Jan (1337); optional keys for LM Studio, llama.cpp, vLLM
+- [ ] Z.ai GLM rows
+- [ ] Qwen through Alibaba Model Studio (workspace and region in the address)
+- [ ] MiniMax, with `reasoning_content` sent back alongside tool calls
+- [ ] Azure OpenAI (resource, deployment, `api-key` header)
+- [ ] Bedrock with a Bedrock API key; Vertex with a `gcloud` token
+- [ ] **decision** AWS SigV4 signing (parked; Bedrock takes its API key as a Bearer key)
+- [ ] **decision** A Responses-API protocol (Perplexity's Agent API) (parked)
 
 ---
 
@@ -2485,5 +2555,5 @@ Looked at and not committed to; none of this is open work. Say in the issue if y
   source folder as a target (#480), actions after a build ends (#495), WebAssembly disassembly
   (#175), an HTTPS intercepting proxy (#164), VM and Windows Sandbox detonation (#144, #163), an
   adapter for another disassembler (#147)
-- More providers and agents (#14, #63, #97, #162, #170, #186, #206, #470): R2.2's table comes first,
-  so each new one is a small addition rather than another half-wired agent
+- More agents (#14, #63, #97, #162, #170, #186, #206, #470): R2.2's table comes first; providers
+  moved to R2.11/R2.12
