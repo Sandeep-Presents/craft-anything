@@ -1481,7 +1481,6 @@ Owner: open · Status: in progress
 - [ ] Unity: crunched textures (DXT1Crunched, DXT5Crunched; two of the games checked use them)
 - [x] Unity: decode R16 and RG16 texture pixels through the shared bounded PNG export path.
       — claimed: Afloat16, branch feature/r3.9-unity-integer-textures-20261109
-      Source `540b4947aa1b`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42633003467/job/129213811395) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Unity: the float formats (RHalf, RGHalf, RGBAHalf, RFloat, RGFloat, RGBAFloat)
       — claimed: Afloat16, branch feature/r3.9-unity-float-textures
 - [x] Decode Unity RGB9e5 shared-exponent textures through the existing bounded picture exporter.
@@ -1490,7 +1489,6 @@ Owner: open · Status: in progress
 - [ ] Game files: save pictures from IoStore containers (needs the Unreal 5 support above)
 - [x] Unreal: decode cooked half- and full-precision floating-point textures with the shared bounded pixel reader.
       — claimed: Afloat16, branch feature/r3.9-unreal-float-textures-20261109
-      Source `75b507c0b96f`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42634877637/job/129220281335) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [ ] Unreal: sounds and meshes out (so a Deep-mode rebuild needs no outside converter for them)
 
 - [x] Decode Unity ETC1 RGB textures through the bounded picture exporter, including both block modes and clipped edges.
@@ -1613,17 +1611,10 @@ Owner: open · Status: in progress
       — claimed: Plastic-time, branch rrfz/bugfix-r3.12-js-module-collisions
 - [x] Refuse oversized GNU tar long names and link targets instead of silently truncating member identities.
       — claimed: Afloat16, branch bugfix/r3.12-tar-long-identities-20261109
-      Source [`de2c6390`](https://github.com/Afloat16/craft-anything/commit/de2c63908909cab675887103921ed2601b1bae9b) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the long-name identity regression.
 - [x] Refuse managed engine installation when GNU tar name metadata stops the archive walk, before writing files; retain partial listings for inspection and accept complete member data without an end marker.
       — claimed: Afloat16, branch bugfix/r3.12-tar-install-stop-reasons-20261109
-      Source `3e588c55` passed [formats and engines tests, formatting, clippy and L0 gates](https://github.com/Afloat16/claude-mem/actions/runs/42649935938/job/129273248608).
-      The [unchanged-production baseline](https://github.com/Afloat16/claude-mem/actions/runs/42648642576/job/129268658248) reproduces four failed guards while two compatibility controls pass.
 - [x] Require the complete padded extent of GNU tar name and link records before allowing installation, including extents that overflow checked offsets; preserve ordinary member reads without trailing padding.
       — claimed: Afloat16, branch bugfix/r3.12-gnu-tar-padded-records-20261109
-      Exact source `25c45ef0` passed [formats and engines tests (1,200 passed, one existing network test ignored), fmt, clippy and L0 gates](https://github.com/Afloat16/claude-mem/actions/runs/42659466852/job/129306793039).
-      The [unchanged-production baseline](https://github.com/Afloat16/claude-mem/actions/runs/42659466852/job/129306793039) reproduces four failed guards while seven compatibility controls pass.
 - [x] Extract legacy PyInstaller PYZ data as raw files and report modern namespace packages without fabricating bytecode.
       — claimed: Afloat16, branch bugfix/r3.12-pyz-member-kinds
 - [x] Bound retained expanded PYZ paths across nested archives before allocating repeated prefixes;
@@ -1631,9 +1622,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-pyz-expanded-path-budget-20261110
 - [x] Keep PyInstaller CArchive member reads before the table and cookie, including signed files with trailing bytes.
       — claimed: Afloat16, branch bugfix/r3.12-carchive-payload-range-20261109
-      Source [`a5bcfaed`](https://github.com/Afloat16/craft-anything/commit/a5bcfaedcb1ad67c8bb7f06c7143befc8292409c) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226891917)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Build only the requested keyed-archive object rows and count shared class names without copying them for every object.
       — claimed: Afloat16, branch bugfix/r3.12-keyed-archive-page-before-copy-20261110
 - [x] Bound rejected ASAR names by the archive listing limit.
@@ -1644,19 +1632,14 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-asar-path-budget-20261110
 - [x] Keep embedded Godot pack tables and member reads before the executable's pack trailer.
       — claimed: Afloat16, branch bugfix/r3.12-godot-trailer-boundary-20261109
-      Source `9744a0569a7c`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42633003467/job/129213811429) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Keep .NET bundle member reads before the manifest.
       — claimed: Afloat16, branch bugfix/r3.12-dotnet-data-bounds-20261107
 - [x] Bound retained Node SEA asset and argument metadata while still validating the complete blob layout.
       — claimed: Afloat16, branch bugfix/r3.12-node-sea-retained-budget-20261109
-      Source `ce34c2446499`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42642329977/job/129246378958) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642329977/job/129246378958) passed.
 - [x] Check the decoded byte count for packed files whose manifest declares their original size.
       — claimed: Afloat16, branch bugfix/r3.12-packed-member-size
 - [x] Validate gzip packed-member trailers and decode concatenated members within one output budget.
       — claimed: Afloat16, branch bugfix/r3.12-packed-gzip-integrity-20261109
-      Source [`3f3ec6a4`](https://github.com/Afloat16/craft-anything/commit/3f3ec6a4bd97bb987d9cad906ce4b2f5028ff88b) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226891924)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Decode all frames of concatenated Zstandard members and account for their combined output.
       — claimed: Afloat16, branch bugfix/r3.12-zstandard-multiple-frames
 - [x] SQLite TEXT values cut at the 4 KiB cap can end in a spurious U+FFFD when the cut lands
@@ -1713,23 +1696,14 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-tar-octal-fields
 - [x] Recognize GNU sparse PAX metadata and report unsupported reconstruction instead of returning packed extents as complete files.
       — claimed: Afloat16, branch bugfix/r3.12-tar-pax-sparse-20261109
-      Source [`daaeb4fe`](https://github.com/Afloat16/craft-anything/commit/daaeb4fe6c2db3f805fb9b02f9fbdfe55d80eb4a) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895529)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Recognize ZIP directories from DOS directory attributes and Unix file-type metadata when the entry name has no trailing slash.
       — claimed: Afloat16, branch bugfix/r3.12-zip-directory-attributes
 - [x] Read ZIP bzip2 and XZ members through the existing bounded pure-Rust decompressors.
       — claimed: Afloat16, branch feature/r3.12-zip-bzip2-xz-20261109
-      Source [`4cac3638`](https://github.com/Afloat16/craft-anything/commit/4cac36386e426e332bd89cb2cfa63894f3a367a5) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226892219)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Use a verified Info-ZIP Unicode Path extra field when listing a member stored under a legacy filename.
       — claimed: Afloat16, branch feature/r3.12-zip-unicode-path
 - [x] Decode ZIP method 14 property headers and size or end-marker framing with bounded LZMA output.
       — claimed: Afloat16, branch feature/r3.12-zip-lzma-20261109
-      Source [`61fdab39`](https://github.com/Afloat16/craft-anything/commit/61fdab39da4849eb5a84196df53c55e19c869134) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226892042)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Stop decoding extension headers inside noninitial IPv6 fragments.
       — claimed: Afloat16, branch bugfix/r3.12-ipv6-fragment-payload-20261105
 - [x] Enforce the expanded DNS name wire-length limit.
@@ -1775,9 +1749,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-unity-stored-block-ranges-20261110
 - [x] Apply standalone LZMA output budgets to its internal dictionary and reject oversized declared output before decoding.
       — claimed: Afloat16, branch bugfix/r3.12-standalone-lzma-budget-20261109
-      Source [`5da8880d`](https://github.com/Afloat16/craft-anything/commit/5da8880d3b56785498cf0c09ae46f300f070322d) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226892150)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Expand repeated LZ4 match bytes in blocks when reading Unity bundles.
       — claimed: Afloat16, branch refactor/r3.12-expand-lz4-matches
 - [x] Require terminated cpio pathnames and a complete, empty trailer before reporting an archive as complete.
@@ -1793,7 +1764,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-unity-node-ranges-20261110
 - [x] Validate Unity serialized metadata offsets and lengths before reading so short inputs cannot panic or borrow object bytes.
       — claimed: Afloat16, branch bugfix/r3.12-unity-metadata-range-20261109
-      Source `de9d7444f509`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42633003467/job/129213811357) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Reject Unity serialized objects outside their declared file.
       — claimed: Afloat16, branch bugfix/r3.12-unity-serialized-object-ranges-20261105
 - [x] Count WebAssembly locals across all declaration groups in retained function bodies.
@@ -1838,7 +1808,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-arsc-type-id-offset-20261110
 - [x] Keep Android resource packages, child chunks and library records inside their enclosing declared ranges.
       — claimed: Afloat16, branch bugfix/r3.12-arsc-parent-chunk-boundaries-20261109
-      Source `ea680eeb9e92`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895431) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Keep explicit script and variant subtags when grouping Android resource strings by locale.
       — claimed: Afloat16, branch bugfix/r3.12-android-script-locale
 - [x] Bound decoded Android string-pool bytes and disclose partial pools in binary XML and resource tables, so shared offsets cannot multiply a small chunk into unbounded retained strings.
@@ -2035,7 +2004,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-wasm-custom-inventory-budget-20261109
 - [x] Bound bytes retained when WebAssembly types and function names are expanded through references, reuse formatted type signatures, and disclose omitted derived metadata.
       — claimed: Afloat16, branch bugfix/r3.12-wasm-reference-bytes-20261110
-      Source `232100030ace`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42642340046/job/129246412808) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642340046/job/129246412808) passed.
 - [x] Report WebAssembly metadata truncation accurately in summary and complete tool views, including byte-budget exhaustion before entry limits (follow-up to #1540).
       — claimed: Afloat16, branch bugfix/r3.12-wasm-metadata-limits-20261110
 - [x] Accept only valid WebAssembly names when reporting custom-section debug and source map URLs.
@@ -2113,9 +2081,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-cramfs-big-endian-20261110
 - [x] Verify gzip FHCRC and accept informational XFL and OS bytes without inventing reserved-value restrictions.
       — claimed: Afloat16, branch bugfix/r3.12-gzip-header-crc-20261109
-      Source [`dde4aa02`](https://github.com/Afloat16/craft-anything/commit/dde4aa0233be968f9b55bd3316204b880b8dbf2e) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226891865)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Match firmware ZIP end records to the same archive start so stored nested archives do not shorten the outer region.
       — claimed: Afloat16, branch bugfix/r3.12-firmware-zip-extent-20261110
 - [x] Exercise signed PAX lengths, empty keys and equals signs inside a path value.
@@ -2151,7 +2116,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-android-xml-events
 - [x] Reject Java Long and Double constants without their reserved constant-pool slot, including the maximum u16 pool boundary.
       — claimed: Afloat16, branch bugfix/r3.12-java-wide-pool-slot-20261109
-      Source `e0dbc3a5b60b`; [full Linux gate](https://github.com/Afloat16/craft-anything/actions/runs/42629757277) passed.
 - [x] Borrow Java attribute names from the constant pool so repeated references cannot multiply temporary parser memory.
       — claimed: Afloat16, branch bugfix/r3.12-java-attribute-name-borrowing-20261110
 - [x] Unfold JAR manifest attributes as bytes before UTF-8 decoding, preserve value whitespace, and recognize every specified line ending so entry digests use the original filenames.
@@ -2166,7 +2130,6 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-dex-payload-memory-20261110
 - [x] Stop capped DEX member and handler lists from interpreting unread records as the following field or a catch-all.
       — claimed: Afloat16, branch bugfix/r3.12-dex-capped-table-alignment-20261109
-      Source `149f060b9959`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42633003467/job/129213811327) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Address the combined parser review: preserve partial Java reference coverage,
       enforce DEX signed 32-bit LEB128 limits, recover legacy AAPT UTF-8 lengths within
       their pool with a shared recovery probe limit, and distinguish missing ext indirect
@@ -2217,7 +2180,6 @@ Owner: open · Status: in progress
       shows it unchanged. — claimed: AlexJoaquimPereira, branch bugfix/r3.12-sqlite-type-comma
 - [x] Keep shortened IL2CPP literals within their UTF-8 output budget without inventing a partial character.
       — claimed: Afloat16, branch bugfix/r3.12-il2cpp-literal-byte-budget-20261109
-      Source `d81b7d570546`; [format checks](https://github.com/Afloat16/claude-mem/actions/runs/42634877637/job/129220281761) and [compatibility gates](https://github.com/Afloat16/claude-mem/actions/runs/42642583301/job/129247271153) passed.
 - [x] Check that IL2CPP method ranges agree with each method's declaring type before reporting names and ownership.
       — claimed: Afloat16, branch bugfix/r3.12-il2cpp-method-owners
 - [x] Asset catalogs name each rendition key attribute as CoreUI reads it. When the deployment
@@ -2285,9 +2247,6 @@ Owner: open · Status: in progress
       — claimed: Chr0mium24, branch bugfix/r3.12-car-glyph-attributes
 - [x] Reject malformed ASAR directory, link and file nodes instead of listing fabricated empty files.
       — claimed: Afloat16, branch bugfix/r3.12-asar-node-shapes-20261109
-      Source [`351002ea`](https://github.com/Afloat16/craft-anything/commit/351002eab7e69791a9eb6cd3764c35e1c3cbc130) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226891843)
-      and [layers, locks, secret scanning, wasm checks and Cargo.lock stability](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663).
-      The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 
 - [x] Calculate GGUF quantized tensor byte ranges from their block layout and diagnose invalid row widths.
       — claimed: Afloat16, branch bugfix/r3.12-gguf-quantized-extents-20261110

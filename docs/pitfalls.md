@@ -71,6 +71,11 @@ whenever a `Cargo.toml` changed.
 on a new branch, open a new PR that says it supersedes the old one, and comment on the old one.
 Don't close or rewrite other people's work without asking.
 
+**Links to other repositories in the plan.** Contributors' roadmap and status lines carried links to
+CI runs and commits in their own repositories; reviews read the code and skimmed the docs lines, so
+62 such links reached `main`. Read every docs line a PR adds, and keep validation notes (where and
+how it was checked) in the PR description: ROADMAP and STATUS link only inside this repository.
+
 **Review fixes pushed to a PR that had already merged.** #686 was merged hours before its review
 comments were acted on; the fixes went to its branch and the threads were answered "Fixed", while
 `main` had the code without them. Read `gh pr view --json state,headRefOid` before pushing to a PR's
