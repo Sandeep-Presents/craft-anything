@@ -163,8 +163,8 @@ pub fn scan<'a>(src: &'a str, max_tokens: usize, mut emit: impl FnMut(Token<'a>)
             i = i.min(b.len());
             tok_kind = TokKind::Regex;
         } else {
-            let rest = slice(i, (i + 4).min(b.len()));
-            let len = PUNCTS.iter().find(|p| rest.starts_with(**p)).map_or(1, |p| p.len());
+            let rest = b.get(i..).unwrap_or_default();
+            let len = PUNCTS.iter().find(|p| rest.starts_with(p.as_bytes())).map_or(1, |p| p.len());
             // Never split a multi-byte character.
             let mut z = i + len;
             while z < b.len() && !src.is_char_boundary(z) {
@@ -340,6 +340,15 @@ mod tests {
 
     fn kinds(s: &str) -> Vec<(TokKind, String)> {
         tokenize(s, 1000).0.into_iter().map(|t| (t.kind, t.text.to_string())).collect()
+    }
+
+    #[test]
+    fn operators_before_non_ascii_identifier() {
+        for (src, op) in [("a===日本", "==="), ("a>>日本", ">>"), ("a=>é", "=>"), ("a!==😀", "!==")] {
+            let t: Vec<&str> = tokenize(src, 100).0.into_iter().map(|t| t.text).collect();
+            assert_eq!(t.len(), 3, "{src}: {t:?}");
+            assert_eq!(t[1], op, "{src}");
+        }
     }
 
     #[test]
