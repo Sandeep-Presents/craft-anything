@@ -449,6 +449,9 @@ pub fn rust_name_without_hash(name: &str) -> Option<String> {
     }
 }
 
+/// How far back from the end of a v0 name its instantiating crate is looked for.
+const TRAILING_CRATE_BYTES: usize = 256;
+
 /// The instantiating crate's name at the end of a v0 name: a crate root (`C`, an optional
 /// `s<hash>_`, an identifier) or a back-reference to one.
 fn v0_instantiating_crate(name: &str) -> Option<&str> {
@@ -471,7 +474,10 @@ fn v0_instantiating_crate(name: &str) -> Option<&str> {
             }
         }
     }
-    for (i, _) in body.char_indices().rev().filter(|(_, c)| *c == 'C') {
+    // A crate root at the end is short; looking further back would make each `C` of a long
+    // hostile name another full read.
+    let tail = b.len().saturating_sub(TRAILING_CRATE_BYTES);
+    for (i, _) in body.char_indices().rev().take_while(|(i, _)| *i >= tail).filter(|(_, c)| *c == 'C') {
         if let Some((krate, end)) = crate_root(b, i)
             && end == b.len()
         {
@@ -976,6 +982,21 @@ mod tests {
         for bad in ["_RC", "_RB_", "_RBzzzzzzzzzzzzzzzzzz_", "_RCs_", "_RC99x", "__RNvC3foo3barB"] {
             let _ = rust_name_without_hash(bad);
         }
+        // A long hostile tail of crate-root starts is read only near its end.
+        // Each `C<n>` claims an identifier that ends one byte short of the name, so every one is
+        // read to nearly the end before it's refused.
+        let mut pieces = vec![String::from("xx")];
+        let mut len = 2;
+        for _ in 0..200_000 {
+            let piece = format!("C{}", len - 1);
+            len += piece.len();
+            pieces.push(piece);
+        }
+        pieces.reverse();
+        let long = format!("_R{}", pieces.concat());
+        let started = std::time::Instant::now();
+        assert_eq!(v0_instantiating_crate(&long), None);
+        assert!(started.elapsed() < std::time::Duration::from_secs(1), "{:?}", started.elapsed());
     }
 
     #[test]
