@@ -316,7 +316,11 @@ pub fn fill_project(app: &mut CraftApp) {
     ];
     app.facts = crate::project::Facts {
         root: ws.root.clone(),
-        open_questions: vec!["May the original's logo and text be reused, or must they be placeholders?".into()],
+        open_questions: vec![craft_anything_engine::evidence::Unknown::new(
+            "Does check_for_updates send anything about the user?",
+            "network",
+            craft_anything_engine::evidence::Severity::Medium,
+        )],
         ..Default::default()
     };
     app.workspace = Some(ws);

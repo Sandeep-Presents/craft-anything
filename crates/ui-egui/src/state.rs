@@ -468,6 +468,10 @@ pub struct UiState {
     pub unsent: BTreeMap<PathBuf, (String, Vec<PathBuf>)>,
     /// Typed answers to open questions, by request id.
     pub answers: BTreeMap<String, String>,
+    /// The open question being answered in the side panel (its id), and what's typed so far: the
+    /// builder's unknowns are answered where they're listed, not in a message below.
+    #[serde(skip)]
+    pub open_answer: Option<(String, String)>,
     /// Settings → Plugins: the plugin being added.
     #[serde(default)]
     pub plugin_form: PluginForm,
@@ -576,6 +580,7 @@ impl Default for UiState {
             plan_height: None,
             pin_draft: Default::default(),
             answers: BTreeMap::new(),
+            open_answer: None,
             plugin_form: PluginForm::default(),
             game: GameFiles::default(),
         }

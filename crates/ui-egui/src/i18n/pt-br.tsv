@@ -1,5 +1,6 @@
 # Brazilian Portuguese UI catalog: English key<TAB>Portuguese text. See ../i18n.rs.
 # Brazilian Portuguese translation of the English source; wording and terminology reviewed.
+Answer	Responder
 OpenCode default	Padrão do OpenCode
 Model default	Padrão do modelo
 Thinking depth	Nível de raciocínio

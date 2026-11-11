@@ -1,5 +1,6 @@
 # th: Thai UI translations. Licensed MIT OR Apache-2.0.
 # UTF-8: English source<TAB>translation. Keep placeholders and escapes intact.
+Answer	ตอบ
 OpenCode default	ค่าเริ่มต้นของ OpenCode
 Model default	ค่าเริ่มต้นของโมเดล
 Thinking depth	ระดับการคิด
