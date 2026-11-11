@@ -266,8 +266,7 @@ pub struct RebuildRun {
 
 impl RebuildRun {
     /// Start a run on a worker thread. Fails fast (before any work) when no coding agent is set up.
-    pub fn start(hub: &AiHub, ws: Workspace, mut opts: RunOptions) -> Result<RebuildRun, ToolError> {
-        send_left_notes(&mut opts, &notes::notes_dir(&ws.inbox_dir()));
+    pub fn start(hub: &AiHub, ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
         let cfg = hub.config();
         let entry = builder_backend(&cfg, opts.backend.as_deref().or_else(|| project_builder(&cfg, &ws)))?;
         // The person's choice of mode is a session setting. A run that waited its turn uses the mode
@@ -314,9 +313,9 @@ impl RebuildRun {
         let preview: Arc<Mutex<Option<StaticServer>>> = Arc::default();
         let notes: Arc<Mutex<Vec<Note>>> = Arc::default();
         let inbox = Inbox::new(ws.inbox_dir());
-        // Notes left by an earlier run would be handed over again (ids restart with the process);
-        // cleared before the app can add any to this one.
-        notes::clear(&notes::notes_dir(&ws.inbox_dir()));
+        // Notes an earlier run never handed over (the app closed while they waited, #1620) wait for
+        // this run's builder; their old files go before the app can add any to this one.
+        let left = notes::take_left(&notes::notes_dir(&ws.inbox_dir()), opts.message.is_none());
         let root = ws.root.clone();
         // The project's conversation: the run keeps it in the folder as it goes.
         let feed = Arc::new(Mutex::new(feed::FeedLog::open(&ws)));
@@ -365,7 +364,13 @@ impl RebuildRun {
             })
             .map_err(|e| ToolError::internal(e.to_string()))?;
         let activity = feed.lock().unwrap_or_else(PoisonError::into_inner).activity();
-        Ok(RebuildRun { rx, stop, inbox, running, preview, notes, clean_room, feed, root, started: Instant::now(), activity })
+        let run = RebuildRun { rx, stop, inbox, running, preview, notes, clean_room, feed, root, started: Instant::now(), activity };
+        // Waiting again with files of their own: the builder takes them at its next step or after
+        // its turn, and a run that ends first hands them to the next one, as with any note.
+        for n in left {
+            run.add_note(n.text, n.shown, n.pictures);
+        }
+        Ok(run)
     }
 
     /// Add something while it works; the agent reads it at its next step, and only then does it
@@ -1407,21 +1412,6 @@ impl Worker {
             }
         }
     }
-}
-
-/// Notes an earlier run never handed over (the app closed while they waited, #1620) are this run's
-/// message when it has none, as a finished run's waiting notes start the next one. Read before
-/// the run clears the folder; a run with its own message leaves them to that clearing, since
-/// whoever started it already sent what was waiting.
-fn send_left_notes(opts: &mut RunOptions, dir: &Path) {
-    let left = notes::left(dir);
-    if opts.message.is_some() || left.is_empty() {
-        return;
-    }
-    let join = |part: fn(&notes::Left) -> &str| left.iter().map(part).collect::<Vec<_>>().join("\n\n");
-    opts.message = Some(join(|n| &n.text));
-    opts.shown = Some(join(|n| &n.shown));
-    opts.shown_pictures = left.iter().flat_map(|n| n.pictures.clone()).collect();
 }
 
 /// What the run says, and the status it leaves on the project, when it ends: paused, failed, or

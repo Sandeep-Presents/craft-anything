@@ -1241,9 +1241,11 @@ Gaps found while using the app for real projects.
       — claimed: AlexJoaquimPereira, branch bugfix/r2.9-note-just-ask; commit 78d3963
 - [x] A note still waiting when the app closes is sent by the next run instead of deleted when it
       starts (#1620): its hand-over file keeps the person's words (`notes::Left`), and a run started
-      without a message sends them. A file from before this has only the hand-over text, whose
-      Just-ask answers may be from the other mode, so it's still dropped. Unit-tested; not run live
-      — claimed: justinjohn0306, branch `bugfix/r2.9-notes-survive-restart`
+      without a message takes them as its own waiting notes, so they stay on disk until its builder
+      takes them; a folder it can't read is moved aside (`notes-unread-…`), not deleted. A file
+      from before this has only the hand-over text, whose Just-ask answers may be from the other
+      mode, so it's still dropped. Unit-tested; not run live
+      — claimed: justinjohn0306, branches `bugfix/r2.9-notes-survive-restart`, `bugfix/r2.9-left-notes-kept`
 - [x] Record which mode a builder's session ran in: `agent_session` is kept across modes, so a Clean
       room build or question can resume a session from a Deep build and carry what it read, and such
       a question's answer is recorded as asked in Clean room. Don't resume one for Clean room

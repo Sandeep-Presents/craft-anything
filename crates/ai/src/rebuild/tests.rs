@@ -1187,8 +1187,12 @@ fn needs_an_agent_app() {
     let d = tempfile::tempdir().unwrap();
     let hub = AiHub::with_stores(engine, d.path().join("settings.toml"), crate::KeyStore::file_only(d.path().join("keys.toml")));
     let ws = Workspace::create(d.path(), "x", "y", TargetRef::None).unwrap();
+    let dir = notes::notes_dir(&ws.inbox_dir());
+    let left = notes::Left { text: "make it blue".into(), shown: "make it blue".into(), pictures: Vec::new() };
+    notes::hand_over(&dir, 1, "make it blue", Some(&left)).unwrap();
     let err = RebuildRun::start(&hub, ws, RunOptions::default()).err().unwrap();
     assert!(err.message.contains("coding agent"), "{}", err.message);
+    assert!(dir.join("1.json").is_file(), "a run that can't start leaves an earlier run's notes waiting (#1620)");
 }
 
 /// A fork's own kind: recognised from its words, with its own stack and check.
@@ -4344,27 +4348,4 @@ fn a_later_run_opens_the_projects_program_again_for_the_builder() {
             assert!(opened.is_empty(), "Clean room opens nothing");
         }
     }
-}
-
-/// #1620: a note still waiting when the app closed is the next run's message, not deleted.
-#[test]
-fn a_note_left_waiting_is_the_next_runs_message() {
-    let d = tempfile::tempdir().unwrap();
-    let dir = notes::notes_dir(d.path());
-    let left = |text: &str, picture: &str| notes::Left { text: text.into(), shown: format!("{text}!"), pictures: vec![PathBuf::from(picture)] };
-    notes::hand_over(&dir, 1, "make it blue, with answers", Some(&left("make it blue", "a.png"))).unwrap();
-    notes::hand_over(&dir, 2, "add a footer", Some(&left("add a footer", "b.png"))).unwrap();
-    let mut continuing = RunOptions { continuing: true, ..RunOptions::default() };
-    send_left_notes(&mut continuing, &dir);
-    assert_eq!(continuing.message.as_deref(), Some("make it blue\n\nadd a footer"));
-    assert_eq!(continuing.shown.as_deref(), Some("make it blue!\n\nadd a footer!"));
-    assert_eq!(continuing.shown_pictures, [PathBuf::from("a.png"), PathBuf::from("b.png")]);
-    // A run started with a message: whoever started it sent what was waiting.
-    let mut asked = RunOptions { message: Some("new request".into()), ..RunOptions::default() };
-    send_left_notes(&mut asked, &dir);
-    assert_eq!(asked.message.as_deref(), Some("new request"));
-    assert!(asked.shown.is_none() && asked.shown_pictures.is_empty());
-    let mut nothing = RunOptions::default();
-    send_left_notes(&mut nothing, &d.path().join("none"));
-    assert!(nothing.message.is_none());
 }
