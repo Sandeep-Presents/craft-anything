@@ -870,6 +870,10 @@ Owner: open · Status: in progress
       or `craft-anything-cli uninstall` (#1115) — a background thread at start-up, so a delete
       over SSH can't hold up the window
       — claimed: AlexJoaquimPereira, branch bugfix/r2.2-startup-session-sweep
+- [x] A leftover OpenCode session that is already gone counts as deleted: `session delete` exits 1
+      with "Session not found" then, and the sweep retried it three times and told the person to run
+      a command that can't succeed (#1707)
+      — claimed: bflatastic, branch bugfix/r2.2-opencode-gone-session
 - [ ] A turn stopped before OpenCode's first event leaves no session id to delete: OpenCode names its
       session only in that event, so the session it may already have made stays (#1115, review on
       #1176). Needs a session id known before the run (one we create and pass in), if OpenCode allows it

@@ -119,7 +119,7 @@ impl AgentAdapter for OpenCode {
             None => self.process(program).args(args),
         };
         let out = proc.timeout(std::time::Duration::from_secs(30)).stdout_cap(64 * 1024).run().map_err(|e| e.with_remediation(by_hand.clone()))?;
-        if out.success {
+        if out.success || already_gone(&out) {
             Ok(())
         } else {
             Err(ToolError::new(
@@ -199,6 +199,13 @@ impl AgentAdapter for OpenCode {
         }
         events
     }
+}
+
+/// `opencode session delete` exits 1 with "Session not found" when the session is already gone
+/// (the person deleted it, or OpenCode did): nothing is left to resume, so that's done, not a
+/// failure to report and retry (#1707).
+fn already_gone(out: &craft_anything_platform::Output) -> bool {
+    [out.stdout_text(), out.stderr_text(), out.end_text()].iter().any(|t| t.contains("Session not found"))
 }
 
 /// Our tool server's config for `mcp`: the bytes of the `OPENCODE_CONFIG` file (both local and
@@ -552,6 +559,26 @@ mod tests {
         let e = OpenCode.discard_unfinished("no-such-opencode-here", "ses_1", None).unwrap_err();
         assert_ne!(e.code, ErrorCode::BadInput, "{e:?}");
         assert!(e.remediation.as_deref().unwrap_or_default().contains("opencode session delete --standalone ses_1"), "{e:?}");
+    }
+
+    /// A session OpenCode no longer has counts as deleted; any other failure still says what to do (#1707).
+    #[test]
+    fn a_session_already_gone_counts_as_deleted() {
+        let out = |code: i32, stdout: &str, stderr: &str| craft_anything_platform::Output {
+            code: Some(code),
+            success: code == 0,
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: stderr.as_bytes().to_vec(),
+            stdout_tail: Vec::new(),
+            stderr_tail: Vec::new(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+            duration: Duration::ZERO,
+        };
+        assert!(already_gone(&out(1, "", "Session not found: ses_1\n")));
+        assert!(already_gone(&out(1, "Session not found: ses_1\n", "")));
+        assert!(!already_gone(&out(1, "", "Error: database is locked\n")));
+        assert!(!already_gone(&out(1, "", "")));
     }
 
     #[test]
