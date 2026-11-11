@@ -1067,6 +1067,9 @@ Owner: open · Status: in progress
 - [x] Codex's and Grok Build's `config.toml` keep their Windows line endings when setup adds or
       removes our entry.
       — claimed: Plastic-time, branch bugfix/r2.2-toml-config-crlf
+- [x] Offer Claude Fable 5.2 (`claude-fable-5-2`) in Claude Code's model list and where the API's live
+      list can't be fetched, and price it ($8 / $40 per million tokens, cache reads $0.20) (#1462)
+      — claimed: bflatastic, branch feature/r2.2-claude-fable-5-2
 
 ### R2.4 Runtime study for apps and games (with consent)
 Owner: maintainers · Status: in progress

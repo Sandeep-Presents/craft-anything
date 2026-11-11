@@ -8,13 +8,15 @@ const fn p(input: f64, output: f64, cache_read: f64) -> Price {
     Price { input_per_mtok: input, output_per_mtok: output, cache_read_per_mtok: Some(cache_read), cache_write_per_mtok: None }
 }
 
-/// Built-in list prices (USD per million tokens, first-party API rates, checked 2026-10).
+/// Built-in list prices (USD per million tokens, first-party API rates, checked 2026-10; Fable 5.2
+/// checked 2026-11-10).
 pub fn builtin(model: &str) -> Option<Price> {
     let m = model.rsplit('/').next().unwrap_or(model);
     Some(match m {
         "claude-opus-5-5" => p(4.0, 20.0, 0.20),
         "claude-sonnet-5-5" => p(2.0, 10.0, 0.20),
         "claude-haiku-5-5" => p(0.10, 0.50, 0.01),
+        "claude-fable-5-2" => p(8.0, 40.0, 0.20),
         "claude-fable-5-1" => p(10.0, 50.0, 0.25),
         "claude-opus-5" => p(5.0, 25.0, 0.50),
         "claude-sonnet-5" => p(2.0, 10.0, 0.20),
@@ -76,6 +78,10 @@ mod tests {
         assert!((c - (4.0 + 2.0 + 0.2)).abs() < 1e-9, "{c}");
         assert_eq!(cost("anthropic/claude-sonnet-5-5", &Usage { output_tokens: 1_000_000, ..Default::default() }, &BTreeMap::new(), false), Some(10.0));
         assert_eq!(cost("mystery", &u, &BTreeMap::new(), false), None);
+        // #1462: Fable 5.2 is priced, and offered where the live model list can't be fetched.
+        let f = cost("claude-fable-5-2", &u, &BTreeMap::new(), false).unwrap();
+        assert!((f - (8.0 + 4.0 + 0.2)).abs() < 1e-9, "{f}");
+        assert!(crate::anthropic::MODELS.contains(&"claude-fable-5-2"));
         // Kimi K3.1 Pro through OpenRouter is priced by its model id.
         let k = cost("moonshotai/kimi-k3.1-pro", &Usage { input_tokens: 1_000_000, output_tokens: 1_000_000, ..Default::default() }, &BTreeMap::new(), false)
             .unwrap();

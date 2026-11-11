@@ -14,7 +14,7 @@ pub fn is_anthropic_api(address: &str) -> bool {
     crate::openai::https_host_path(address).is_some_and(|(host, _)| host.eq_ignore_ascii_case("api.anthropic.com"))
 }
 /// Offered in the model dropdown when the live list can't be fetched.
-pub const MODELS: &[&str] = &["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"];
+pub const MODELS: &[&str] = &["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-2"];
 /// Models that offer fewer effort levels than all five (Claude's effort guide), by model id
 /// prefix; any other model is sent the level as chosen.
 pub const EFFORT_LEVELS: &[(&str, &[Effort])] = &[
