@@ -232,9 +232,6 @@ only when it's green and a maintainer has fully reviewed it, code as well as wor
 - [ ] `website_tools::tests::a_browser_that_exits_at_once_is_reported_at_once` (engine) failed once
       on Windows with the whole engine suite running (66 s under load) and passes alone, three
       times in a row. Find what it times
-- [ ] `a_helper_is_judged_by_whether_it_runs` (ai crate) sometimes fails when several crates'
-      tests run at once and passes alone: it writes a script and runs it straight away, which a
-      busy machine can refuse while another test's child still holds the file open
 - [x] `a_remote_query_expands_only_the_remote_working_directory` compares the shell's `$PWD`
       with the fixture's canonical path, so macOS's `/var` → `/private/var` alias does not fail
       the test. Remote expansion and special-character quoting checks are retained — PR #949
@@ -434,9 +431,6 @@ been run live.
       not a folder inside `app/` (a brief can't say `cargo init`: not every builder's commands
       start in `app/`). Live, with calls after a sentence run too, the model then made
       `app/Cargo.toml` and the build compiled (#751)
-- [ ] The model reads file paths from the project folder and commands from `app/` as one base:
-      it ran `cargo init app` and `cd app && cargo build` after writing `app/Cargo.toml`. Say the
-      folder in `build_command_run`'s result (or its description) so the two can't be mixed up
 - [x] `usage.json` after a local build says about 4,200 input tokens and 6.5 s of work, while
       Ollama logged about six requests of 4,000-5,000 tokens each: find what it leaves out.
       Cached tokens: Ollama 0.40 reports them apart (`cached_tokens`), and the built-in loop's
@@ -455,8 +449,6 @@ been run live.
       then reached the model; on the CPU a second run wrote the call with a summary after it, so
       nothing ran (the open line on a call followed by a summary)
       — claimed: SoldierPePe, branch bugfix/r5.4-build-command-folder
-- [ ] `usage.json` after a local build says about 4,200 input tokens and 6.5 s of work, while
-      Ollama logged about six requests of 4,000-5,000 tokens each: find what it leaves out
 - [x] An assistant turn with no text sends an empty string, not `content: null`, which Ollama
       refused as `invalid message content type: <nil>` (#403, #536)
 - [x] Understand a tool call a model writes as JSON in its text (#417; implementation `dfe9a4db2dcb3e27edbd67311cbb4202584e7af6`). The fallback protocol reads
@@ -845,7 +837,6 @@ Owner: open · Status: in progress
 - [x] Supply and verify the run's Craft Anything MCP server in native OpenCode before enabling
       explicit model/thinking execution: a config file in `OPENCODE_CONFIG` with `run --standalone`
       (verified live locally). — claimed: advokat11, branch bugfix/r2.2-opencode-native-mcp
-- [ ] Hand native OpenCode runs over SSH the Craft Anything MCP server (the config file is local).
 - [x] Hand native OpenCode runs over SSH the Craft Anything MCP server (the config file is local).
       One `ssh` run checks `craft-anything-cli` is on the host's PATH and writes the config on the
       host (`~/.cache/craft-anything/`, mode 600, atomic rename); the builder fails fast with the
