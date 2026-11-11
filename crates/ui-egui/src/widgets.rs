@@ -309,7 +309,7 @@ pub fn confidence_badge(ui: &mut Ui, c: Option<Confidence>) -> Response {
     let t = Tokens::get(ui.ctx());
     let col = confidence_color(c);
     let font = theme::medium(theme::CAPTION);
-    let g = ui.painter().layout_no_wrap(tr(confidence_label(c)), font, col);
+    let g = crate::bidi::layout_no_wrap(ui, tr(confidence_label(c)), font, col);
     let size = Vec2::new(g.size().x + 26.0, g.size().y + 7.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
     let bg = Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), 34);
@@ -328,7 +328,7 @@ pub fn confidence_badge(ui: &mut Ui, c: Option<Confidence>) -> Response {
 /// A section caption in the label style, faint.
 pub fn caption(ui: &mut Ui, text: &str) {
     let t = Tokens::get(ui.ctx());
-    ui.label(theme::label_text(&tr(text), 12.0).color(t.text_faint));
+    crate::bidi::text(ui, theme::label_text(&tr(text), 12.0).color(t.text_faint));
 }
 
 /// A centred, calm empty state.
@@ -340,9 +340,9 @@ pub fn empty_state(ui: &mut Ui, icon: &str, title: &str, body: &str) {
         ui.painter().circle_filled(rect.center(), 22.0, t.raised);
         icons::paint(ui, rect, icon, 22.0, t.text_faint);
         ui.add_space(6.0);
-        ui.label(RichText::new(tr(title)).font(theme::medium(theme::SMALL)).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr(title)).font(theme::medium(theme::SMALL)).color(t.text_dim));
         if !body.is_empty() {
-            ui.label(RichText::new(tr(body)).color(t.text_faint).size(theme::CAPTION));
+            crate::bidi::text(ui, RichText::new(tr(body)).color(t.text_faint).size(theme::CAPTION));
         }
         ui.add_space(12.0);
     });
@@ -363,7 +363,7 @@ pub fn big_card(ui: &mut Ui, size: Vec2, icon: &str, title: &str, blurb: &str, b
     ui.painter().rect_filled(icon_rect, t.radius, t.accent_soft);
     icons::paint(ui, icon_rect, icon, 28.0, t.accent_ink);
     if let Some(b) = badge {
-        let g = ui.painter().layout_no_wrap(tr(b), theme::medium(theme::TINY), t.text_dim);
+        let g = crate::bidi::layout_no_wrap(ui, tr(b), theme::medium(theme::TINY), t.text_dim);
         let br = egui::Rect::from_min_size(egui::pos2(rect.right() - g.size().x - 34.0, rect.top() + 22.0), g.size() + Vec2::new(16.0, 8.0));
         ui.painter().rect_filled(br, t.r_sm(), t.hover);
         ui.painter().galley_with_override_text_color(br.center() - g.size() / 2.0, g, t.text_dim);
@@ -392,8 +392,8 @@ pub fn glossary_word(ui: &mut Ui, word: &str, meaning: &str, font: egui::FontId)
         x += 4.0;
     }
     resp.on_hover_ui(|ui| {
-        ui.label(RichText::new(word.trim()).font(theme::semibold(theme::SMALL)));
-        ui.label(tr(meaning));
+        crate::bidi::text(ui, RichText::new(word.trim()).font(theme::semibold(theme::SMALL)));
+        crate::bidi::text(ui, tr(meaning));
     })
 }
 
@@ -599,14 +599,14 @@ pub fn working_since(ui: &mut Ui, title: &str, detail: Option<&str>, began: Opti
             ui.painter().add(egui::Shape::line(arc, Stroke::new(2.5, t.accent)));
             ui.add_space(4.0);
             ui.vertical(|ui| {
-                ui.label(RichText::new(tr(title)).font(theme::semibold(theme::BODY)).color(t.text));
+                crate::bidi::text(ui, RichText::new(tr(title)).font(theme::semibold(theme::BODY)).color(t.text));
                 if !sub.is_empty() {
-                    ui.add(egui::Label::new(RichText::new(sub).color(t.text_dim).size(theme::SMALL)).wrap());
+                    crate::bidi::label(ui, RichText::new(sub).color(t.text_dim).size(theme::SMALL));
                 }
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let clock = crate::usage::duration_words(std::time::Duration::from_secs(secs));
-                ui.label(RichText::new(clock).font(theme::mono(12.5)).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(clock).font(theme::mono(12.5)).color(t.text_faint));
             });
         });
         // An indeterminate sweep along the bottom: movement even when nothing new has arrived.

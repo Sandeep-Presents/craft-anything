@@ -109,6 +109,32 @@ The Korean catalog `ko.tsv` uses 클린룸 (Clean room), 심층 (Deep), 분석 /
 (Study / Build / Check / Ready), 근거 (Evidence) and 프로젝트 (Project); short labels are nouns and
 sentences use the formal 합니다 style.
 
+## Right-to-left text
+
+egui 0.36 joins Arabic letters but doesn't reorder bidirectional text: it places each word left
+to right, so an Arabic sentence showed its words in reverse order, mixed Arabic/English lines in
+a jumble, and the caret, selection and mouse in a text field all worked from that reversed
+layout. `ui-egui/src/bidi.rs` breaks text into lines itself (egui gives an Arabic word more
+glyphs than letters, so a galley's glyph counts can't say where rows break), reorders each line
+with the Unicode Bidirectional Algorithm (`unicode-bidi`), and aligns right-to-left paragraphs to
+the right. A paragraph's direction is its first strong letter's, as in browsers.
+
+Where it's used: the labels that can show the person's or an AI's text or names: the
+conversation, project and target names, plans, errors, evidence (`ui.label` calls and single-line
+`Label::new(..).wrap()` / `.truncate()` labels go through `bidi::text`, `bidi::label` and
+`bidi::truncated`; a cut right-to-left line keeps its start and puts "…" on the left); text painted
+directly (sidebar project names, the workbench, the palette); code excerpts, which keep a
+left-to-right base (`bidi::code_text`); and the prompt box, where `bidi` draws the text, caret and
+selection over egui's hidden ones, places the caret from clicks and drags, and swaps Left and Right
+in right-to-left text. Some labels with fixed English text (built over several lines) still use
+egui directly, which is fine until a right-to-left translation exists. Text with no right-to-left
+letters takes egui's usual path, unchanged.
+
+Limits: right-to-left labels aren't selectable (a selection would copy the visual order; messages
+have a copy button) and skip the glossary underlines; inside one Arabic word the caret and
+selection edges are approximate (a part of a word is measured on its own); other text fields
+(renaming, settings), buttons, menus and tooltips still draw right-to-left text left to right.
+
 ## Spanish
 
 **Español** (`es`) uses informal "tú", Mexican vocabulary (*agregar*, *computadora*, *presiona*) and

@@ -136,7 +136,7 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
     popup.close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
         egui::Grid::new("approvals").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
             for row in ACTION_KINDS {
-                ui.label(RichText::new(tr(label(row.kind))).size(theme::SMALL));
+                crate::bidi::text(ui, RichText::new(tr(label(row.kind))).size(theme::SMALL));
                 let now = chosen.get(&row.kind).copied();
                 let sel = CHOICES.iter().position(|(_, c)| *c == now).unwrap_or(0);
                 // Every row has the same labels, which `segmented` makes its ids from.
@@ -150,7 +150,7 @@ pub(crate) fn menu(app: &mut CraftApp, ui: &mut Ui, root: &Path) {
         });
         ui.add_space(4.0);
         let note = tr("Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.");
-        ui.add(egui::Label::new(RichText::new(note).size(theme::SMALL).color(t.text_faint)).wrap());
+        crate::bidi::label(ui, RichText::new(note).size(theme::SMALL).color(t.text_faint));
     });
     if let Some((kind, choice)) = picked {
         app.set_approval(root, kind, choice);

@@ -162,7 +162,7 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
                                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, true, &name));
                                 resp.on_hover_ui(|ui| {
                                     ui.add(egui::Image::new((tex.id(), fit(tex.size_vec2(), PREVIEW_HOVER))));
-                                    ui.label(RichText::new(p.display().to_string()).size(theme::CAPTION));
+                                    crate::bidi::text(ui, RichText::new(p.display().to_string()).size(theme::CAPTION));
                                 });
                                 let x = egui::Rect::from_min_size(rect.right_top() + egui::vec2(-26.0, 4.0), egui::Vec2::splat(22.0));
                                 ui.painter().circle_filled(x.center(), 10.0, t.card);
@@ -181,7 +181,7 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
                                     .show(ui, |ui| {
                                         ui.horizontal(|ui| {
                                             icons::show(ui, "paperclip", 13.0, t.icon);
-                                            ui.add(egui::Label::new(RichText::new(&name).size(theme::SMALL)).truncate()).on_hover_text(p.display().to_string());
+                                            crate::bidi::truncated(ui, RichText::new(&name).size(theme::SMALL)).on_hover_text(p.display().to_string());
                                             if icons::button(ui, "x", 24.0, false, &remove).clicked() {
                                                 out.remove = Some(i);
                                             }
@@ -223,23 +223,31 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
             ui.spacing_mut().scroll.fade.strength = 0.0;
             let tallest = tallest_text(line, b.rows.1, ui.ctx().content_rect().height());
             egui::ScrollArea::vertical().id_salt(id.with("scroll")).max_height(tallest + 4.0).stick_to_bottom(true).show(ui, |ui| {
-                let r = ui.add(
-                    egui::TextEdit::multiline(text)
-                        .id(id)
-                        .hint_text(&b.hint)
-                        .frame(egui::Frame::NONE)
-                        .desired_rows(b.rows.0)
-                        .desired_width(f32::INFINITY)
-                        .font(egui::FontId::proportional(b.font_size))
-                        // Enter sends; Shift+Enter starts a new line.
-                        .return_key(Some(egui::KeyboardShortcut::new(egui::Modifiers::SHIFT, egui::Key::Enter)))
-                        .event_filter(egui::EventFilter {
-                            tab: completing.is_some(),
-                            horizontal_arrows: true,
-                            vertical_arrows: true,
-                            ..egui::EventFilter::default()
-                        }),
-                );
+                // egui's text field lays Arabic words out left to right; for right-to-left text
+                // its own text, caret and selection are hidden and `bidi` draws them in order.
+                let font = egui::FontId::proportional(b.font_size);
+                let ink = ui.visuals().override_text_color.unwrap_or_else(|| ui.visuals().widgets.inactive.text_color());
+                let rtl = crate::bidi::text_edit_style(ui, text);
+                crate::bidi::arrow_keys_follow_direction(ui, id, text);
+                let output = egui::TextEdit::multiline(text)
+                    .id(id)
+                    .hint_text(&b.hint)
+                    .frame(egui::Frame::NONE)
+                    .desired_rows(b.rows.0)
+                    .desired_width(f32::INFINITY)
+                    .font(font.clone())
+                    .text_color_opt(rtl.then_some(egui::Color32::TRANSPARENT))
+                    // Enter sends; Shift+Enter starts a new line.
+                    .return_key(Some(egui::KeyboardShortcut::new(egui::Modifiers::SHIFT, egui::Key::Enter)))
+                    .event_filter(egui::EventFilter {
+                        tab: completing.is_some(),
+                        horizontal_arrows: true,
+                        vertical_arrows: true,
+                        ..egui::EventFilter::default()
+                    })
+                    .show(ui);
+                crate::bidi::paint_text_edit(ui, &output, text, font, ink);
+                let r = output.response.response;
                 widgets::named(r.clone(), b.name);
                 if r.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift) && !text.trim().is_empty() {
                     out.send = true;
@@ -253,7 +261,7 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
             }
             // Hint: available slash commands when typing one.
             if text.trim_start().starts_with('/') && !text.trim().contains(' ') {
-                ui.label(RichText::new(format!("{} {}", tr("Commands:"), crate::slash::names())).size(theme::CAPTION).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(format!("{} {}", tr("Commands:"), crate::slash::names())).size(theme::CAPTION).color(t.text_faint));
             }
             ui.add_space(4.0);
             ui.horizontal(|ui| {
@@ -262,7 +270,7 @@ pub fn show(ui: &mut Ui, text: &mut String, attachments: &[PathBuf], b: PromptBo
                 {
                     out.attach = true;
                 }
-                ui.label(RichText::new(tr("Enter to send · Shift+Enter for a new line")).size(theme::CAPTION).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(tr("Enter to send · Shift+Enter for a new line")).size(theme::CAPTION).color(t.text_faint));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if b.send {
                         let ready = !text.trim().is_empty();

@@ -25,6 +25,9 @@ eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
+# Unicode Bidirectional Algorithm (UAX #9) for right-to-left text, which egui does not reorder yet
+# (see `bidi`); pure Rust, no dependencies, MIT OR Apache-2.0.
+unicode-bidi = "0.3.18"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Native open/save dialogs, always shown from a worker thread (never blocks a frame).

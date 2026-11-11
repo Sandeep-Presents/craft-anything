@@ -104,9 +104,9 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
         mine(app, ui, w);
         return;
     }
-    ui.label(theme::heading(tr("What do you want to make?"), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr("What do you want to make?"), theme::TITLE));
     ui.add_space(6.0);
-    ui.label(RichText::new(tr("Choose what to recreate, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr("Choose what to recreate, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
     ui.add_space(16.0);
     widgets::card(&t).inner_margin(Margin::same(20)).show(ui, |ui| {
         ui.set_width(w - 50.0);
@@ -162,9 +162,9 @@ pub fn hero(app: &mut CraftApp, ui: &mut Ui, w: f32) {
 /// edits in place, and what to change. There's no original to pick, so no Clean room / Deep choice.
 fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     let t = Tokens::get(ui.ctx());
-    ui.label(theme::heading(tr("Work on a project you already have"), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr("Work on a project you already have"), theme::TITLE));
     ui.add_space(6.0);
-    ui.label(RichText::new(tr("Pick its folder, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr("Pick its folder, say what you want, then press Start.")).size(theme::LEAD).color(t.text_dim));
     ui.add_space(16.0);
     widgets::card(&t).inner_margin(Margin::same(20)).show(ui, |ui| {
         ui.set_width(w - 50.0);
@@ -184,12 +184,12 @@ fn mine(app: &mut CraftApp, ui: &mut Ui, w: f32) {
                 let place = f.display().to_string();
                 ui.horizontal(|ui| {
                     icons::show(ui, "folder", 16.0, t.icon);
-                    ui.add(egui::Label::new(RichText::new(&place).font(theme::semibold(theme::BODY))).truncate()).on_hover_text(&place);
+                    crate::bidi::truncated(ui, RichText::new(&place).font(theme::semibold(theme::BODY))).on_hover_text(&place);
                 });
                 ui.horizontal_wrapped(|ui| {
                     ui.add_space(24.0);
-                    ui.label(RichText::new(tr("your files there are the app, edited in place")).size(theme::SMALL).color(t.text_dim));
-                    ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
+                    crate::bidi::text(ui, RichText::new(tr("your files there are the app, edited in place")).size(theme::SMALL).color(t.text_dim));
+                    crate::bidi::text(ui, RichText::new("·").size(theme::SMALL).color(t.text_faint));
                     if widgets::link(ui, "Pick another folder…").clicked() {
                         app.pick(Pick::OwnProject);
                     }
@@ -269,9 +269,9 @@ fn engine_choices(app: &mut CraftApp, ui: &mut Ui) {
 /// "Just look inside": what to look at, each opening straight away. Nothing is built or run.
 fn look(app: &mut CraftApp, ui: &mut Ui, w: f32) {
     let t = Tokens::get(ui.ctx());
-    ui.label(theme::heading(tr("What do you want to look inside?"), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr("What do you want to look inside?"), theme::TITLE));
     ui.add_space(6.0);
-    ui.label(RichText::new(tr("We only read it; nothing runs. Every answer shows how sure we are.")).size(theme::LEAD).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr("We only read it; nothing runs. Every answer shows how sure we are.")).size(theme::LEAD).color(t.text_dim));
     ui.add_space(22.0);
     widgets::card(&t).inner_margin(Margin::same(24)).show(ui, |ui| {
         ui.set_width(w - 50.0);
@@ -307,7 +307,7 @@ fn step_title(ui: &mut Ui, n: u32, text: &str) {
         let g = widgets::label_galley(ui, &n.to_string(), 13.0, t.text);
         ui.painter().galley_with_override_text_color(r.center() - g.size() / 2.0, g, t.text);
         ui.add_space(4.0);
-        ui.label(theme::heading(tr(text), theme::SECTION));
+        crate::bidi::text(ui, theme::heading(tr(text), theme::SECTION));
     });
 }
 
@@ -364,15 +364,15 @@ fn choose_target(app: &mut CraftApp, ui: &mut Ui) {
     if let TargetRef::Local { path } = m.target.clone() {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
-            ui.label(RichText::new(tr("You chose:")).size(theme::BODY).color(t.text_dim));
+            crate::bidi::text(ui, RichText::new(tr("You chose:")).size(theme::BODY).color(t.text_dim));
             // A long name (an APK from a mirror) is cut short, whole on hover, so the row never widens the page.
             let name = m.target.label();
-            ui.add(egui::Label::new(RichText::new(name.clone()).font(theme::semibold(theme::BODY))).truncate()).on_hover_text(name);
-            ui.add(egui::Label::new(RichText::new(crate::short_path(&path)).color(t.text_faint).size(theme::SMALL)).truncate());
+            crate::bidi::truncated(ui, RichText::new(name.clone()).font(theme::semibold(theme::BODY))).on_hover_text(name);
+            crate::bidi::truncated(ui, RichText::new(crate::short_path(&path)).color(t.text_faint).size(theme::SMALL));
         });
     } else if website {
         ui.add_space(16.0);
-        ui.label(RichText::new(tr("Type the website's address:")).size(theme::BODY).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr("Type the website's address:")).size(theme::BODY).color(t.text_dim));
         ui.add_space(6.0);
         let r = ui.add(
             egui::TextEdit::singleline(&mut m.url)
@@ -389,7 +389,7 @@ fn choose_target(app: &mut CraftApp, ui: &mut Ui) {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 icons::show(ui, "triangle-alert", 16.0, t.danger);
-                ui.label(RichText::new(tr(problem)).color(t.danger).size(theme::BODY));
+                crate::bidi::text(ui, RichText::new(tr(problem)).color(t.danger).size(theme::BODY));
             });
         }
     }
@@ -400,8 +400,8 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     // The app's one setting (the title bar's switch), not this project's: said where it's chosen.
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(tr("How closely may Craft Anything look at it?")).size(theme::BODY).color(t.text_dim));
-        ui.label(RichText::new(tr("For everything you make, like the switch in the title bar.")).size(theme::SMALL).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("How closely may Craft Anything look at it?")).size(theme::BODY).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr("For everything you make, like the switch in the title bar.")).size(theme::SMALL).color(t.text_faint));
     });
     ui.add_space(6.0);
     let deep = app.settings.deep_mode;
@@ -431,7 +431,7 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
         ui.horizontal_wrapped(|ui| {
             icons::show(ui, "cpu", 16.0, t.icon);
             let line = format!("{} {}", crate::engine_ui::ghidra_memory_words(app), tr("More makes a big program's first look faster."));
-            ui.label(RichText::new(line).size(theme::SMALL).color(t.text_dim)).on_hover_text(crate::engine_ui::ghidra_memory_guide());
+            crate::bidi::text(ui, RichText::new(line).size(theme::SMALL).color(t.text_dim)).on_hover_text(crate::engine_ui::ghidra_memory_guide());
             if widgets::link(ui, "Change").clicked() {
                 app.state.settings_open = true;
                 app.state.settings_tab = crate::state::SettingsTab::Engines;
@@ -442,7 +442,10 @@ fn look_inside(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             icons::show(ui, "triangle-alert", 16.0, t.warning);
-            ui.label(RichText::new(tr("Ghidra isn't on this computer yet, so the built-in decompiler stands in.")).size(theme::SMALL).color(t.text_dim));
+            crate::bidi::text(
+                ui,
+                RichText::new(tr("Ghidra isn't on this computer yet, so the built-in decompiler stands in.")).size(theme::SMALL).color(t.text_dim),
+            );
             if app.ghidra.job.is_none() && widgets::secondary(ui, Some("download"), "Get Ghidra").clicked() {
                 app.state.modal = Some(crate::state::Modal::Ghidra);
             }
@@ -460,7 +463,7 @@ fn suggestions(app: &mut CraftApp, ui: &mut Ui) {
     };
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = Vec2::new(8.0, 8.0);
-        ui.label(RichText::new(tr("Ideas:")).size(theme::BODY).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr("Ideas:")).size(theme::BODY).color(t.text_dim));
         for s in list.iter().take(2) {
             if widgets::suggestion(ui, s).clicked() {
                 app.state.make.request = tr(s);

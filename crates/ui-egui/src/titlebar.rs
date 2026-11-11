@@ -156,7 +156,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         if ui.add(crate::app_icon(22.0 * s).sense(egui::Sense::click())).on_hover_text(tr("Home")).clicked() {
             app.state.screen = Screen::Home;
         }
-        ui.label(theme::label_text("Craft Anything", label(12.0, s)).color(t.text).strong());
+        crate::bidi::text(ui, theme::label_text("Craft Anything", label(12.0, s)).color(t.text).strong());
         let in_project = app.state.screen == Screen::Project;
         let project = if in_project { app.workspace.as_ref().map(|w| w.manifest.name.clone()) } else { app.view.project.clone() };
         let target = if in_project { None } else { app.view.active_target().map(|t| (t.name.clone(), t.kind)) };
@@ -164,14 +164,14 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
             rule(ui);
         }
         if let Some(p) = project {
-            ui.label(theme::label_text(&p, label(12.0, s)).color(t.text_dim));
+            crate::bidi::text(ui, theme::label_text(&p, label(12.0, s)).color(t.text_dim));
             if target.is_some() {
-                ui.label(RichText::new("/").color(t.text_faint));
+                crate::bidi::text(ui, RichText::new("/").color(t.text_faint));
             }
         }
         if let Some((name, kind)) = target {
             icons::show(ui, crate::kind_icon(kind), 14.0 * s, t.icon);
-            ui.add(egui::Label::new(RichText::new(name).font(theme::mono(theme::CAPTION * s)).color(t.text)).truncate()).on_hover_text(tr(kind.plain()));
+            crate::bidi::truncated(ui, RichText::new(name).font(theme::mono(theme::CAPTION * s)).color(t.text)).on_hover_text(tr(kind.plain()));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
@@ -244,8 +244,8 @@ fn usage_pill(app: &CraftApp, ui: &mut Ui) {
     let r = widgets::pill_sized(ui, &text, t.text_dim, t.raised, label(11.0, scale(ui.ctx())));
     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &text));
     r.on_hover_ui(|ui| {
-        ui.label(RichText::new(tr("AI use this session")).font(theme::semibold(theme::SMALL)));
-        ui.label(crate::usage::explain(u, "Since Craft Anything opened."));
+        crate::bidi::text(ui, RichText::new(tr("AI use this session")).font(theme::semibold(theme::SMALL)));
+        crate::bidi::text(ui, crate::usage::explain(u, "Since Craft Anything opened."));
     });
 }
 
@@ -299,13 +299,20 @@ fn deep_toggle(app: &mut CraftApp, ui: &mut Ui) {
     widgets::focus_ring(ui, &resp, rect);
     resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, !deep, tr("Clean room")));
     let resp = resp.on_hover_ui(|ui| {
-        ui.label(RichText::new(tr("Clean room or Deep")).font(theme::semibold(theme::SMALL)));
-        ui.label(tr(
-            "Clean room: nothing inside the original is read. We work from what you can see: pictures, the page as a visitor sees it, and watching it run.",
-        ));
-        ui.label(tr("Deep: we read its code, files and page source with every tool we have, and with Ghidra when it's installed. Click to switch."));
+        crate::bidi::text(ui, RichText::new(tr("Clean room or Deep")).font(theme::semibold(theme::SMALL)));
+        crate::bidi::text(
+            ui,
+            tr("Clean room: nothing inside the original is read. We work from what you can see: pictures, the page as a visitor sees it, and watching it run."),
+        );
+        crate::bidi::text(
+            ui,
+            tr("Deep: we read its code, files and page source with every tool we have, and with Ghidra when it's installed. Click to switch."),
+        );
         if missing {
-            ui.label(RichText::new(tr("Ghidra isn't installed, so the built-in decompiler stands in. Get it in Settings → Engines.")).color(t.warning));
+            crate::bidi::text(
+                ui,
+                RichText::new(tr("Ghidra isn't installed, so the built-in decompiler stands in. Get it in Settings → Engines.")).color(t.warning),
+            );
         }
     });
     if resp.clicked() {

@@ -149,9 +149,19 @@ pub fn card(ui: &mut Ui, a: &mut Asked, glossary: bool) {
             toggle |= icons::button(ui, if a.collapsed { "chevron-right" } else { "chevron-down" }, 22.0, false, name).clicked();
             let (icon, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
             icons::paint(ui, icon, "circle-help", 16.0, t.icon);
-            let line = egui::Label::new(RichText::new(&a.question).font(theme::semibold(theme::BODY))).sense(egui::Sense::click()).selectable(false);
-            let line = if a.collapsed { line.truncate() } else { line.wrap() };
-            toggle |= ui.add(line).on_hover_cursor(egui::CursorIcon::PointingHand).clicked();
+            let question = RichText::new(&a.question).font(theme::semibold(theme::BODY));
+            let line = if crate::bidi::has_rtl(&a.question) {
+                egui::Label::new(crate::bidi::galley(ui, question, a.collapsed))
+            } else if a.collapsed {
+                egui::Label::new(question).truncate()
+            } else {
+                egui::Label::new(question).wrap()
+            };
+            let line = line.sense(egui::Sense::click()).selectable(false);
+            let response = ui.add(line).on_hover_cursor(egui::CursorIcon::PointingHand);
+            // A right-to-left question's galley is in visual order: screen readers get its own order.
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), a.question.as_str()));
+            toggle |= response.clicked();
         });
         if toggle {
             a.collapsed = !a.collapsed;
@@ -167,14 +177,15 @@ pub fn card(ui: &mut Ui, a: &mut Asked, glossary: bool) {
                 ui.add_space(4.0);
                 let from = if ans.from_session { tr("from the builder's own memory of the build") } else { tr("from the project's files") };
                 let cost = ans.cost_usd.map(|c| format!(" · ${c:.2}")).unwrap_or_default();
-                ui.label(
+                crate::bidi::text(
+                    ui,
                     RichText::new(format!("{} {} · {}{cost}", tr("Just a question: nothing was changed. Answered by"), ans.backend, from))
                         .color(t.text_faint)
                         .size(theme::SMALL),
                 );
             }
             Some(Err(why)) => {
-                ui.add(egui::Label::new(RichText::new(format!("{} {why}", tr("Couldn't answer:"))).color(t.danger)).wrap());
+                crate::bidi::label(ui, RichText::new(format!("{} {why}", tr("Couldn't answer:"))).color(t.danger));
             }
         }
     });

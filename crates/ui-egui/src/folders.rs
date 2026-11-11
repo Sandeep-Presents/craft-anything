@@ -31,23 +31,23 @@ pub fn make_line(app: &mut CraftApp, ui: &mut Ui) {
     // Where it goes (and what the files there are), then what can be changed, each on its own line.
     ui.horizontal(|ui| {
         crate::icons::show(ui, "folder", 14.0, t.text_faint);
-        ui.label(RichText::new(tr("Saved in")).size(theme::SMALL).color(t.text_dim));
-        ui.add(egui::Label::new(RichText::new(&place).size(theme::SMALL).color(t.text)).truncate()).on_hover_text(&place);
+        crate::bidi::text(ui, RichText::new(tr("Saved in")).size(theme::SMALL).color(t.text_dim));
+        crate::bidi::truncated(ui, RichText::new(&place).size(theme::SMALL).color(t.text)).on_hover_text(&place);
     });
     ui.horizontal_wrapped(|ui| {
         ui.add_space(22.0);
         if let Some(how) = how {
-            ui.label(RichText::new(how).size(theme::SMALL).color(t.text_dim));
+            crate::bidi::text(ui, RichText::new(how).size(theme::SMALL).color(t.text_dim));
             if widgets::link(ui, "Change").clicked() {
                 app.state.modal = Some(Modal::ExistingFiles);
             }
-            ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
+            crate::bidi::text(ui, RichText::new("·").size(theme::SMALL).color(t.text_faint));
         }
         if widgets::link(ui, if picked { "Pick another folder…" } else { "Choose a folder…" }).clicked() {
             app.pick(Pick::ProjectFolder);
         }
         if picked {
-            ui.label(RichText::new("·").size(theme::SMALL).color(t.text_faint));
+            crate::bidi::text(ui, RichText::new("·").size(theme::SMALL).color(t.text_faint));
             if widgets::link(ui, "Use the projects folder").clicked() {
                 clear(app);
             }
@@ -151,13 +151,13 @@ pub fn existing_modal(app: &mut CraftApp, ui: &mut Ui, close: &mut bool) {
         return;
     };
     let (names, count) = app.state.make.folder_files.clone().unwrap_or_default();
-    ui.label(theme::heading(tr("This folder already has files"), theme::SECTION));
+    crate::bidi::text(ui, theme::heading(tr("This folder already has files"), theme::SECTION));
     ui.add_space(4.0);
     let some = names.iter().take(4).cloned().collect::<Vec<_>>().join(", ");
     let more = if count > 4 { trf(" and {n} more", &[("n", &(count - 4).to_string())]) } else { String::new() };
-    ui.add(egui::Label::new(RichText::new(format!("{}: {some}{more}.", folder.display())).color(t.text_dim)).wrap());
+    crate::bidi::label(ui, RichText::new(format!("{}: {some}{more}.", folder.display())).color(t.text_dim));
     ui.add_space(4.0);
-    ui.label(RichText::new(tr("How should the builder use them?")).color(t.text));
+    crate::bidi::text(ui, RichText::new(tr("How should the builder use them?")).color(t.text));
     ui.add_space(12.0);
     let current = app.state.make.existing;
     let size = Vec2::new(268.0, 168.0);

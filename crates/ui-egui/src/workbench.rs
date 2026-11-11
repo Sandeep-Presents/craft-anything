@@ -168,7 +168,7 @@ fn rail_icons(app: &mut CraftApp, ui: &mut Ui) {
 fn panel_title(ui: &mut Ui, title: &str, count: Option<usize>) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
-        ui.label(theme::label_text(&tr(title), 11.5).color(t.text));
+        crate::bidi::text(ui, theme::label_text(&tr(title), 11.5).color(t.text));
         if let Some(n) = count {
             widgets::pill(ui, &n.to_string(), t.text_dim, t.raised);
         }
@@ -231,7 +231,7 @@ fn rail_list(app: &mut CraftApp, ui: &mut Ui, kind: RailKind, fill: &Fill) {
         Fill::Loading => {
             ui.horizontal(|ui| {
                 ui.add(crate::widgets::Spinner::new().color(t.accent));
-                ui.label(RichText::new(tr("Loading…")).color(t.text_dim));
+                crate::bidi::text(ui, RichText::new(tr("Loading…")).color(t.text_dim));
             });
         }
         Fill::Unavailable(reason) => {
@@ -282,15 +282,15 @@ fn list_row(ui: &mut Ui, r: &Value, selected: bool, h: f32) -> bool {
     resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, &name));
     let x = rect.left() + 8.0;
     if let Some(a) = &addr {
-        let g = ui.painter().layout_no_wrap(a.clone(), theme::mono(11.0), if selected { t.accent_ink } else { t.text_faint });
+        let g = crate::bidi::layout_no_wrap(ui, a.clone(), theme::mono(11.0), if selected { t.accent_ink } else { t.text_faint });
         ui.painter().galley(egui::pos2(x, rect.top() + 3.0), g, t.text_faint);
     }
     let name_y = if addr.is_some() { rect.top() + 17.0 } else { rect.center().y - 8.0 };
-    let name_g = ui.painter().layout_no_wrap(truncate(&name, 120), theme::mono(12.5), t.text);
+    let name_g = crate::bidi::layout_no_wrap(ui, truncate(&name, 120), theme::mono(12.5), t.text);
     let clip = rect.shrink2(Vec2::new(6.0, 0.0));
     ui.painter().with_clip_rect(clip).galley(egui::pos2(x, name_y), name_g, t.text);
     if let Some(d) = row_detail(r) {
-        let g = ui.painter().layout_no_wrap(d, egui::FontId::proportional(theme::TINY), t.text_faint);
+        let g = crate::bidi::layout_no_wrap(ui, d, egui::FontId::proportional(theme::TINY), t.text_faint);
         let pos = egui::pos2(rect.right() - g.size().x - 8.0, rect.top() + 4.0);
         ui.painter().with_clip_rect(clip).galley(pos, g, t.text_faint);
     }
@@ -334,8 +334,9 @@ fn targets_list(app: &mut CraftApp, ui: &mut Ui) {
         let ir = egui::Rect::from_min_size(rect.min + Vec2::new(8.0, 10.0), Vec2::splat(30.0));
         ui.painter().rect_filled(ir, t.radius_sm, t.raised);
         icons::paint(ui, ir, crate::kind_icon(tgt.kind), 16.0, if active { t.accent_ink } else { t.icon });
-        ui.painter().text(egui::pos2(ir.right() + 10.0, rect.top() + 8.0), egui::Align2::LEFT_TOP, &tgt.name, theme::medium(theme::SMALL), t.text);
-        ui.painter().text(
+        crate::bidi::paint_line(ui, egui::pos2(ir.right() + 10.0, rect.top() + 8.0), egui::Align2::LEFT_TOP, &tgt.name, theme::medium(theme::SMALL), t.text);
+        crate::bidi::paint_line(
+            ui,
             egui::pos2(ir.right() + 10.0, rect.top() + 27.0),
             egui::Align2::LEFT_TOP,
             format!("{} · {}", tgt.kind.id(), crate::human_bytes(tgt.bytes.len())),
@@ -446,7 +447,7 @@ fn no_target(app: &mut CraftApp, ui: &mut Ui) {
         });
         ui.add_space(10.0);
         let t = Tokens::get(ui.ctx());
-        ui.label(RichText::new(tr("Tip: press Ctrl/⌘ K to run any tool.")).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("Tip: press Ctrl/⌘ K to run any tool.")).color(t.text_faint));
     });
 }
 
@@ -470,7 +471,7 @@ fn tool_view(app: &mut CraftApp, ui: &mut Ui, tab: CenterTab) {
         Fill::Loading => {
             ui.horizontal(|ui| {
                 ui.add(crate::widgets::Spinner::new().color(Tokens::get(ui.ctx()).accent));
-                ui.label(tr("Working…"));
+                crate::bidi::text(ui, tr("Working…"));
             });
         }
         Fill::Unavailable(reason) => widgets::empty_state(ui, tab.icon(), "Not available yet", &reason),
@@ -480,7 +481,7 @@ fn tool_view(app: &mut CraftApp, ui: &mut Ui, tab: CenterTab) {
         Fill::Ready(e) => {
             ui.horizontal(|ui| {
                 widgets::confidence_badge(ui, Some(e.confidence));
-                ui.label(RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim));
+                crate::bidi::text(ui, RichText::new(&e.summary).color(Tokens::get(ui.ctx()).text_dim));
             });
             ui.add_space(6.0);
             render_result(ui, &e.result, tab);
@@ -525,7 +526,7 @@ fn code_view(ui: &mut Ui, code: &str, t: &Tokens) {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 12.0;
                     ui.add_sized(Vec2::new(38.0, row_h), egui::Label::new(RichText::new(format!("{:>4}", i + 1)).font(theme::mono(12.0)).color(t.text_faint)));
-                    ui.label(highlight(line, t));
+                    crate::bidi::code_text(ui, highlight(line, t));
                 });
             }
         });
@@ -631,7 +632,7 @@ fn hex_view(app: &mut CraftApp, ui: &mut Ui) {
     let mut goto: String = ui.data_mut(|d| d.get_temp::<String>(goto_id).unwrap_or_default());
     let mut scroll_to: Option<usize> = None;
     ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("{} · {}", target.name, crate::human_bytes(bytes.len()))).font(theme::medium(theme::CAPTION)));
+        crate::bidi::text(ui, RichText::new(format!("{} · {}", target.name, crate::human_bytes(bytes.len()))).font(theme::medium(theme::CAPTION)));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let r = ui.add(
                 egui::TextEdit::singleline(&mut goto)
@@ -680,7 +681,7 @@ fn hex_view(app: &mut CraftApp, ui: &mut Ui) {
                 }
                 let ascii: String = chunk.iter().map(|b| if b.is_ascii_graphic() || *b == b' ' { *b as char } else { '·' }).collect();
                 job.append(&format!(" {ascii}"), 0.0, egui::TextFormat { font_id: f.clone(), color: t.text_dim, ..Default::default() });
-                ui.label(job);
+                crate::bidi::text(ui, job);
             }
         });
     });
@@ -694,7 +695,7 @@ fn result_view(app: &mut CraftApp, ui: &mut Ui) {
         (Some(Fill::Loading), _) => {
             ui.horizontal(|ui| {
                 ui.add(crate::widgets::Spinner::new().color(t.accent));
-                ui.label(tr("Working…"));
+                crate::bidi::text(ui, tr("Working…"));
             });
         }
         (Some(Fill::Error(m, r)), _) => widgets::empty_state(ui, "triangle-alert", &m, r.as_deref().unwrap_or("")),
@@ -745,8 +746,8 @@ fn right(app: &mut CraftApp, ui: &mut Ui) {
 }
 
 fn kv(ui: &mut Ui, k: &str, v: &str, t: &Tokens) {
-    ui.label(RichText::new(tr(k)).color(t.text_faint).size(theme::CAPTION));
-    ui.add(egui::Label::new(RichText::new(v).font(theme::mono(12.0))).wrap());
+    crate::bidi::text(ui, RichText::new(tr(k)).color(t.text_faint).size(theme::CAPTION));
+    crate::bidi::label(ui, RichText::new(v).font(theme::mono(12.0)));
     ui.end_row();
 }
 
@@ -757,7 +758,7 @@ fn inspector(app: &mut CraftApp, ui: &mut Ui) {
             widgets::panel(&t).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 widgets::caption(ui, "Selection");
-                ui.label(RichText::new(row_name(&sel).unwrap_or_else(|| "—".into())).font(theme::semibold(theme::BODY)));
+                crate::bidi::text(ui, RichText::new(row_name(&sel).unwrap_or_else(|| "—".into())).font(theme::semibold(theme::BODY)));
                 ui.add_space(4.0);
                 egui::Grid::new("sel-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
                     if let Value::Object(m) = &sel {
@@ -783,9 +784,9 @@ fn inspector(app: &mut CraftApp, ui: &mut Ui) {
                     widgets::caption(ui, "Target");
                     ui.horizontal(|ui| {
                         icons::show(ui, crate::kind_icon(tgt.kind), 16.0, t.accent);
-                        ui.label(RichText::new(&tgt.name).font(theme::semibold(theme::SMALL)));
+                        crate::bidi::text(ui, RichText::new(&tgt.name).font(theme::semibold(theme::SMALL)));
                     });
-                    ui.label(RichText::new(tr(tgt.kind.plain())).color(t.text_dim));
+                    crate::bidi::text(ui, RichText::new(tr(tgt.kind.plain())).color(t.text_dim));
                     ui.add_space(4.0);
                     egui::Grid::new("tgt-grid").num_columns(2).spacing([10.0, 4.0]).show(ui, |ui| {
                         kv(ui, "Kind", &tgt.kind.id(), &t);
@@ -817,9 +818,9 @@ fn ledger(app: &mut CraftApp, ui: &mut Ui) {
             panel_title(ui, "findings", Some(app.view.findings.len()));
             for finding in &app.view.findings {
                 ui.add_space(6.0);
-                ui.label(RichText::new(&finding.id).font(theme::mono(12.0)).color(t.accent));
-                ui.add(egui::Label::new(&finding.statement).wrap());
-                ui.label(RichText::new(finding.confidence.plain_label()).color(t.text_dim).size(theme::CAPTION));
+                crate::bidi::text(ui, RichText::new(&finding.id).font(theme::mono(12.0)).color(t.accent));
+                crate::bidi::label(ui, &finding.statement);
+                crate::bidi::text(ui, RichText::new(finding.confidence.plain_label()).color(t.text_dim).size(theme::CAPTION));
                 for id in &finding.evidence_ids {
                     if widgets::link(ui, id).clicked() {
                         pick = Some(id.clone());
@@ -836,7 +837,10 @@ fn ledger(app: &mut CraftApp, ui: &mut Ui) {
             ui.add_space(3.0);
         }
         if app.view.ledger_len > app.view.ledger.len() {
-            ui.label(RichText::new(crate::i18n::trf("… {n} older", &[("n", &(app.view.ledger_len - app.view.ledger.len()).to_string())])).color(t.text_faint));
+            crate::bidi::text(
+                ui,
+                RichText::new(crate::i18n::trf("… {n} older", &[("n", &(app.view.ledger_len - app.view.ledger.len()).to_string())])).color(t.text_faint),
+            );
         }
     });
     if let Some(id) = pick {
@@ -867,11 +871,11 @@ fn unknowns(app: &mut CraftApp, ui: &mut Ui) {
                     };
                     widgets::pill(ui, &sev, col, t.raised);
                     widgets::pill(ui, &format!("{:?}", u.status), t.text_dim, t.raised);
-                    ui.label(RichText::new(&u.domain).color(t.text_faint).size(theme::TINY));
+                    crate::bidi::text(ui, RichText::new(&u.domain).color(t.text_faint).size(theme::TINY));
                 });
-                ui.add(egui::Label::new(RichText::new(&u.question)).wrap());
+                crate::bidi::label(ui, RichText::new(&u.question));
                 if let Some(r) = &u.resolution {
-                    ui.label(RichText::new(r).color(t.success).size(theme::CAPTION));
+                    crate::bidi::text(ui, RichText::new(r).color(t.success).size(theme::CAPTION));
                 }
             });
             ui.add_space(4.0);
@@ -886,7 +890,7 @@ fn status_line(app: &CraftApp, ui: &mut Ui) {
     // One label that shortens: in a narrow console, two would run over the tabs beside them. The
     // count goes first so it's what stays; the Jobs tab's title also says how many are running.
     let text = format!("{} {} · {text}", app.view.findings.len(), tr("findings"));
-    ui.add(egui::Label::new(RichText::new(text).color(t.text_faint).size(theme::CAPTION)).truncate());
+    crate::bidi::truncated(ui, RichText::new(text).color(t.text_faint).size(theme::CAPTION));
 }
 
 fn bottom(app: &mut CraftApp, ui: &mut Ui) {
@@ -923,7 +927,7 @@ fn jobs(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let visible: Vec<_> = app.jobs.list.iter().filter(|j| j.visible).collect();
     if visible.is_empty() {
-        ui.label(RichText::new(tr("No jobs yet. Long tasks show their progress here, and you can cancel them.")).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("No jobs yet. Long tasks show their progress here, and you can cancel them.")).color(t.text_faint));
         return;
     }
     let mut cancel = None;
@@ -939,20 +943,20 @@ fn jobs(app: &mut CraftApp, ui: &mut Ui) {
                 icons::show(ui, icon, 14.0, col);
                 ui.add_sized(Vec2::new(220.0, 18.0), egui::Label::new(RichText::new(tr(&j.title)).font(theme::medium(theme::CAPTION))).truncate());
                 let secs = j.finished_at.unwrap_or_else(std::time::Instant::now).duration_since(j.started).as_secs_f32();
-                ui.label(RichText::new(format!("{secs:.1}s")).font(theme::mono(11.5)).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(format!("{secs:.1}s")).font(theme::mono(11.5)).color(t.text_faint));
                 match &j.outcome {
                     None => {
                         let p = j.progress();
                         ui.add(crate::widgets::ProgressBar::new(p.as_ref().and_then(|p| p.fraction)).size(Vec2::new(160.0, 8.0)).color(t.accent));
                         if let Some(p) = p {
-                            ui.label(RichText::new(p.message).color(t.text_dim).size(theme::CAPTION));
+                            crate::bidi::text(ui, RichText::new(p.message).color(t.text_dim).size(theme::CAPTION));
                         }
                         if icons::button(ui, "x", 24.0, false, "Cancel").clicked() {
                             cancel = Some(j.id);
                         }
                     }
                     Some(Err(e)) => {
-                        ui.add(egui::Label::new(RichText::new(e).color(t.danger).size(theme::CAPTION)).truncate());
+                        crate::bidi::truncated(ui, RichText::new(e).color(t.danger).size(theme::CAPTION));
                     }
                     Some(Ok(())) => {}
                 }
@@ -978,8 +982,8 @@ fn log_view(app: &CraftApp, ui: &mut Ui) {
         for l in &app.log {
             let secs = start.map(|s| l.at.duration_since(s).as_secs_f32()).unwrap_or(0.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("{secs:>8.2}")).font(theme::mono(11.5)).color(t.text_faint));
-                ui.label(RichText::new(&l.text).font(theme::mono(11.5)).color(if l.error { t.danger } else { t.text_dim }));
+                crate::bidi::text(ui, RichText::new(format!("{secs:>8.2}")).font(theme::mono(11.5)).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(&l.text).font(theme::mono(11.5)).color(if l.error { t.danger } else { t.text_dim }));
             });
         }
     });

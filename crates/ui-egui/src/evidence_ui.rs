@@ -23,7 +23,7 @@ pub fn proof_card(ui: &mut Ui, e: &Evidence, dense: bool, open: bool) {
         ui.painter().rect_filled(egui::Rect::from_min_max(egui::pos2(r.left() - 8.0, r.top() + 2.0), egui::pos2(r.left() - 5.0, r.bottom() - 2.0)), 2.0, col);
         ui.horizontal(|ui| {
             widgets::confidence_badge(ui, Some(e.confidence));
-            ui.label(RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)).color(t.text_dim));
+            crate::bidi::text(ui, RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)).color(t.text_dim));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if e.environment.clean_room {
                     widgets::pill(ui, "Clean room", t.success, t.raised).on_hover_text(tr("Made without looking inside the original."));
@@ -34,7 +34,7 @@ pub fn proof_card(ui: &mut Ui, e: &Evidence, dense: bool, open: bool) {
         });
         ui.add_space(4.0);
         if !e.summary.is_empty() {
-            ui.label(RichText::new(&e.summary).size(if dense { theme::SMALL } else { theme::BODY }));
+            crate::bidi::text(ui, RichText::new(&e.summary).size(if dense { theme::SMALL } else { theme::BODY }));
         }
         let id = ui.id().with(("proof", &e.id));
         egui::CollapsingHeader::new(RichText::new(tr("Show me the proof")).color(t.accent_ink).font(theme::medium(theme::SMALL)))
@@ -57,11 +57,11 @@ fn details(ui: &mut Ui, e: &Evidence, t: &Tokens) {
                     None => l.value.clone(),
                 };
                 egui::Frame::new().fill(t.raised).corner_radius(t.r_sm()).inner_margin(Margin::symmetric(8, 3)).show(ui, |ui| {
-                    ui.label(RichText::new(text).font(theme::mono(theme::CAPTION)).color(t.text)).on_hover_text(&l.kind);
+                    crate::bidi::text(ui, RichText::new(text).font(theme::mono(theme::CAPTION)).color(t.text)).on_hover_text(&l.kind);
                 });
             }
             if e.locations.len() > 40 {
-                ui.label(RichText::new(format!("+{}", e.locations.len() - 40)).color(t.text_faint));
+                crate::bidi::text(ui, RichText::new(format!("+{}", e.locations.len() - 40)).color(t.text_faint));
             }
         });
         ui.add_space(6.0);
@@ -71,7 +71,7 @@ fn details(ui: &mut Ui, e: &Evidence, t: &Tokens) {
         for l in &e.limitations {
             ui.horizontal(|ui| {
                 icons::show(ui, "info", 13.0, t.warning);
-                ui.add(egui::Label::new(RichText::new(&l.message).color(t.text_dim)).wrap());
+                crate::bidi::label(ui, RichText::new(&l.message).color(t.text_dim));
             });
         }
         ui.add_space(6.0);
@@ -101,7 +101,7 @@ fn details(ui: &mut Ui, e: &Evidence, t: &Tokens) {
         widgets::caption(ui, "The code");
         egui::Frame::new().fill(t.code_bg).corner_radius(t.r()).inner_margin(Margin::same(10)).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(RichText::new(truncate(code, 4000)).font(theme::mono(theme::CAPTION)).color(t.text));
+            crate::bidi::code_text(ui, RichText::new(truncate(code, 4000)).font(theme::mono(theme::CAPTION)).color(t.text));
         });
         ui.add_space(6.0);
     }
@@ -135,7 +135,7 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
     let t = Tokens::get(ui.ctx());
     let key_text = RichText::new(key).font(theme::mono(12.0)).color(t.accent_ink);
     if depth > MAX_DEPTH {
-        ui.label(RichText::new("…").color(t.text_faint));
+        crate::bidi::text(ui, RichText::new("…").color(t.text_faint));
         return;
     }
     match v {
@@ -149,7 +149,10 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
                         json_tree(ui, k, v, depth + 1);
                     }
                     if m.len() > MAX_CHILDREN {
-                        ui.label(RichText::new(crate::i18n::trf("… {n} more", &[("n", &(m.len() - MAX_CHILDREN).to_string())])).color(t.text_faint));
+                        crate::bidi::text(
+                            ui,
+                            RichText::new(crate::i18n::trf("… {n} more", &[("n", &(m.len() - MAX_CHILDREN).to_string())])).color(t.text_faint),
+                        );
                     }
                 });
         }
@@ -163,21 +166,24 @@ pub fn json_tree(ui: &mut Ui, key: &str, v: &Value, depth: usize) {
                         json_tree(ui, &i.to_string(), v, depth + 1);
                     }
                     if a.len() > MAX_CHILDREN {
-                        ui.label(RichText::new(crate::i18n::trf("… {n} more", &[("n", &(a.len() - MAX_CHILDREN).to_string())])).color(t.text_faint));
+                        crate::bidi::text(
+                            ui,
+                            RichText::new(crate::i18n::trf("… {n} more", &[("n", &(a.len() - MAX_CHILDREN).to_string())])).color(t.text_faint),
+                        );
                     }
                 });
         }
         leaf => {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                ui.label(RichText::new(format!("{key}:")).font(theme::mono(12.0)).color(t.accent_ink));
+                crate::bidi::text(ui, RichText::new(format!("{key}:")).font(theme::mono(12.0)).color(t.accent_ink));
                 let (text, col) = match leaf {
                     Value::String(s) => (format!("\"{}\"", truncate(s, 400)), t.text),
                     Value::Null => ("null".into(), t.text_faint),
                     Value::Bool(b) => (b.to_string(), theme::WORKED_OUT),
                     other => (other.to_string(), theme::SEEN_IT),
                 };
-                ui.add(egui::Label::new(RichText::new(text).font(theme::mono(12.0)).color(col)).wrap());
+                crate::bidi::label(ui, RichText::new(text).font(theme::mono(12.0)).color(col));
             });
         }
     }
@@ -213,12 +219,12 @@ pub fn ledger_row(ui: &mut Ui, e: &Evidence, selected: bool) -> bool {
             ui.horizontal(|ui| {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
                 ui.painter().circle_filled(r.center(), 3.5, col);
-                ui.label(RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)));
+                crate::bidi::text(ui, RichText::new(nice_operation(&e.operation)).font(theme::medium(theme::CAPTION)));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(tr(crate::theme::confidence_label(Some(e.confidence)))).size(theme::TINY).color(col));
+                    crate::bidi::text(ui, RichText::new(tr(crate::theme::confidence_label(Some(e.confidence)))).size(theme::TINY).color(col));
                 });
             });
-            ui.add(egui::Label::new(RichText::new(truncate(&e.summary, 160)).size(theme::CAPTION).color(t.text_dim)).wrap());
+            crate::bidi::label(ui, RichText::new(truncate(&e.summary, 160)).size(theme::CAPTION).color(t.text_dim));
         })
         .response;
     let resp = resp.interact(egui::Sense::click());

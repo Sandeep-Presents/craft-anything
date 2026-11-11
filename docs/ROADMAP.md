@@ -1371,6 +1371,16 @@ Gaps found while using the app for real projects.
       — claimed: monarchsofchaos004-gif, branch docs/readme-zh-hant; PR #926
 - [ ] macOS: an Edit menu (Undo, Cut, Copy, Paste, Select All). The keys work in text boxes, but
       the system's Edit items need the text box to answer them, so they'd show greyed out today
+- [x] Arabic (and other right-to-left) text reads in the right order and sits on the right in the
+      conversation, labels, project names and the prompt box (caret, selection and mouse
+      included): egui joined the letters but laid the words out left to right, so a sentence came
+      out backwards (`ui-egui/src/bidi.rs`, docs/localization.md)
+      — claimed: MohammedTsmu, branch bugfix/rtl-chat-text
+- [ ] Right-to-left text in the other text fields (renaming a project or pin, settings, filters),
+      buttons, menus and tooltips: they still draw it left to right. The prompt box's approach
+      (`bidi::text_edit_style` + `bidi::paint_text_edit`) can be reused for the fields
+- [ ] Drop `bidi`'s reordering once egui orders bidirectional text itself (its text layout has a
+      "heed bidi characters" TODO); keep the tests as the check
 - [x] The Advanced console's prompt box starts tall enough to read what's typed (#942)
       — claimed: justinjohn0306, branch bugfix/942-console-input-height
 - [x] A French README (`README.fr.md`) translated from `README.md` and linked from the language

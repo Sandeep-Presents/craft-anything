@@ -105,7 +105,7 @@ fn project<'a>(app: &'a CraftApp, root: &Path) -> Option<&'a Workspace> {
 
 pub fn rename_modal(app: &mut CraftApp, ui: &mut Ui, root: &Path, close: &mut bool) {
     let t = Tokens::get(ui.ctx());
-    ui.label(theme::heading(tr("Rename the project"), theme::SECTION));
+    crate::bidi::text(ui, theme::heading(tr("Rename the project"), theme::SECTION));
     ui.add_space(8.0);
     let r = ui.add(egui::TextEdit::singleline(&mut app.state.rename_input).desired_width(f32::INFINITY).frame(widgets::text_field_frame(&t)));
     widgets::named(r.clone(), "Project name");
@@ -114,7 +114,7 @@ pub fn rename_modal(app: &mut CraftApp, ui: &mut Ui, root: &Path, close: &mut bo
     }
     let ok = !app.state.rename_input.trim().is_empty();
     let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-    ui.add(egui::Label::new(RichText::new(tr("Only its name changes; its folder stays where it is.")).color(t.text_faint).size(theme::SMALL)).wrap());
+    crate::bidi::label(ui, RichText::new(tr("Only its name changes; its folder stays where it is.")).color(t.text_faint).size(theme::SMALL));
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         if (widgets::primary_icon(ui, None, "Rename", ok).clicked() || enter) && ok {
@@ -138,7 +138,7 @@ pub fn delete_modal(app: &mut CraftApp, ui: &mut Ui, root: &Path, close: &mut bo
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(40.0), egui::Sense::hover());
         ui.painter().rect_filled(rect, t.radius, t.raised);
         icons::paint(ui, rect, "trash-2", 20.0, t.danger);
-        ui.label(theme::heading(trf("Delete {name}?", &[("name", &ws.manifest.name)]), theme::SECTION));
+        crate::bidi::text(ui, theme::heading(trf("Delete {name}?", &[("name", &ws.manifest.name)]), theme::SECTION));
     });
     ui.add_space(8.0);
     // What goes and what stays, in so many words: it can't be undone.
@@ -148,10 +148,10 @@ pub fn delete_modal(app: &mut CraftApp, ui: &mut Ui, root: &Path, close: &mut bo
     } else {
         tr("Its folder is deleted with everything in it: what was built, the checks and the conversation.")
     };
-    ui.add(egui::Label::new(RichText::new(what).color(t.text_dim)).wrap());
-    ui.add(egui::Label::new(RichText::new(crate::short_path(&ws.root)).font(theme::mono(12.0)).color(t.text_faint)).truncate());
+    crate::bidi::label(ui, RichText::new(what).color(t.text_dim));
+    crate::bidi::truncated(ui, RichText::new(crate::short_path(&ws.root)).font(theme::mono(12.0)).color(t.text_faint));
     ui.add_space(4.0);
-    ui.label(RichText::new(tr("This can't be undone.")).color(t.danger).size(theme::SMALL));
+    crate::bidi::text(ui, RichText::new(tr("This can't be undone.")).color(t.danger).size(theme::SMALL));
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         if widgets::secondary(ui, Some("trash-2"), "Delete it").clicked() {

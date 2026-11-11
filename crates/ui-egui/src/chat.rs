@@ -157,13 +157,13 @@ fn target_card(app: &mut CraftApp, ui: &mut Ui) {
                     ui.painter().rect_filled(rect, t.radius, t.accent_soft);
                     icons::paint(ui, rect, crate::kind_icon(target.kind), 26.0, t.accent_ink);
                     ui.vertical(|ui| {
-                        ui.add(egui::Label::new(theme::heading(&target.name, theme::CARD)).truncate());
-                        ui.label(RichText::new(crate::human_bytes(target.bytes.len())).color(t.text_faint).size(theme::CAPTION));
+                        crate::bidi::truncated(ui, theme::heading(&target.name, theme::CARD));
+                        crate::bidi::text(ui, RichText::new(crate::human_bytes(target.bytes.len())).color(t.text_faint).size(theme::CAPTION));
                     });
                 });
                 ui.add_space(10.0);
                 widgets::caption(ui, "What is it");
-                ui.label(RichText::new(tr(target.kind.plain())).size(theme::BODY));
+                crate::bidi::text(ui, RichText::new(tr(target.kind.plain())).size(theme::BODY));
                 ui.add_space(10.0);
                 ui.horizontal_wrapped(|ui| {
                     if app.view.clean_room {
@@ -299,7 +299,7 @@ fn history(app: &mut CraftApp, ui: &mut Ui, dense: bool, pad: f32, max_w: f32) {
 fn greeting(app: &CraftApp, ui: &mut Ui, dense: bool) {
     let t = Tokens::get(ui.ctx());
     if dense {
-        ui.label(RichText::new(tr("Ask the agent about this target. It cites evidence for every claim.")).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("Ask the agent about this target. It cites evidence for every claim.")).color(t.text_faint));
         return;
     }
     ui.add_space(24.0);
@@ -308,14 +308,14 @@ fn greeting(app: &CraftApp, ui: &mut Ui, dense: bool) {
         Some(n) => crate::i18n::trf("What would you like to know about {name}?", &[("name", n)]),
         None => tr("What would you like to find out?"),
     };
-    ui.label(theme::heading(title, theme::TITLE));
+    crate::bidi::text(ui, theme::heading(title, theme::TITLE));
     ui.add_space(4.0);
     let sub = if app.state.backend.is_some() {
         "Ask in your own words. Every answer shows how sure we are, and the proof."
     } else {
         "No AI brain is set up, so answers come straight from the built-in engines. Add one any time for plain-words explanations."
     };
-    ui.label(RichText::new(tr(sub)).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr(sub)).color(t.text_dim));
     ui.add_space(16.0);
 }
 
@@ -399,9 +399,10 @@ pub(crate) fn user_bubble(ui: &mut Ui, text: &str, dense: bool) {
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
         let shown = bubble(&t, true, dense).show(ui, |ui| {
             ui.set_max_width((ui.available_width() - COPY - 4.0).min(560.0));
-            // The bubble sits on the right; its lines still read from the left.
+            // The bubble sits on the right; its lines read from the left, or from the right in
+            // Arabic, Hebrew and other right-to-left scripts.
             ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.add(egui::Label::new(RichText::new(text).color(t.text)).wrap());
+                crate::bidi::label(ui, RichText::new(text).color(t.text));
             });
         });
         let r = shown.response.rect;
@@ -426,7 +427,7 @@ pub(crate) fn activity_row(ui: &mut Ui, text: RichText) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal_top(|ui| {
         icons::show(ui, "activity", 14.0, t.accent);
-        ui.add(egui::Label::new(text).wrap());
+        crate::bidi::label(ui, text);
     });
 }
 
@@ -442,7 +443,7 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 }
                 if let Some(b) = backend {
                     ui.add_space(4.0);
-                    ui.label(RichText::new(crate::i18n::trf("Answered by {name}", &[("name", b)])).color(t.text_faint).size(theme::CAPTION));
+                    crate::bidi::text(ui, RichText::new(crate::i18n::trf("Answered by {name}", &[("name", b)])).color(t.text_faint).size(theme::CAPTION));
                 }
             });
         }
@@ -459,11 +460,11 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 egui::Frame::new().fill(t.raised).corner_radius(t.r_sm()).inner_margin(Margin::symmetric(10, 3)).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         icons::show(ui, icon, 13.0, col);
-                        ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
+                        crate::bidi::text(ui, RichText::new(tool.replace('_', " ")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                     });
                 });
                 if !summary.is_empty() {
-                    ui.label(RichText::new(summary).color(t.text_dim).size(theme::CAPTION));
+                    crate::bidi::text(ui, RichText::new(summary).color(t.text_dim).size(theme::CAPTION));
                 }
             });
             if let Some(e) = evidence {
@@ -473,7 +474,7 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
         }
         ChatItem::Proof { intro, evidence } => {
             if !intro.is_empty() {
-                ui.label(RichText::new(intro).color(t.text_dim));
+                crate::bidi::text(ui, RichText::new(intro).color(t.text_dim));
                 ui.add_space(4.0);
             }
             evidence_ui::proof_card(ui, evidence, dense, open);
@@ -483,10 +484,11 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     icons::show(ui, "shield", 18.0, t.warning);
-                    ui.label(RichText::new(crate::i18n::trf("May I run \"{title}\"?", &[("title", title)])).font(theme::semibold(theme::BODY)));
+                    crate::bidi::text(ui, RichText::new(crate::i18n::trf("May I run \"{title}\"?", &[("title", title)])).font(theme::semibold(theme::BODY)));
                 });
-                ui.label(RichText::new(explanation).color(t.text_dim));
-                ui.label(
+                crate::bidi::text(ui, RichText::new(explanation).color(t.text_dim));
+                crate::bidi::text(
+                    ui,
                     RichText::new(tr("This runs code from the target or changes a device. Nothing runs until you say so."))
                         .color(t.text_faint)
                         .size(theme::CAPTION),
@@ -512,7 +514,7 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                             ConsentAnswer::AlwaysForProject => "Allowed for this project.",
                             ConsentAnswer::Deny => "Not allowed.",
                         };
-                        ui.label(RichText::new(tr(text)).color(t.text_faint));
+                        crate::bidi::text(ui, RichText::new(tr(text)).color(t.text_faint));
                     }
                 }
             });
@@ -527,10 +529,10 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         icons::show(ui, "triangle-alert", 16.0, t.danger);
-                        ui.add(egui::Label::new(RichText::new(message).color(t.text)).wrap());
+                        crate::bidi::label(ui, RichText::new(message).color(t.text));
                     });
                     if let Some(r) = remediation {
-                        ui.add(egui::Label::new(RichText::new(r).color(t.text_dim)).wrap());
+                        crate::bidi::label(ui, RichText::new(r).color(t.text_dim));
                     }
                     if let Some(l) = log
                         && widgets::open_log_button(ui, l)
@@ -545,8 +547,9 @@ fn item_ui(ui: &mut Ui, item: &ChatItem, beginner: bool, dense: bool, open: bool
                 ui.horizontal(|ui| {
                     icons::show(ui, "sparkles", 20.0, t.accent_ink);
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(tr("Want answers in plain words?")).font(theme::semibold(theme::BODY)));
-                        ui.label(
+                        crate::bidi::text(ui, RichText::new(tr("Want answers in plain words?")).font(theme::semibold(theme::BODY)));
+                        crate::bidi::text(
+                            ui,
                             RichText::new(tr("Add an AI brain and I'll read this evidence for you, answer follow-up questions and point at the proof."))
                                 .color(t.text_dim),
                         );
@@ -587,7 +590,7 @@ pub fn rich_text(ui: &mut Ui, text: &str, with_glossary: bool) {
             continue;
         }
         if let Some(h) = trimmed.strip_prefix("### ").or_else(|| trimmed.strip_prefix("## ")).or_else(|| trimmed.strip_prefix("# ")) {
-            ui.add(egui::Label::new(RichText::new(h).font(theme::semibold(body.size + 2.0))).wrap());
+            crate::bidi::label(ui, RichText::new(h).font(theme::semibold(body.size + 2.0)));
             continue;
         }
         let (bullet, rest) = match trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
@@ -614,6 +617,10 @@ fn paragraph(ui: &mut Ui, text: &str, bullet: bool, with_glossary: bool, body: &
     let mut job = egui::text::LayoutJob::default();
     job.wrap.max_width = ui.available_width().max(1.0);
     job.first_row_min_height = ui.spacing().interact_size.y;
+    // Right-to-left text is reordered line by line (see `bidi`), which moves characters away from
+    // the indices the glossary underlines use, so such paragraphs skip the glossary.
+    let rtl_text = crate::bidi::has_rtl(text);
+    let with_glossary = with_glossary && !rtl_text;
     let mut spans = Vec::new();
     let mut at = 0;
     if bullet {
@@ -658,6 +665,11 @@ fn paragraph(ui: &mut Ui, text: &str, bullet: bool, with_glossary: bool, body: &
             }
         }
     }
+    if rtl_text {
+        let (galley, rtl) = crate::bidi::layout(ui, job);
+        crate::bidi::show(ui, galley, rtl, text);
+        return;
+    }
     let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
     let response = ui.add(egui::Label::new(galley.clone()));
     if !ui.is_rect_visible(response.rect) {
@@ -694,8 +706,8 @@ fn paragraph(ui: &mut Ui, text: &str, bullet: bool, with_glossary: bool, body: &
     }
     if let Some(span) = meaning {
         response.on_hover_ui(|ui| {
-            ui.label(RichText::new(&span.word).font(theme::semibold(theme::SMALL)));
-            ui.label(tr(span.meaning));
+            crate::bidi::text(ui, RichText::new(&span.word).font(theme::semibold(theme::SMALL)));
+            crate::bidi::text(ui, tr(span.meaning));
         });
     }
 }
@@ -703,7 +715,7 @@ fn paragraph(ui: &mut Ui, text: &str, bullet: bool, with_glossary: bool, body: &
 fn code_block(ui: &mut Ui, code: &str, t: &Tokens) {
     egui::Frame::new().fill(t.code_bg).corner_radius(t.r()).inner_margin(Margin::same(10)).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        ui.add(egui::Label::new(RichText::new(code.trim_end()).font(theme::mono(theme::CAPTION)).color(t.text)).wrap());
+        crate::bidi::label(ui, RichText::new(code.trim_end()).font(theme::mono(theme::CAPTION)).color(t.text));
     });
 }
 

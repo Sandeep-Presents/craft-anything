@@ -218,14 +218,15 @@ pub fn ghidra_modal(app: &mut CraftApp, ui: &mut Ui, close: &mut bool) {
             } else {
                 "Get Ghidra for Deep mode"
             };
-            ui.label(theme::heading(tr(title), theme::SECTION));
-            ui.label(
+            crate::bidi::text(ui, theme::heading(tr(title), theme::SECTION));
+            crate::bidi::text(
+                ui,
                 RichText::new(tr("Ghidra, a free reverse-engineering tool from the NSA, gives Deep mode richer decompiled code and types.")).color(t.text_dim),
             );
         });
     });
     ui.add_space(12.0);
-    let body = |ui: &mut Ui, text: String| ui.add(egui::Label::new(RichText::new(text).size(theme::BODY)).wrap());
+    let body = |ui: &mut Ui, text: String| crate::bidi::label(ui, RichText::new(text).size(theme::BODY));
     let then = if app.ghidra.start_after.is_some() { tr("Your project starts as soon as it's done.") } else { String::new() };
     if ready {
         body(ui, tr("Deep mode now decompiles with Ghidra. The first look at a large program can take several minutes."));
@@ -332,7 +333,7 @@ pub fn ghidra_memory_setting(app: &mut CraftApp, ui: &mut Ui) {
         match set {
             None => {
                 let line = trf("Half of this computer's memory, up to {gb} GB.", &[("gb", &ghidra::HEAP_GB.end().to_string())]);
-                ui.label(RichText::new(line).color(t.text_faint).size(theme::CAPTION));
+                crate::bidi::text(ui, RichText::new(line).color(t.text_faint).size(theme::CAPTION));
             }
             Some(mut gb) => {
                 // A visible rail on the card, filled in the app colour up to the knob.
@@ -352,7 +353,7 @@ pub fn ghidra_memory_setting(app: &mut CraftApp, ui: &mut Ui) {
                 if r.drag_stopped() || (r.changed() && !r.dragged()) {
                     app.settings_changed();
                 }
-                ui.label(RichText::new(tr("Leave a few GB for the rest of your computer.")).color(t.text_faint).size(theme::CAPTION));
+                crate::bidi::text(ui, RichText::new(tr("Leave a few GB for the rest of your computer.")).color(t.text_faint).size(theme::CAPTION));
             }
         }
     });
@@ -475,7 +476,7 @@ pub fn assets_toggle(app: &mut CraftApp, ui: &mut Ui, mut on: bool) {
         )
     };
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(note).color(if no_key { t.warning } else { t.text_dim }).size(theme::SMALL));
+        crate::bidi::text(ui, RichText::new(note).color(if no_key { t.warning } else { t.text_dim }).size(theme::SMALL));
         if no_key && widgets::link(ui, "Add a fal.ai key").clicked() {
             app.state.modal = Some(Modal::Assets);
         }
@@ -491,8 +492,8 @@ pub fn assets_modal(app: &mut CraftApp, ui: &mut Ui, close: &mut bool) {
         ui.painter().rect_filled(rect, t.radius, t.accent_soft);
         icons::paint(ui, rect, "boxes", 24.0, t.accent_ink);
         ui.vertical(|ui| {
-            ui.label(theme::heading(tr("Your fal.ai key"), theme::SECTION));
-            ui.label(RichText::new(tr("Generated pictures and 3D models are made with fal.ai.")).color(t.text_dim));
+            crate::bidi::text(ui, theme::heading(tr("Your fal.ai key"), theme::SECTION));
+            crate::bidi::text(ui, RichText::new(tr("Generated pictures and 3D models are made with fal.ai.")).color(t.text_dim));
         });
     });
     ui.add_space(12.0);
@@ -558,7 +559,7 @@ fn keys_link(ui: &mut Ui, provider: &dyn AssetProvider) {
 /// Settings → AI: each asset provider's key for game assets.
 pub fn assets_settings(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(tr("Game assets")).font(theme::medium(theme::SMALL)));
+    crate::bidi::text(ui, RichText::new(tr("Game assets")).font(theme::medium(theme::SMALL)));
     ui.add(
         egui::Label::new(
             RichText::new({
@@ -576,7 +577,7 @@ pub fn assets_settings(app: &mut CraftApp, ui: &mut Ui) {
     let all = AssetProviders::built_in();
     for provider in all.ids().into_iter().filter_map(|id| all.get(id)) {
         ui.add_space(6.0);
-        ui.label(RichText::new(provider.name()).size(theme::SMALL));
+        crate::bidi::text(ui, RichText::new(provider.name()).size(theme::SMALL));
         let stored = app.asset_keys.as_ref().and_then(|k| k.get(provider.id()).copied());
         ui.push_id(provider.id(), |ui| {
             if stored == Some(true) {
@@ -619,10 +620,11 @@ pub fn build_with(app: &mut CraftApp, ui: &mut Ui) {
     if let Some(f) = app.state.make.found.clone() {
         ui.horizontal_wrapped(|ui| {
             icons::show(ui, "puzzle", 16.0, t.accent_ink);
-            ui.label(RichText::new(trf("Made with {engine}", &[("engine", &f.label())])).font(theme::semibold(theme::BODY)));
+            crate::bidi::text(ui, RichText::new(trf("Made with {engine}", &[("engine", &f.label())])).font(theme::semibold(theme::BODY)));
         });
         if !matches!(f.engine, game::Made::Unity | game::Made::Unreal | game::Made::Godot) {
-            ui.label(
+            crate::bidi::text(
+                ui,
                 RichText::new(trf("Craft Anything can't build with {engine}, so Unity is the closest match.", &[("engine", f.engine.name())]))
                     .color(t.text_dim)
                     .size(theme::SMALL),
@@ -631,7 +633,7 @@ pub fn build_with(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(8.0);
     }
     ui.horizontal(|ui| {
-        ui.label(RichText::new(tr("Build with")).size(theme::BODY).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr("Build with")).size(theme::BODY).color(t.text_dim));
         let names: Vec<&str> = Builder::ALL.iter().map(|b| b.name()).collect();
         // Nothing is selected while the request names another way to build.
         let sel = b.and_then(|b| Builder::ALL.iter().position(|x| *x == b)).unwrap_or(usize::MAX);
@@ -646,7 +648,8 @@ pub fn build_with(app: &mut CraftApp, ui: &mut Ui) {
             let named = app.kinds.named(&app.state.make.request, &crate::make::resolve_target(&app.state.make)).unwrap_or_default();
             ui.horizontal_wrapped(|ui| {
                 icons::show(ui, "check", 16.0, t.success);
-                ui.label(
+                crate::bidi::text(
+                    ui,
                     RichText::new(trf("Built with {stack}, as you asked, so no game engine is needed.", &[("stack", named)]))
                         .color(t.text_dim)
                         .size(theme::SMALL),
@@ -689,13 +692,13 @@ fn status_line(app: &mut CraftApp, ui: &mut Ui, b: Builder, offer: bool) {
     ui.horizontal_wrapped(|ui| match &inv {
         None => {
             ui.add(crate::widgets::Spinner::new().size(14.0).color(t.accent));
-            ui.label(RichText::new(tr("Looking for game engines on this computer…")).color(t.text_dim).size(theme::SMALL));
+            crate::bidi::text(ui, RichText::new(tr("Looking for game engines on this computer…")).color(t.text_dim).size(theme::SMALL));
         }
         Some(inv) if inv.ready(b) => {
             icons::show(ui, "check", 16.0, t.success);
             let v = inv.best(b).map(|i| i.version.clone()).unwrap_or_default();
             let what = if v.is_empty() { b.name().to_string() } else { format!("{} {v}", b.name()) };
-            ui.label(RichText::new(trf("Ready: {what} is on this computer.", &[("what", &what)])).color(t.text_dim).size(theme::SMALL));
+            crate::bidi::text(ui, RichText::new(trf("Ready: {what} is on this computer.", &[("what", &what)])).color(t.text_dim).size(theme::SMALL));
         }
         Some(inv) => {
             icons::show(ui, "download", 16.0, t.warning);
@@ -704,7 +707,7 @@ fn status_line(app: &mut CraftApp, ui: &mut Ui, b: Builder, offer: bool) {
             } else {
                 format!("{} {}", trf("{name} isn't on this computer yet.", &[("name", b.name())]), tr(b.needs()))
             };
-            ui.label(RichText::new(text).color(t.text_dim).size(theme::SMALL));
+            crate::bidi::text(ui, RichText::new(text).color(t.text_dim).size(theme::SMALL));
             if offer && widgets::secondary(ui, Some("download"), &trf("Get {name}", &[("name", b.name())])).clicked() {
                 // One dialog at a time: the steps replace Settings when opened from there.
                 app.state.settings_open = false;
@@ -803,7 +806,7 @@ pub fn modal(app: &mut CraftApp, ui: &mut Ui, b: Builder, close: &mut bool) {
     let Some(inv) = app.game_engines.clone() else {
         ui.horizontal(|ui| {
             ui.add(crate::widgets::Spinner::new().size(16.0).color(t.accent));
-            ui.label(tr("Looking for game engines on this computer…"));
+            crate::bidi::text(ui, tr("Looking for game engines on this computer…"));
         });
         app.refresh_game_engines();
         return;
@@ -821,8 +824,8 @@ pub fn modal(app: &mut CraftApp, ui: &mut Ui, b: Builder, close: &mut bool) {
         icons::paint(ui, rect, if ready { "check" } else { "download" }, 24.0, t.accent_ink);
         ui.vertical(|ui| {
             let title = if ready { trf("{name} is ready", &[("name", b.name())]) } else { trf("Get {name}", &[("name", b.name())]) };
-            ui.label(theme::heading(title, theme::SECTION));
-            ui.label(RichText::new(tr(b.needs())).color(t.text_dim));
+            crate::bidi::text(ui, theme::heading(title, theme::SECTION));
+            crate::bidi::text(ui, RichText::new(tr(b.needs())).color(t.text_dim));
         });
     });
     ui.add_space(16.0);
@@ -844,9 +847,9 @@ pub fn modal(app: &mut CraftApp, ui: &mut Ui, b: Builder, close: &mut bool) {
             }
             ui.add_space(4.0);
             ui.vertical(|ui| {
-                ui.label(RichText::new(&s.title).font(theme::semibold(theme::BODY)).color(if s.done || now { t.text } else { t.text_dim }));
+                crate::bidi::text(ui, RichText::new(&s.title).font(theme::semibold(theme::BODY)).color(if s.done || now { t.text } else { t.text_dim }));
                 if now || !s.done {
-                    ui.add(egui::Label::new(RichText::new(&s.detail).color(t.text_dim).size(theme::SMALL)).wrap());
+                    crate::bidi::label(ui, RichText::new(&s.detail).color(t.text_dim).size(theme::SMALL));
                 }
                 if now {
                     ui.add_space(8.0);
@@ -874,7 +877,7 @@ pub fn modal(app: &mut CraftApp, ui: &mut Ui, b: Builder, close: &mut bool) {
                         ui.add_space(4.0);
                     }
                     if !s.done && current.is_some() && i > 0 {
-                        ui.label(RichText::new(tr("This updates by itself when it's done.")).color(t.text_faint).size(theme::SMALL));
+                        crate::bidi::text(ui, RichText::new(tr("This updates by itself when it's done.")).color(t.text_faint).size(theme::SMALL));
                     }
                 }
             });
@@ -935,7 +938,7 @@ pub fn progress_bar(ui: &mut Ui, fraction: Option<f32>, message: &str) {
     ui.painter().rect_filled(egui::Rect::from_x_y_ranges(bar.left() + bar.width() * from..=bar.left() + bar.width() * to, bar.y_range()), 3.0, t.accent);
     ui.add_space(4.0);
     let pct = fraction.map(|f| format!("{:.0}%  ·  ", f * 100.0)).unwrap_or_default();
-    ui.label(RichText::new(format!("{pct}{message}")).font(theme::mono(12.5)).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(format!("{pct}{message}")).font(theme::mono(12.5)).color(t.text_dim));
     widgets::animate(ui, Duration::from_millis(100));
 }
 
@@ -945,7 +948,7 @@ pub fn settings_section(app: &mut CraftApp, ui: &mut Ui) {
     if app.game_engines.is_none() {
         app.refresh_game_engines();
     }
-    ui.label(RichText::new(tr("Game engines")).font(theme::medium(theme::SMALL)));
+    crate::bidi::text(ui, RichText::new(tr("Game engines")).font(theme::medium(theme::SMALL)));
     ui.add(
         egui::Label::new(
             RichText::new(tr(
@@ -958,7 +961,7 @@ pub fn settings_section(app: &mut CraftApp, ui: &mut Ui) {
     );
     ui.add_space(8.0);
     for b in Builder::ALL {
-        ui.label(RichText::new(b.name()).font(theme::semibold(theme::SMALL)));
+        crate::bidi::text(ui, RichText::new(b.name()).font(theme::semibold(theme::SMALL)));
         status_line(app, ui, b, true);
         ui.add_space(8.0);
     }

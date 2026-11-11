@@ -83,7 +83,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             if app.projects.is_empty() && !fold {
                 egui::Frame::new().inner_margin(egui::Margin { left: 12, right: 8, top: 2, bottom: 2 }).show(ui, |ui| {
-                    ui.label(RichText::new(tr("Nothing made yet. What you make shows up here.")).color(t.text_faint).size(theme::SMALL));
+                    crate::bidi::text(ui, RichText::new(tr("Nothing made yet. What you make shows up here.")).color(t.text_faint).size(theme::SMALL));
                 });
                 return;
             }
@@ -166,16 +166,15 @@ pub(crate) fn row(ui: &mut Ui, icon: &str, label: &str, status: Option<(egui::Co
         return resp.on_hover_text(name).on_hover_cursor(egui::CursorIcon::PointingHand);
     }
     // An urgent status is a small pill on the right; the name gives way to it.
-    let pill = status.filter(|s| s.2).map(|(color, s, _)| (color, ui.painter().layout_no_wrap(tr(s), theme::semibold(theme::CAPTION), color)));
+    let pill = status.filter(|s| s.2).map(|(color, s, _)| (color, crate::bidi::layout_no_wrap(ui, tr(s), theme::semibold(theme::CAPTION), color)));
     let right = match (&pill, status) {
         (Some((_, g)), _) => g.size().x + 26.0,
         (None, Some(_)) => 26.0,
         (None, None) => 10.0,
     };
     let max_w = (rect.width() - 40.0 - right).max(20.0);
-    let mut job = egui::text::LayoutJob::simple_singleline(text.clone(), egui::FontId::proportional(theme::SMALL), ink);
-    job.wrap = egui::text::TextWrapping::truncate_at_width(max_w);
-    let g = ui.painter().layout_job(job);
+    // Project names may be Arabic or Hebrew: laid out in visual order, cut where the text goes on.
+    let g = crate::bidi::line_galley(ui, &text, egui::FontId::proportional(theme::SMALL), ink, max_w);
     ui.painter().galley(egui::pos2(rect.left() + 38.0, rect.center().y - g.size().y / 2.0), g, ink);
     match (pill, status) {
         (Some((color, g)), _) => {

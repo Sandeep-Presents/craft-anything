@@ -24,7 +24,7 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.set_width(680.0);
             ui.horizontal(|ui| {
-                ui.label(theme::heading(tr("Settings"), theme::SECTION));
+                crate::bidi::text(ui, theme::heading(tr("Settings"), theme::SECTION));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if icons::button(ui, "x", 32.0, false, "Close").clicked() {
                         open = false;
@@ -37,7 +37,7 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     icons::show(ui, "triangle-alert", 16.0, t.danger);
-                    ui.add(egui::Label::new(RichText::new(text).color(t.danger)).wrap());
+                    crate::bidi::label(ui, RichText::new(text).color(t.danger));
                     if icons::button(ui, "x", 24.0, false, "Dismiss").clicked() {
                         app.state.toasts.remove(i);
                     }
@@ -70,7 +70,8 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
                             16.0,
                             if on { t.accent_ink } else { t.icon },
                         );
-                        ui.painter().text(
+                        crate::bidi::paint_line(
+                            ui,
                             egui::pos2(rect.left() + 36.0, rect.center().y),
                             egui::Align2::LEFT_CENTER,
                             tr(title),
@@ -123,9 +124,9 @@ fn row(ui: &mut Ui, title: &str, sub: &str, add: impl FnOnce(&mut Ui)) {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.set_width(220.0);
-            ui.label(RichText::new(tr(title)).font(theme::medium(theme::SMALL)));
+            crate::bidi::text(ui, RichText::new(tr(title)).font(theme::medium(theme::SMALL)));
             if !sub.is_empty() {
-                ui.add(egui::Label::new(RichText::new(tr(sub)).color(t.text_faint).size(theme::CAPTION)).wrap());
+                crate::bidi::label(ui, RichText::new(tr(sub)).color(t.text_faint).size(theme::CAPTION));
             }
         });
         add(ui);
@@ -156,7 +157,7 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.add_space(12.0);
             crate::icons::show(ui, "folder", 14.0, Tokens::get(ui.ctx()).text_faint);
-            ui.add(egui::Label::new(RichText::new(f.display().to_string()).font(theme::mono(12.0))).truncate());
+            crate::bidi::truncated(ui, RichText::new(f.display().to_string()).font(theme::mono(12.0)));
             if crate::icons::button(ui, "x", 22.0, false, &trf("Stop listing {folder}", &[("folder", &f.display().to_string())])).clicked() {
                 remove = Some(f.clone());
             }
@@ -269,7 +270,7 @@ fn engines(app: &mut CraftApp, ui: &mut Ui) {
         "More memory makes Ghidra's first look at a big program faster; leave some for the rest of the computer. Used from the next time Ghidra starts.",
         |ui| crate::engine_ui::ghidra_memory_setting(app, ui),
     );
-    ui.label(RichText::new(crate::engine_ui::ghidra_memory_guide()).color(t.text_faint).size(theme::CAPTION));
+    crate::bidi::text(ui, RichText::new(crate::engine_ui::ghidra_memory_guide()).color(t.text_faint).size(theme::CAPTION));
     ui.add_space(8.0);
     row(ui, "Ghidra folder", "Leave empty to use the one Craft Anything sets up.", |ui| {
         if path_field(ui, &mut app.settings.engines.ghidra.install_dir, "Ghidra folder", "managed") {
@@ -288,14 +289,17 @@ fn engines(app: &mut CraftApp, ui: &mut Ui) {
     crate::engine_ui::settings_section(app, ui);
     ui.add_space(12.0);
     widgets::caption(ui, "Your own tool installs (optional)");
-    ui.label(RichText::new(tr("Leave a path empty to use the managed install. We never need environment variables.")).color(t.text_faint).size(theme::CAPTION));
+    crate::bidi::text(
+        ui,
+        RichText::new(tr("Leave a path empty to use the managed install. We never need environment variables.")).color(t.text_faint).size(theme::CAPTION),
+    );
     ui.add_space(6.0);
     let mut changed = false;
     egui::Grid::new("tool-paths").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
         // Names and purposes come from the engine table; the override list matches it (tested).
         for (id, v) in app.settings.engines.tools.entries_mut() {
             let (name, needed_for) = craft_anything_engines::engine(id).map(|e| (e.name, e.needed_for)).unwrap_or((id, ""));
-            ui.label(RichText::new(tr(name)).size(theme::CAPTION)).on_hover_text(format!("{}\n{id}", tr(needed_for)));
+            crate::bidi::text(ui, RichText::new(tr(name)).size(theme::CAPTION)).on_hover_text(format!("{}\n{id}", tr(needed_for)));
             changed |= path_field(ui, v, name, "managed");
             ui.end_row();
         }
@@ -310,7 +314,7 @@ fn engines(app: &mut CraftApp, ui: &mut Ui) {
 fn model_options_loading(ui: &mut Ui, backend: &str) {
     ui.add_enabled_ui(false, |ui| {
         ui.horizontal_wrapped(|ui| {
-            ui.label(tr("Context window"));
+            crate::bidi::text(ui, tr("Context window"));
             egui::ComboBox::from_id_salt(("model-context", backend)).icon(widgets::combo_icon).selected_text(tr("Default")).show_ui(ui, |_| {});
         });
     });
@@ -328,7 +332,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     widgets::caption(ui, "Your brains");
     ui.add_space(4.0);
     if app.backends.is_empty() {
-        ui.label(RichText::new(tr("No AI is set up yet. The built-in engines still work; an AI adds plain-words answers.")).color(t.text_dim));
+        crate::bidi::text(ui, RichText::new(tr("No AI is set up yet. The built-in engines still work; an AI adds plain-words answers.")).color(t.text_dim));
     }
     let (mut pick, mut builds, mut extracts, mut toggle, mut remove) = (None, None, None, None, None);
     let (mut choose_program, mut usual_program, mut use_program) = (None, None, None);
@@ -354,13 +358,13 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 icons::show(ui, "bot", 18.0, if b.enabled { t.accent } else { t.text_faint });
                 ui.vertical(|ui| {
-                    ui.add(egui::Label::new(RichText::new(&b.name).font(theme::semibold(theme::SMALL))).truncate());
+                    crate::bidi::truncated(ui, RichText::new(&b.name).font(theme::semibold(theme::SMALL)));
                     let model_in_use = craft_anything_ai::model_in_use(b, app.backend_options.get(&b.name));
                     let live_catalog = b.kind == BackendKind::AgentCli && craft_anything_ai::cli_agents::adapter_for(&b.model).has_model_catalog();
                     // An API's model has its own line below; an agent app is named by its `model`.
                     let what = if model_in_use.is_some() && b.kind != BackendKind::AgentCli { String::new() } else { format!(" · {}", b.model) };
                     let ssh = b.ssh_host.as_ref().map(|h| format!(" · ssh {h}")).unwrap_or_default();
-                    ui.add(egui::Label::new(RichText::new(format!("{:?}{what}{ssh}", b.kind)).color(t.text_faint).size(theme::CAPTION)).truncate());
+                    crate::bidi::truncated(ui, RichText::new(format!("{:?}{what}{ssh}", b.kind)).color(t.text_faint).size(theme::CAPTION));
                     // An agent app on this computer: which program runs it, for one installed
                     // where it isn't looked for (#53).
                     if b.kind == BackendKind::AgentCli && b.ssh_host.as_deref().is_none_or(|h| h.trim().is_empty()) {
@@ -369,7 +373,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                             // The links at the caption's size, so the line reads as one.
                             ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
                             let text = program.map_or_else(|| tr("Program: found automatically"), |p| trf("Program: {path}", &[("path", p)]));
-                            ui.add(egui::Label::new(RichText::new(text).color(t.text_faint).size(theme::CAPTION)).truncate());
+                            crate::bidi::truncated(ui, RichText::new(text).color(t.text_faint).size(theme::CAPTION));
                             if widgets::link(ui, "Choose…").clicked() {
                                 choose_program = Some(b.name.clone());
                             }
@@ -403,8 +407,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                         }
                         let mut text = folder_drafts.get(&b.name).cloned().unwrap_or_else(|| saved.clone());
                         ui.add_space(4.0);
-                        let label = ui.label(RichText::new(tr("Claude Code folder (CLAUDE_CONFIG_DIR)")).size(theme::CAPTION).color(t.text_dim));
-                        ui.label(
+                        let label = crate::bidi::text(ui, RichText::new(tr("Claude Code folder (CLAUDE_CONFIG_DIR)")).size(theme::CAPTION).color(t.text_dim));
+                        crate::bidi::text(
+                            ui,
                             RichText::new(tr("Its own sign-in, settings and conversations: another folder is another account. Empty: its usual folder."))
                                 .color(t.text_faint)
                                 .size(theme::CAPTION),
@@ -434,7 +439,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                             .data_mut(|d| d.get_temp::<String>(id))
                             .unwrap_or_else(|| app.backend_options.get(&b.name).and_then(|o| o.command.clone()).unwrap_or_default());
                         ui.horizontal_wrapped(|ui| {
-                            ui.label(tr("Remote program"));
+                            crate::bidi::text(ui, tr("Remote program"));
                             ui.add(egui::TextEdit::singleline(&mut program).hint_text(&b.model).desired_width(200.0));
                             if widgets::link(ui, "Apply").clicked() {
                                 remote_program = Some((b.name.clone(), program.clone()));
@@ -449,9 +454,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                             .and_then(|o| o.cli_model.as_deref())
                             .map(str::to_string)
                             .unwrap_or_else(|| if b.model == "opencode" { tr("OpenCode default") } else { tr("Model default") });
-                        ui.label(trf("Model: {model}", &[("model", &current)]));
+                        crate::bidi::text(ui, trf("Model: {model}", &[("model", &current)]));
                         let thinking = options.and_then(|o| o.cli_thinking).map(|d| d.title().to_string()).unwrap_or_else(|| tr("Model default"));
-                        ui.label(format!("{}: {thinking}", tr("Thinking depth")));
+                        crate::bidi::text(ui, format!("{}: {thinking}", tr("Thinking depth")));
                         if let Some(picker) = app.agent_model_picker.as_mut().filter(|p| p.context.backend.config.name == b.name) {
                             let previous = picker.model.clone();
                             let apply = crate::builders::agent_model_picker(ui, picker);
@@ -486,7 +491,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                 }
                                 Some((_, None)) => {
                                     ui.add(crate::widgets::Spinner::new().size(theme::CAPTION).color(t.accent));
-                                    ui.label(RichText::new(tr("Asking for its models…")).color(t.text_faint).size(theme::CAPTION));
+                                    crate::bidi::text(ui, RichText::new(tr("Asking for its models…")).color(t.text_faint).size(theme::CAPTION));
                                 }
                                 Some((_, Some(models))) => {
                                     egui::ComboBox::from_id_salt(("model", &b.name)).icon(widgets::combo_icon).selected_text(&current).show_ui(ui, |ui| {
@@ -500,7 +505,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                     // `opusplan`, or one another harness serves (#470).
                                     let id = egui::Id::new(("other-model", &b.name));
                                     let mut other = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_default();
-                                    let label = ui.label(RichText::new(tr("Another model")).color(t.text_faint).size(theme::CAPTION));
+                                    let label = crate::bidi::text(ui, RichText::new(tr("Another model")).color(t.text_faint).size(theme::CAPTION));
                                     let r = ui.add(egui::TextEdit::singleline(&mut other).desired_width(140.0)).labelled_by(label.id);
                                     let entered = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                                     if (widgets::link(ui, "Use").clicked() || entered) && !other.trim().is_empty() && other.trim() != current {
@@ -514,7 +519,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                 }
                             }
                             if let Some(current) = effort {
-                                ui.label(RichText::new(tr("Effort:")).color(t.text_faint).size(theme::CAPTION));
+                                crate::bidi::text(ui, RichText::new(tr("Effort:")).color(t.text_faint).size(theme::CAPTION));
                                 egui::ComboBox::from_id_salt(("effort", &b.name)).icon(widgets::combo_icon).selected_text(current.as_str()).show_ui(ui, |ui| {
                                     for e in craft_anything_ai::Effort::ALL {
                                         if ui.selectable_label(e == current, e.as_str()).clicked() && e != current {
@@ -531,7 +536,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                 let mut changed = false;
                                 ui.add_enabled_ui(!draft.saving, |ui| {
                                     ui.horizontal_wrapped(|ui| {
-                                        ui.label(tr("Context window"));
+                                        crate::bidi::text(ui, tr("Context window"));
                                         let label = draft
                                             .context
                                             .and_then(|value| choices.context.iter().find(|choice| choice.value == value))
@@ -554,7 +559,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                             } else {
                                 model_options_loading(ui, &b.name);
                                 if let Some(error) = &draft.error {
-                                    ui.add(egui::Label::new(RichText::new(error).color(t.danger)).wrap());
+                                    crate::bidi::label(ui, RichText::new(error).color(t.danger));
                                     if icons::button(ui, "refresh-cw", 24.0, false, "Load model options").clicked() {
                                         tune_models.push(b.name.clone());
                                     }
@@ -668,7 +673,7 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                 }
             });
             if !b.enabled {
-                ui.label(RichText::new(tr("Off")).color(t.text_faint).size(theme::CAPTION));
+                crate::bidi::text(ui, RichText::new(tr("Off")).color(t.text_faint).size(theme::CAPTION));
             }
             if let Some(Some(result)) = app.agent_connections.get(&b.name) {
                 let (message, color) = match result {
@@ -765,14 +770,14 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
         .inner;
     ui.add_space(4.0);
     if detected.is_empty() && !app.detecting {
-        ui.label(
+        crate::bidi::text(ui,
             RichText::new(tr("Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below."))
                 .color(t.text_faint),
         );
     }
     let shown = detected.iter().filter(|d| crate::detect_tabs::tab_of(d) == tab).count();
     if shown == 0 && !detected.is_empty() && !app.detecting {
-        ui.label(RichText::new(tr("Nothing of this kind was found.")).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("Nothing of this kind was found.")).color(t.text_faint));
     }
     for d in detected.into_iter().filter(|d| crate::detect_tabs::tab_of(d) == tab) {
         let configured = app.backends.iter().any(|b| b.name == d.suggestion.name);
@@ -803,8 +808,8 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
             let text_right = if right.width() > 0.0 { right.left() - ui.spacing().item_spacing.x } else { top.right() };
             let mut left_ui =
                 ui.new_child(egui::UiBuilder::new().max_rect(top.with_max_x(text_right.max(top.left()))).layout(egui::Layout::top_down(egui::Align::Min)));
-            left_ui.add(egui::Label::new(RichText::new(&d.suggestion.name).font(theme::medium(theme::SMALL))).wrap());
-            left_ui.add(egui::Label::new(RichText::new(&d.reason).color(t.text_faint).size(theme::CAPTION)).wrap());
+            crate::bidi::label(&mut left_ui, RichText::new(&d.suggestion.name).font(theme::medium(theme::SMALL)));
+            crate::bidi::label(&mut left_ui, RichText::new(&d.reason).color(t.text_faint).size(theme::CAPTION));
             ui.advance_cursor_after_rect(left_ui.min_rect().union(right));
             // A subscription key is worth pasting even when the environment already has one, so a
             // different key can be used without restarting the app.
@@ -840,7 +845,10 @@ pub(crate) fn server_form(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(14.0);
     widgets::caption(ui, "Add an AI by its address");
-    ui.label(RichText::new(tr("Ollama or LM Studio on another computer, or any service that speaks the OpenAI API.")).color(t.text_faint).size(theme::CAPTION));
+    crate::bidi::text(
+        ui,
+        RichText::new(tr("Ollama or LM Studio on another computer, or any service that speaks the OpenAI API.")).color(t.text_faint).size(theme::CAPTION),
+    );
     ui.add_space(4.0);
     let form = &mut app.server_form;
     // `width` is the text's; the compact frame adds 8 points a side and its border.
@@ -974,7 +982,7 @@ fn plugins(app: &mut CraftApp, ui: &mut Ui) {
     let plugins = app.settings.plugins.mcp.clone();
     let wasm = app.settings.plugins.wasm.clone();
     if plugins.is_empty() && wasm.is_empty() {
-        ui.label(RichText::new(tr("No plugins yet.")).color(t.text_faint));
+        crate::bidi::text(ui, RichText::new(tr("No plugins yet.")).color(t.text_faint));
     }
     let mut changed = false;
     for (i, p) in plugins.iter().enumerate() {
@@ -982,13 +990,13 @@ fn plugins(app: &mut CraftApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.set_width(300.0);
-                    ui.label(RichText::new(p.display_name()).font(theme::medium(theme::SMALL)));
-                    ui.label(RichText::new(p.place()).font(theme::mono(theme::CAPTION)).color(t.text_faint));
+                    crate::bidi::text(ui, RichText::new(p.display_name()).font(theme::medium(theme::SMALL)));
+                    crate::bidi::text(ui, RichText::new(p.place()).font(theme::mono(theme::CAPTION)).color(t.text_faint));
                     if let Some(problem) = p.problem() {
-                        ui.label(RichText::new(problem).color(t.warning).size(theme::CAPTION));
+                        crate::bidi::text(ui, RichText::new(problem).color(t.warning).size(theme::CAPTION));
                     }
                     if !p.consent {
-                        ui.label(RichText::new(tr("Runs its tools without asking")).color(t.warning).size(theme::CAPTION));
+                        crate::bidi::text(ui, RichText::new(tr("Runs its tools without asking")).color(t.warning).size(theme::CAPTION));
                     }
                 });
                 if widgets::toggle(ui, &mut app.settings.plugins.mcp[i].enabled, "On").changed() {
@@ -1009,10 +1017,10 @@ fn plugins(app: &mut CraftApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.set_width(300.0);
-                    ui.label(RichText::new(p.display_name()).font(theme::medium(theme::SMALL)));
-                    ui.label(RichText::new(p.path.display().to_string()).font(theme::mono(theme::CAPTION)).color(t.text_faint));
+                    crate::bidi::text(ui, RichText::new(p.display_name()).font(theme::medium(theme::SMALL)));
+                    crate::bidi::text(ui, RichText::new(p.path.display().to_string()).font(theme::mono(theme::CAPTION)).color(t.text_faint));
                     if let Some(problem) = p.problem() {
-                        ui.label(RichText::new(problem).color(t.warning).size(theme::CAPTION));
+                        crate::bidi::text(ui, RichText::new(problem).color(t.warning).size(theme::CAPTION));
                     }
                 });
                 if widgets::toggle(ui, &mut app.settings.plugins.wasm[i].enabled, "On").changed() {
@@ -1029,7 +1037,7 @@ fn plugins(app: &mut CraftApp, ui: &mut Ui) {
         app.settings_changed();
     }
     if !plugins.is_empty() || !wasm.is_empty() {
-        ui.label(RichText::new(tr("Turning a plugin on or off takes effect from the next start.")).color(t.text_faint).size(theme::CAPTION));
+        crate::bidi::text(ui, RichText::new(tr("Turning a plugin on or off takes effect from the next start.")).color(t.text_faint).size(theme::CAPTION));
     }
     ui.add_space(14.0);
     widgets::caption(ui, "Add a plugin");
@@ -1059,7 +1067,7 @@ fn plugins(app: &mut CraftApp, ui: &mut Ui) {
         app.act("plugins_add", params, tr("Add a plugin"));
         app.state.plugin_form = Default::default();
     }
-    ui.label(RichText::new(tr("Plugins added here always ask before each call.")).color(t.text_faint).size(theme::CAPTION));
+    crate::bidi::text(ui, RichText::new(tr("Plugins added here always ask before each call.")).color(t.text_faint).size(theme::CAPTION));
 }
 
 fn safety(app: &mut CraftApp, ui: &mut Ui) {
@@ -1077,7 +1085,10 @@ fn safety(app: &mut CraftApp, ui: &mut Ui) {
     if !app.settings.ask_before_running {
         ui.horizontal(|ui| {
             icons::show(ui, "triangle-alert", 15.0, t.warning);
-            ui.label(RichText::new(tr("Tools may now run code from what you open without asking. Turn this back on unless you're sure.")).color(t.warning));
+            crate::bidi::text(
+                ui,
+                RichText::new(tr("Tools may now run code from what you open without asking. Turn this back on unless you're sure.")).color(t.warning),
+            );
         });
     }
     row(
@@ -1117,10 +1128,10 @@ fn safety(app: &mut CraftApp, ui: &mut Ui) {
         ui.add_space(8.0);
         widgets::caption(ui, &format!("{} {}", tr("Allowed in"), p));
         if app.view.project_allows.is_empty() {
-            ui.label(RichText::new(tr("Nothing allowed yet.")).color(t.text_faint));
+            crate::bidi::text(ui, RichText::new(tr("Nothing allowed yet.")).color(t.text_faint));
         }
         for tool in app.view.project_allows.clone() {
-            ui.label(RichText::new(tool).font(theme::mono(12.0)));
+            crate::bidi::text(ui, RichText::new(tool).font(theme::mono(12.0)));
         }
     }
 }

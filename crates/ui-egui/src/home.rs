@@ -85,16 +85,16 @@ pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
                     ui.painter().rect_filled(rect, t.radius, t.accent_soft);
                     icons::paint(ui, rect, icon, 26.0, t.accent_ink);
                     ui.add_space(10.0);
-                    ui.label(theme::heading(tr(title), theme::SECTION));
+                    crate::bidi::text(ui, theme::heading(tr(title), theme::SECTION));
                     ui.add_space(4.0);
-                    ui.label(RichText::new(tr(body)).color(t.text_dim));
+                    crate::bidi::text(ui, RichText::new(tr(body)).color(t.text_dim));
                     ui.add_space(16.0);
                     if widgets::primary(ui, "Got it").clicked() {
                         close = true;
                     }
                 }
                 Modal::Website => {
-                    ui.label(theme::heading(tr("Look at a website"), theme::SECTION));
+                    crate::bidi::text(ui, theme::heading(tr("Look at a website"), theme::SECTION));
                     ui.add_space(8.0);
                     let r = ui.add(
                         egui::TextEdit::singleline(&mut app.state.url_input)
@@ -135,21 +135,22 @@ pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
                 }
                 Modal::Tutorial(i) => {
                     if let Some((_, title, blurb, steps)) = TUTORIALS.get(*i) {
-                        ui.label(theme::heading(tr(title), theme::SECTION));
-                        ui.label(RichText::new(tr(blurb)).color(t.text_dim));
+                        crate::bidi::text(ui, theme::heading(tr(title), theme::SECTION));
+                        crate::bidi::text(ui, RichText::new(tr(blurb)).color(t.text_dim));
                         ui.add_space(12.0);
                         for (n, s) in steps.iter().enumerate() {
                             ui.horizontal(|ui| {
                                 let (rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
                                 ui.painter().circle_filled(rect.center(), 12.0, t.accent_soft);
-                                ui.painter().text(
+                                crate::bidi::paint_line(
+                                    ui,
                                     rect.center(),
                                     egui::Align2::CENTER_CENTER,
                                     (n + 1).to_string(),
                                     theme::semibold(theme::CAPTION),
                                     t.accent_ink,
                                 );
-                                ui.add(egui::Label::new(tr(s)).wrap());
+                                crate::bidi::label(ui, tr(s));
                             });
                             ui.add_space(4.0);
                         }
@@ -178,8 +179,8 @@ pub fn modals(app: &mut CraftApp, ctx: &egui::Context) {
                 Modal::PinRename(root, id) => crate::pins::rename_modal(app, ui, root, *id, &mut close),
                 Modal::PinDelete(root, id) => crate::pins::delete_modal(app, ui, root, *id, &mut close),
                 Modal::About => {
-                    ui.label(theme::heading("Craft Anything", theme::SECTION));
-                    ui.label(RichText::new(format!("{} {}", tr("Version"), env!("CARGO_PKG_VERSION"))).color(t.text_dim));
+                    crate::bidi::text(ui, theme::heading("Craft Anything", theme::SECTION));
+                    crate::bidi::text(ui, RichText::new(format!("{} {}", tr("Version"), env!("CARGO_PKG_VERSION"))).color(t.text_dim));
                     ui.add_space(12.0);
                     if widgets::primary(ui, "Close").clicked() {
                         close = true;

@@ -981,6 +981,19 @@ tests left a file on the developer's machine and two runs could collide. Anythin
 through the hub's stores (AiHub::with_stores, Session::isolated), which tests point at a temp
 folder; production code never writes under the real config folder by hand.
 
+**Rows found from glyph counts.** The first right-to-left fix took a galley's rows by counting
+glyphs (`char_count_excluding_newline`), but egui 0.36 gives an Arabic word more glyphs than it
+has letters, so a row took text from the next one, ran past its bubble under the sidebar and left
+a full stop on a row of its own. Don't map a galley's glyphs back to characters; measure the text
+and break it yourself (`bidi::break_lines`), and test that every row fits its width.
+
+**A live check of the installed app, not the build.** `cmd /c start "" craft-anything.exe` from
+the build's folder opened the copy in Program Files (Windows looks the name up), so a person
+checked an unchanged app and reported the fix didn't work. Start a build by its full path and
+check which file the process runs (`Get-Process … | Select Path`) before asking anyone to look.
+A local build also has no Arabic or CJK font unless `CRAFT_FONTS_DIR` is set: check the script
+renders before judging its layout.
+
 **A per-probe walk repeated expensive work on the same bytes.** CRC cpio verification was bounded
 inside one archive, but a firmware scan could rediscover overlapping, trailerless archives and
 sum the same payload repeatedly. Count checksum byte visits across the whole scan, poll its

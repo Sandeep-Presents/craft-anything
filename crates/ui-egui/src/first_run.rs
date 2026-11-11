@@ -58,9 +58,9 @@ fn welcome(app: &mut CraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     ui.add(crate::app_icon(132.0));
     ui.add_space(20.0);
-    ui.label(theme::heading(tr("Craft Anything"), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr("Craft Anything"), theme::TITLE));
     ui.add_space(6.0);
-    ui.label(RichText::new(tr("Find out how any software works, then craft your own.")).size(theme::LEAD).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr("Find out how any software works, then craft your own.")).size(theme::LEAD).color(t.text_dim));
     ui.add_space(36.0);
     let w = 270.0;
     ui.horizontal(|ui| {
@@ -87,9 +87,9 @@ fn choice_card(ui: &mut Ui, w: f32, icon: &str, title: &str, blurb: &str) -> egu
 
 fn header(ui: &mut Ui, title: &str, sub: &str) {
     let t = Tokens::get(ui.ctx());
-    ui.label(theme::heading(tr(title), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr(title), theme::TITLE));
     ui.add_space(4.0);
-    ui.label(RichText::new(tr(sub)).size(theme::BODY).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(tr(sub)).size(theme::BODY).color(t.text_dim));
     ui.add_space(22.0);
 }
 
@@ -105,13 +105,14 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
         Some(b) => {
             ui.horizontal(|ui| {
                 icons::show(ui, "check", 16.0, t.success);
-                ui.label(RichText::new(crate::i18n::trf("{name} builds what you make.", &[("name", &b)])).color(t.text_dim));
+                crate::bidi::text(ui, RichText::new(crate::i18n::trf("{name} builds what you make.", &[("name", &b)])).color(t.text_dim));
             });
         }
         None => {
             ui.horizontal_wrapped(|ui| {
                 icons::show(ui, "triangle-alert", 16.0, t.warning);
-                ui.label(
+                crate::bidi::text(
+                    ui,
                     RichText::new(tr("Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below."))
                         .color(t.text_dim),
                 );
@@ -127,7 +128,7 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
         if app.detecting {
             ui.horizontal(|ui| {
                 ui.add(crate::widgets::Spinner::new().color(t.accent));
-                ui.label(RichText::new(tr("Looking for AI on this computer…")).color(t.text_dim));
+                crate::bidi::text(ui, RichText::new(tr("Looking for AI on this computer…")).color(t.text_dim));
             });
             ui.add_space(8.0);
         }
@@ -139,7 +140,7 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
             shown += 1;
         }
         if !app.detecting && shown == 0 && !detected.is_empty() {
-            ui.label(RichText::new(tr("Nothing of this kind was found.")).color(t.text_faint));
+            crate::bidi::text(ui, RichText::new(tr("Nothing of this kind was found.")).color(t.text_faint));
         }
         // Once an AI is added by its address, "we didn't find one" no longer applies.
         if !app.detecting && detected.is_empty() && app.backends.is_empty() {
@@ -148,8 +149,8 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
                 ui.horizontal(|ui| {
                     icons::show(ui, "radar", 22.0, t.text_faint);
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(tr("We didn't find an AI on this computer yet")).font(theme::medium(theme::BODY)));
-                        ui.label(RichText::new(tr("You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.")).color(t.text_dim));
+                        crate::bidi::text(ui, RichText::new(tr("We didn't find an AI on this computer yet")).font(theme::medium(theme::BODY)));
+                        crate::bidi::text(ui, RichText::new(tr("You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.")).color(t.text_dim));
                     });
                 });
             });
@@ -203,8 +204,8 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
             ui.painter().rect_filled(rect, t.radius, t.raised);
             icons::paint(ui, rect, kind_icon(d.suggestion.kind), 20.0, t.accent_ink);
             ui.vertical(|ui| {
-                ui.label(theme::heading(&name, theme::CARD));
-                ui.label(RichText::new(&d.reason).color(t.text_dim).size(theme::SMALL));
+                crate::bidi::text(ui, theme::heading(&name, theme::CARD));
+                crate::bidi::text(ui, RichText::new(&d.reason).color(t.text_dim).size(theme::SMALL));
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if on {
@@ -254,8 +255,15 @@ fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui
     let ir = egui::Rect::from_min_size(rect.min + Vec2::new(14.0, 12.0), Vec2::splat(40.0));
     ui.painter().rect_filled(ir, t.radius, t.raised);
     icons::paint(ui, ir, icon, 20.0, if on { t.accent_ink } else { t.icon });
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 14.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::BODY), t.text);
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 35.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
+    crate::bidi::paint_line(ui, egui::pos2(ir.right() + 14.0, rect.top() + 14.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::BODY), t.text);
+    crate::bidi::paint_line(
+        ui,
+        egui::pos2(ir.right() + 14.0, rect.top() + 35.0),
+        Align2::LEFT_TOP,
+        tr(sub),
+        egui::FontId::proportional(theme::SMALL),
+        t.text_dim,
+    );
     if on {
         icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0)), "check", 18.0, t.accent);
     }
@@ -280,8 +288,8 @@ fn purpose(app: &mut CraftApp, ui: &mut Ui, width: f32) {
     // Shown, not a hover tip in link colour: a click on it did nothing and read as broken (#71).
     ui.scope(|ui| {
         ui.set_max_width(width);
-        ui.label(RichText::new(tr("Why we ask")).size(theme::SMALL).color(t.text_dim).strong());
-        ui.label(RichText::new(tr(
+        crate::bidi::text(ui, RichText::new(tr("Why we ask")).size(theme::SMALL).color(t.text_dim).strong());
+        crate::bidi::text(ui, RichText::new(tr(
             "Looking inside software you own or are allowed to examine is normal and often protected (learning, compatibility, security). Saying why helps you keep to it; it stays on this computer.",
         ))
         .size(theme::SMALL)
@@ -310,16 +318,17 @@ fn done(app: &mut CraftApp, ui: &mut Ui) {
     ui.painter().rect(rect, rect.width() / 2.0, t.accent_soft, egui::Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
     icons::paint(ui, rect, "check", 34.0, t.accent);
     ui.add_space(18.0);
-    ui.label(theme::heading(tr("You're all set"), theme::TITLE));
+    crate::bidi::text(ui, theme::heading(tr("You're all set"), theme::TITLE));
     ui.add_space(6.0);
     let brain = app.state.backend.clone().unwrap_or_else(|| tr("the built-in engines"));
     let builds = match app.default_builder() {
         Some(b) => crate::i18n::trf("{name} builds what you make; answers come from {brain}.", &[("name", &b), ("brain", &brain)]),
         None => crate::i18n::trf("Answers come from {brain}. To build, set up a coding agent in Settings → AI.", &[("brain", &brain)]),
     };
-    ui.label(RichText::new(builds).size(theme::BODY).color(t.text_dim));
+    crate::bidi::text(ui, RichText::new(builds).size(theme::BODY).color(t.text_dim));
     ui.add_space(8.0);
-    ui.label(
+    crate::bidi::text(
+        ui,
         RichText::new(tr(
             "Say what you want to make, or drop an app or file on the window to look inside it. Everything runs in Clean room mode unless you switch on Deep.",
         ))
