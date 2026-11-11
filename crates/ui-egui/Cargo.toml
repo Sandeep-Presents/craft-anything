@@ -12,6 +12,7 @@ build = "build.rs"
 workspace = true
 
 [dependencies]
+craft-anything-formats = { workspace = true }
 craft-anything-engine = { workspace = true }
 craft-anything-engines = { workspace = true }
 craft-anything-ai = { workspace = true }

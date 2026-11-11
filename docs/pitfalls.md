@@ -1047,3 +1047,15 @@ child. Preserve ordinary output paths and put collisions in an independent input
 directory; keep complete source identities in the manifest. Check both prefix orders and
 same-named input scripts through the real recovery tool, and retain the writer's symlink and
 exclusive-creation checks after selecting a name.
+
+**Exact geometry bounds rejected after JSON parsing.** The default fast JSON float parser can
+round a serialized f64 to an adjacent value even when packed binary geometry is unchanged.
+Scene metadata needs `float_roundtrip`; retain strict measured bounds and cover varied binary
+float mantissas in a round-trip reader regression instead of loosening bounds silently.
+
+**Asynchronous scene draws accumulated GPU memory.** A worker completing command encoding is
+not a completed GPU frame. Wait with a deadline for the submitted frame before accepting the
+next one, compact hidden instances out of draws, and keep busy-status layout height constant
+so rendering cannot alternate viewport sizes forever.
+Large-scene snapshot runs must explicitly select a hardware adapter: the test harness
+default prefers a CPU rasterizer, which is appropriate for small UI fixtures.

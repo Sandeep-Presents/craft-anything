@@ -29,6 +29,7 @@ pub mod native_workflows;
 pub mod report_tools;
 pub mod session_tools;
 // Shared input helpers for the built-in format tools.
+pub mod scene_tools;
 pub mod static_input;
 // Android apps (APK, DEX, resources, Flutter, JEB).
 pub mod android_tools;
@@ -118,6 +119,7 @@ pub mod rizin_session_tools;
 pub fn all() -> Vec<crate::ToolSpec> {
     let mut v = Vec::new();
     v.extend(session_tools::specs());
+    v.extend(scene_tools::specs());
     v.extend(artifact_tools::specs());
     v.extend(js_tools::specs());
     v.extend(web_tools::specs());

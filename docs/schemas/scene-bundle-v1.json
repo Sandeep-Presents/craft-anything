@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:craft-anything:scene-lab:1",
+  "$comment": "Original scene lab contract. Version1 governs manifest, named JSONL records, and declared binary encoding. No older versions exist. Consumers must reject unknown versions; breaking changes require a new version and explicit offline migration to a new bundle without overwriting the original. Structural validation does not prove units, asset completeness or native semantics.",
+  "$defs": {
+    "guid": {
+      "type": "string",
+      "format": "uuid",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "matrix": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "bounds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vec3"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "section",
+        "offset",
+        "guid",
+        "parent_guid",
+        "name",
+        "matrix",
+        "children",
+        "mesh",
+        "reference",
+        "visibility_storage",
+        "user_value_count",
+        "opaque_guid_list_count"
+      ],
+      "properties": {
+        "section": {
+          "enum": [
+            "Entities",
+            "IncludeLibrary"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "guid": {
+          "$ref": "#/$defs/guid"
+        },
+        "parent_guid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/guid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "matrix": {
+          "$ref": "#/$defs/matrix"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/guid"
+          },
+          "maxItems": 100000
+        },
+        "mesh": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/guid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visibility_storage": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "user_value_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "opaque_guid_list_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "mesh": {
+      "type": "object",
+      "required": [
+        "section",
+        "offset",
+        "owner",
+        "vertex_count",
+        "triangle_count",
+        "vertex_byte_offset",
+        "index_byte_offset",
+        "source_precision_bits",
+        "local_bounds"
+      ],
+      "properties": {
+        "section": {
+          "enum": [
+            "Entities",
+            "IncludeLibrary"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "owner": {
+          "$ref": "#/$defs/guid"
+        },
+        "vertex_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000000
+        },
+        "triangle_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vertex_byte_offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "index_byte_offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_precision_bits": {
+          "enum": [
+            32,
+            64
+          ]
+        },
+        "local_bounds": {
+          "$ref": "#/$defs/bounds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "instance": {
+      "type": "object",
+      "required": [
+        "instance_id",
+        "entity_node_guid",
+        "mesh_id",
+        "path",
+        "world_matrix",
+        "conservative_world_bounds",
+        "resource_guids"
+      ],
+      "properties": {
+        "instance_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "entity_node_guid": {
+          "$ref": "#/$defs/guid"
+        },
+        "mesh_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/guid"
+          },
+          "minItems": 1,
+          "maxItems": 65
+        },
+        "world_matrix": {
+          "$ref": "#/$defs/matrix"
+        },
+        "conservative_world_bounds": {
+          "$ref": "#/$defs/bounds"
+        },
+        "resource_guids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/guid"
+          },
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "binding": {
+      "type": "object",
+      "required": [
+        "resource_guid",
+        "node_guid",
+        "ordinal_storage",
+        "source_offset",
+        "source_section",
+        "binding_kind"
+      ],
+      "properties": {
+        "resource_guid": {
+          "$ref": "#/$defs/guid"
+        },
+        "node_guid": {
+          "$ref": "#/$defs/guid"
+        },
+        "ordinal_storage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_section": {
+          "const": "Resources"
+        },
+        "binding_kind": {
+          "const": "direct_subtree"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "entities",
+    "library_nodes",
+    "meshes",
+    "vertices",
+    "triangles",
+    "direct_resource_bindings",
+    "binary_bytes",
+    "instances",
+    "unmapped_instances",
+    "overlapping_resource_instances",
+    "schema_version",
+    "status",
+    "source_sha256",
+    "decoded_sections",
+    "coordinate_unit",
+    "artifact_layout",
+    "geometry_presence",
+    "world_axis_convention",
+    "limitations"
+  ],
+  "properties": {
+    "entities": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "library_nodes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "meshes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vertices": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "triangles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "direct_resource_bindings": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "binary_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "instances": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unmapped_instances": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "overlapping_resource_instances": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "const": "experimental_scene_partial"
+    },
+    "source_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decoded_sections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "coordinate_unit": {
+      "type": "string"
+    },
+    "artifact_layout": {
+      "type": "object",
+      "required": [
+        "nodes",
+        "meshes",
+        "instances",
+        "resource_bindings",
+        "project",
+        "binary",
+        "positions",
+        "triangle_indices"
+      ],
+      "properties": {
+        "nodes": {
+          "const": "nodes.jsonl"
+        },
+        "meshes": {
+          "const": "meshes.jsonl"
+        },
+        "instances": {
+          "const": "instances.jsonl"
+        },
+        "resource_bindings": {
+          "const": "resource-bindings.jsonl"
+        },
+        "project": {
+          "const": "project.json"
+        },
+        "binary": {
+          "const": "geometry.bin"
+        },
+        "positions": {
+          "const": "little-endian f64 xyz, 24 bytes per vertex"
+        },
+        "triangle_indices": {
+          "const": "little-endian u32 abc, 12 bytes per triangle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "geometry_presence": {
+      "enum": [
+        "empty",
+        "present"
+      ]
+    },
+    "world_axis_convention": {
+      "type": "string"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

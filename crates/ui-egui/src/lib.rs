@@ -34,6 +34,8 @@ pub mod pins;
 pub mod project;
 pub mod prompt_box;
 pub mod report;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod scene_viewer;
 pub mod schema_form;
 pub mod settings_ui;
 pub mod sidebar;

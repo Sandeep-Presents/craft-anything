@@ -51,6 +51,7 @@ pub mod plist;
 pub mod pyc;
 pub mod pyinstaller;
 pub mod rust_bin;
+pub mod scene_bundle;
 pub mod solana;
 pub mod sourcemap;
 pub mod sqlite;

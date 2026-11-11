@@ -2464,9 +2464,12 @@ Owner: open · Status: in progress
 
 ### R3.14 Read-only scene bundles
 Owner: open · Status: in progress
-- [ ] Add a bounded versioned scene-bundle reader and headless inspection/picking tools, with a native experimental viewport for orbit, pan, zoom, resource selection and hide/isolate. Preserve unknown units, axes and materials in the result. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add a bounded versioned scene-bundle reader and headless inspection/picking tools, with a native experimental viewport for orbit, pan, zoom, resource selection and hide/isolate. Preserve unknown units, axes and materials in the result. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
 - [ ] Independently verify native units, axes and visual parity before presenting engineering measurements or claiming general source-format compatibility.
-- [ ] Add validated time-based appearance and cost evaluation as separate follow-up slices after the static viewer is verified.
+- [ ] Embed the validated experimental viewport in the main desktop workbench through the existing engine tools.
+- [ ] Add camera-frustum culling and measured large-scene rendering budgets while preserving selection parity.
+- [ ] Add validated time-based appearance from verified schedule and resource assignments after static viewer validation.
+- [ ] Add validated cost and quantity evaluation after units and cost-basis evidence are independently checked.
 
 ---
 

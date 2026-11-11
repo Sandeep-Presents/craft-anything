@@ -1,10 +1,35 @@
 # Status
 
 What works today and how it was checked. The plan, owners and order of work are in
-[ROADMAP.md](ROADMAP.md). Last updated 2026-11-09. The baseline audit on 2026-10-23 from `main` had 923 tests passing;
+[ROADMAP.md](ROADMAP.md). Last updated 2026-11-12. The baseline audit on 2026-10-23 from `main` had 923 tests passing;
 workspace clippy, layers, fmt and the secret scan of all history were clean. Chinese UI checks are listed separately below.
 
 ## What works, and how it was checked
+
+### Experimental read-only scene bundles (R3.14)
+
+Version-1 scene bundles can be inspected through the Deep-only
+`formats_scene_bundle_open`, `formats_scene_resources_list` and
+`formats_scene_surface_pick` tools. A separate native Rust example provides
+instanced GPU rendering, orbit/pan/zoom, fit, triangle picking, resource selection,
+and instance/resource hide and isolate. Parsing, picking, GPU uploads and draw
+encoding run on workers; GPU completion applies bounded backpressure. Hidden
+instances are compacted out of draws. The main desktop workbench does not yet
+embed this experimental viewer.
+
+A private real-world bundle was rendered locally on Windows with a discrete
+Vulkan GPU. Saved images and UI actions verified picking, hide/show, isolation,
+resource-tree selection and camera changes. Original synthetic fixtures cover
+malformed inputs, cancellation, graph cycles, stale selections, nearest hits,
+filtering, selection budgets and exact binary/JSON f64 bounds. An explicit
+adapter-dependent integration test checks that hiding isolated geometry changes
+viewport pixels and that the asynchronous view settles. Native source parity,
+source units/axes, materials, time-based appearance and costs remain unverified;
+this does not establish general source-format support. Local validation: 2,596 tests
+passed with 20 ignored in the normal run; the adapter-dependent scene test passed
+separately, including pointer orbit/pan and wheel zoom. All-target clippy, format,
+layers, locks, secrets and the L0?L2 WebAssembly check passed. The CLI and native
+example built successfully. See [scene bundles](scene-bundles.md).
 
 ### Local Codex discovery and sign-in (R2.2)
 
