@@ -1067,6 +1067,9 @@ Owner: open · Status: in progress
 - [x] Codex's and Grok Build's `config.toml` keep their Windows line endings when setup adds or
       removes our entry.
       — claimed: Plastic-time, branch bugfix/r2.2-toml-config-crlf
+- [x] A key piped to `ai add --key-stdin` from Windows PowerShell 5.1 kept the byte-order mark
+      it can start with, so the key failed as a header; it's now dropped with the spaces and newline (#1448)
+      — claimed: bflatastic, branch bugfix/r2.2-key-stdin-bom
 
 ### R2.4 Runtime study for apps and games (with consent)
 Owner: maintainers · Status: in progress

@@ -214,10 +214,16 @@ fn read_key(key_env: &Option<String>, key_stdin: bool) -> Result<Option<String>,
     if key_stdin {
         let mut s = String::new();
         std::io::stdin().take(64 * 1024).read_to_string(&mut s).map_err(|e| format!("reading the key from stdin: {e}"))?;
-        let k = s.trim().to_string();
+        let k = key_from_stdin(&s);
         return if k.is_empty() { Err("no key on stdin".into()) } else { Ok(Some(k)) };
     }
     Ok(None)
+}
+
+/// A key piped in, without the spaces, newline or byte-order mark around it: Windows PowerShell 5.1
+/// can put a BOM before what it pipes, which `trim` keeps, and the key then failed as a header (#1448).
+fn key_from_stdin(text: &str) -> String {
+    text.trim().trim_start_matches('\u{feff}').trim().to_string()
 }
 
 /// Dispatch AI configuration, discovery and model-selection commands through the shared hub.
@@ -460,4 +466,19 @@ pub fn doctor_checks() -> Vec<craft_anything_setup::Check> {
                 .fix(format!("Run `craft-anything-cli ai test {name}` for details.")),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::key_from_stdin;
+
+    /// #1448: a key piped from Windows PowerShell 5.1 can start with a byte-order mark and end with
+    /// a newline; neither is part of the key.
+    #[test]
+    fn a_piped_key_loses_its_byte_order_mark_and_newline() {
+        assert_eq!(key_from_stdin("\u{feff}sk-test\r\n"), "sk-test");
+        assert_eq!(key_from_stdin("  \u{feff} sk-test \n"), "sk-test");
+        assert_eq!(key_from_stdin("sk-test"), "sk-test");
+        assert_eq!(key_from_stdin("\u{feff}\r\n"), "");
+    }
 }
