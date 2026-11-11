@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	Подключение к {name}… {seconds
 Stopped adding {name}.	Добавление {name} остановлено.
 It isn't there any more, so {program} runs in its place.	Его там больше нет, поэтому вместо него запускается {program}.
 Use it	Использовать
+Interface font	Шрифт интерфейса
+The font for the whole window.	Шрифт для всего окна.
+Add a font file…	Добавить файл шрифта…
+That file is not a .ttf or .otf font.	Этот файл не шрифт .ttf или .otf.
+That font file is too large.	Этот файл шрифта слишком большой.
+That file is not a font this app can read.	Этот файл не шрифт, который это приложение может прочитать.

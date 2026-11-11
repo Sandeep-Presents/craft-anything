@@ -118,6 +118,80 @@ pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
     }
 }
 
+/// The fonts the person added to `<config dir>/fonts/`, in name order.
+fn custom_fonts() -> Vec<String> {
+    let Ok(dir) = std::fs::read_dir(theme::user_fonts_dir()) else { return Vec::new() };
+    let mut out: Vec<String> = dir
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| {
+            let n = n.to_ascii_lowercase();
+            n.ends_with(".ttf") || n.ends_with(".otf")
+        })
+        .collect();
+    out.sort_unstable();
+    out
+}
+
+/// Check that a picked file is a font egui can read, then let the engine copy it into the fonts
+/// folder (filesystem writes belong below the UI). Returns the name it was stored under.
+pub(crate) fn add_font_file(path: &std::path::Path) -> Result<String, String> {
+    let ext = path.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+    if !(ext == "ttf" || ext == "otf") {
+        return Err(tr("That file is not a .ttf or .otf font."));
+    }
+    let size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
+    if size > theme::MAX_FONT_BYTES {
+        return Err(tr("That font file is too large."));
+    }
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    if !theme::font_is_readable(&bytes) {
+        return Err(tr("That file is not a font this app can read."));
+    }
+    craft_anything_engine::settings::add_font_file(path)
+}
+
+/// What the font picker shows for a stored choice.
+fn font_label(chosen: &str) -> String {
+    if chosen.is_empty() {
+        return tr("Default");
+    }
+    if let Some(family) = chosen.strip_prefix("embedded:") {
+        return family.to_string();
+    }
+    chosen.strip_prefix("file:").unwrap_or(chosen).to_string()
+}
+
+fn font_row(app: &mut CraftApp, ui: &mut Ui) {
+    row(ui, "Interface font", "The font for the whole window.", |ui| {
+        let chosen = app.settings.font.clone();
+        egui::ComboBox::from_id_salt("ui-font").icon(widgets::combo_icon).selected_text(font_label(&chosen)).show_ui(ui, |ui| {
+            if ui.selectable_label(chosen.is_empty(), tr("Default")).clicked() {
+                app.settings.font.clear();
+                app.settings_changed();
+            }
+            for family in theme::embedded_families() {
+                let value = format!("embedded:{family}");
+                if ui.selectable_label(chosen == value, family).clicked() {
+                    app.settings.font = value;
+                    app.settings_changed();
+                }
+            }
+            for name in custom_fonts() {
+                let value = format!("file:{name}");
+                if ui.selectable_label(chosen == value, name.clone()).clicked() {
+                    app.settings.font = value;
+                    app.settings_changed();
+                }
+            }
+        });
+        if widgets::secondary(ui, Some("plus"), "Add a font file…").clicked() {
+            // The dialog and the copy run on a worker thread, like every other picker here.
+            app.pick(Pick::FontFile);
+        }
+    });
+}
+
 fn row(ui: &mut Ui, title: &str, sub: &str, add: impl FnOnce(&mut Ui)) {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
@@ -187,6 +261,7 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
     if LANGUAGES.len() > 1 {
         language(app, ui);
     }
+    font_row(app, ui);
     row(ui, "Show the welcome again", "Runs the first-run steps next time.", |ui| {
         if widgets::secondary(ui, Some("refresh-cw"), "Reset").clicked() {
             app.settings.first_run_done = false;

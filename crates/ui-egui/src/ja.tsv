@@ -947,3 +947,9 @@ yesterday	昨日
 … {n} more	… ほか {n} 件
 … {n} older	… 古いもの {n} 件
 Connecting to {name}… {seconds} s	{name} に接続中… {seconds} 秒
+Interface font	表示フォント
+The font for the whole window.	ウィンドウ全体のフォントです。
+Add a font file…	フォントファイルを追加…
+That file is not a .ttf or .otf font.	そのファイルは .ttf か .otf のフォントではありません。
+That font file is too large.	そのフォントファイルは大きすぎます。
+That file is not a font this app can read.	そのファイルはこのアプリが読めるフォントではありません。

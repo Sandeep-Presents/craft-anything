@@ -175,3 +175,5 @@ already include. Local builds must set `CRAFT_FONTS_DIR` to a craft-fonts checko
 before compiling to get the same glyph coverage. The catalogs add no font assets.
 Check each script, clipping, narrow windows and native file dialogs visually
 on each platform; catalog coverage alone does not verify layout or fonts.
+
+A person whose language needs a face the build does not carry can add one in Settings → General → Interface font: `Add a font file…` copies a `.ttf`/`.otf` into `<config dir>/fonts/` and the interface uses it (a file egui cannot parse is refused, and a missing one falls back to the built-in font).

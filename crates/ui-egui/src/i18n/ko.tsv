@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	{name}에 연결하는 중… {seconds}초
 Stopped adding {name}.	{name} 추가를 멈췄습니다.
 It isn't there any more, so {program} runs in its place.	더 이상 그곳에 없어서 대신 {program}이(가) 실행됩니다.
 Use it	이것 사용
+Interface font	인터페이스 글꼴
+The font for the whole window.	창 전체에 쓰는 글꼴입니다.
+Add a font file…	글꼴 파일 추가…
+That file is not a .ttf or .otf font.	그 파일은 .ttf 또는 .otf 글꼴이 아닙니다.
+That font file is too large.	그 글꼴 파일은 너무 큽니다.
+That file is not a font this app can read.	그 파일은 이 앱이 읽을 수 있는 글꼴이 아닙니다.

@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
 Stopped adding {name}.	已停止新增 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那裡，因此改用 {program}。
 Use it	使用它
+Interface font	介面字型
+The font for the whole window.	整個視窗使用的字型。
+Add a font file…	新增字型檔案…
+That file is not a .ttf or .otf font.	該檔案不是 .ttf 或 .otf 字型。
+That font file is too large.	該字型檔案太大。
+That file is not a font this app can read.	該檔案不是此應用程式能讀取的字型。

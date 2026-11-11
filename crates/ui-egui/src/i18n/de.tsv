@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	Verbinde mit {name}… {seconds} s
 Stopped adding {name}.	Hinzufügen von {name} abgebrochen.
 It isn't there any more, so {program} runs in its place.	Es ist nicht mehr dort, daher läuft stattdessen {program}.
 Use it	Verwenden
+Interface font	Oberflächen-Schrift
+The font for the whole window.	Die Schrift für das ganze Fenster.
+Add a font file…	Schriftdatei hinzufügen…
+That file is not a .ttf or .otf font.	Diese Datei ist keine .ttf- oder .otf-Schrift.
+That font file is too large.	Diese Schriftdatei ist zu groß.
+That file is not a font this app can read.	Diese Datei ist keine Schrift, die diese App lesen kann.

@@ -1399,6 +1399,7 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "skrifa",
  "sys-locale",
  "tempfile",
 ]

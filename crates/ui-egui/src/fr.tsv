@@ -1462,3 +1462,9 @@ Couldn't change the approvals:	Impossible de modifier les autorisations :
 What the builder may do without asking you, in this project.	Ce que le constructeur peut faire sans vous demander, dans ce projet.
 Default follows Auto mode: with it on, what can be undone goes ahead and the rest is refused; with it off, the builder asks.	Par défaut suit le mode automatique : activé, ce qui peut être annulé se fait et le reste est refusé ; désactivé, le constructeur demande.
 Connecting to {name}… {seconds} s	Connexion à {name}… {seconds} s
+Interface font	Police d'interface
+The font for the whole window.	La police de toute la fenêtre.
+Add a font file…	Ajouter un fichier de police…
+That file is not a .ttf or .otf font.	Ce fichier n'est pas une police .ttf ou .otf.
+That font file is too large.	Ce fichier de police est trop volumineux.
+That file is not a font this app can read.	Ce fichier n'est pas une police que cette application peut lire.

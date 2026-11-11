@@ -1467,3 +1467,9 @@ Connecting to {name}… {seconds} s	Đang kết nối với {name}… {seconds} 
 Stopped adding {name}.	Đã dừng thêm {name}.
 It isn't there any more, so {program} runs in its place.	Nó không còn ở đó nữa, nên {program} chạy thay thế.
 Use it	Dùng nó
+Interface font	Phông chữ giao diện
+The font for the whole window.	Phông chữ cho toàn bộ cửa sổ.
+Add a font file…	Thêm tệp phông chữ…
+That file is not a .ttf or .otf font.	Tệp đó không phải phông chữ .ttf hoặc .otf.
+That font file is too large.	Tệp phông chữ đó quá lớn.
+That file is not a font this app can read.	Tệp đó không phải phông chữ mà ứng dụng này đọc được.
