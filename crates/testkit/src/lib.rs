@@ -1008,3 +1008,5 @@ pub fn temp_file(name: &str, bytes: &[u8]) -> std::path::PathBuf {
     std::fs::write(&p, bytes).unwrap();
     p
 }
+
+pub mod scene_bundle;

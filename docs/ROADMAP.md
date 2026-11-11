@@ -86,6 +86,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
 | 3 | R1.5 | — | Small leftovers |
 | Any | M3: R3.3, R3.9, R3.11 | — | Open lane |
+| Any | R3.14 Read-only scene bundles | — | Bounded headless inspection and a thin experimental viewport |
 | Later | R4.1 macOS CLI, R4.2 Managed tier | **decision** | Not before M5 |
 
 ---
@@ -2460,6 +2461,21 @@ Owner: open · Status: in progress
       template only real calendar dates in API paths (#602–#605, by Afloat16)
 - [x] Preserve empty query pairs when matching older stand-in recordings, without treating raw
       query separators as pairs — claimed: Afloat16, branch `bugfix/r3.13-preserve-empty-query-pairs-20261103`
+
+---
+
+### R3.14 Read-only project and scene viewer
+Owner: open · Status: in progress (experimental 3D/4D/5D available; parity expansion remains open)
+- [x] Add a bounded versioned scene-bundle reader and headless inspection/picking tools, with a native experimental viewport for orbit, pan, zoom, resource selection and hide/isolate. Preserve unknown units, axes and materials in the result. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Read the admitted project layout directly without a source application or prepared bundle; retain storage provenance and reject unsupported layouts. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Independently compare native leaf coordinates and explicit object RGB using isolated controls; preserve unverified engineering measurements and full visual parity in results. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Embed the experimental viewport in the main desktop workbench through the shared engine, including normal file opening. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add conservative camera-frustum culling and measured large-scene rendering budgets, preserving picking filters and recoverable errors. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add admitted Install/Maintain intervals, calendar-derived dates and explicit custom-Install interval preview, with focus/playback and unresolved appearance. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add independently controlled Material Fixed/PerUnit cost evaluation, source quantities, working-time rates, separate direct budgets and unresolved actual costs. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Extend native appearance parity to inherited colours, textures, directional growth and transparency after independent controls; the current interval preview explicitly omits these effects. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Independently validate engineering mesh quantities, further resource cost kinds and currency/unit conversion before admitting them. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Validate the available independent project corpus and additional source versions; admit only observed layouts and report unsupported inputs explicitly. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
 
 ---
 

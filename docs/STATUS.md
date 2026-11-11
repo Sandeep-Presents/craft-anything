@@ -1,10 +1,51 @@
 # Status
 
 What works today and how it was checked. The plan, owners and order of work are in
-[ROADMAP.md](ROADMAP.md). Last updated 2026-11-09. The baseline audit on 2026-10-23 from `main` had 923 tests passing;
+[ROADMAP.md](ROADMAP.md). Last updated 2026-11-12. The baseline audit on 2026-10-23 from `main` had 923 tests passing;
 workspace clippy, layers, fmt and the secret scan of all history were clean. Chinese UI checks are listed separately below.
 
 ## What works, and how it was checked
+
+### Experimental project and scene viewer (R3.14)
+
+The desktop Project viewer opens the admitted 6.5.5.28 `.sp` layout directly or a
+version-1 scene bundle through the same Deep-only engine tools used by CLI/MCP.
+It offers instanced 3D, orbit/pan/zoom, picking, resource filters, calendar-derived
+task dates, 4D focus/playback and 5D source quantities/costs. The main workbench
+shares its engine and settings; an existing file path routes into the viewer.
+Optional interval preview states that directional growth, transparency and native
+material effects are omitted. Missing dates, unknown profiles and unsupported
+cost inputs remain explicit. Direct task budgets are separate from experimental
+resource forecasts; partial sums are not presented as complete costs.
+
+A private source project rendered 33,513 instances / 3,699,006 vertices on a
+discrete Vulkan GPU. All 241 tasks obtained schedule bounds; the root start/finish
+and complete direct budget matched retained native observations. Original and
+intentionally changed control copies retained their distinct totals. Direct-import
+geometry matched every frozen f64
+position, GPU byte, mesh, instance transform and resource identity. Three native
+leaf centres independently agreed in XYZ metres to four displayed decimals.
+Explicit object RGB was located using a saved/reopened single-colour control and
+three native leaf readbacks; only the admitted direct entity override is rendered.
+Inherited colours, textures and full source appearance remain unresolved.
+Native-controlled Fixed/PerUnit, actual/remaining and rate-boundary examples also
+matched the headless evaluator. These are scoped observations: no arbitrary-file
+unit guarantee, engineering takeoff, currency conversion or full visual parity.
+
+Workers own parsing, evaluation, uploads and draws; GPU completion applies bounded
+backpressure. Conservative frustum tests include f32 quantization margins, and a
+50-million expanded-triangle budget returns a recoverable error rather than an
+undisclosed partial model. Rendering errors retain GPU ownership. Headless pages
+are capped while the desktop retains a complete bounded typed frame. Synthetic
+regressions cover malformed inputs, cancellation, date/profile ambiguity,
+monetary rounding, stale selections and recovery. See [viewer details](scene-bundles.md).
+
+Local validation: 2,822 tests passed with 22 ignored in the normal selected-crate
+run. Four adapter-dependent GPU tests passed separately, including main-workbench
+file opening, consecutive idle frames with large controls, error recovery, and
+pointer-driven camera/visibility changes. All-target clippy, format, layers,
+locks, tool registration, secrets and L0–L2 WebAssembly checks passed. Desktop,
+CLI and native viewer examples built successfully.
 
 ### Local Codex discovery and sign-in (R2.2)
 

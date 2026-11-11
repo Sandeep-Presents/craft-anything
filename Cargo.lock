@@ -1386,6 +1386,7 @@ dependencies = [
  "craft-anything-ai",
  "craft-anything-engine",
  "craft-anything-engines",
+ "craft-anything-formats",
  "craft-anything-platform",
  "craft-anything-setup",
  "craft-anything-testkit",
