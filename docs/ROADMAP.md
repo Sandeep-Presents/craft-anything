@@ -772,6 +772,9 @@ Owner: open · Status: in progress
 - [x] `doctor` looks a registration's bare command (`craft-anything-cli`, as a hand-made entry
       names it) up on PATH, as the app starting it does, instead of calling it missing.
       — claimed: Plastic-time, branch bugfix/r2.2-doctor-cli-on-path
+- [x] `doctor` counts a program found through a PATH folder that links to another (merged
+      /usr's `/bin -> /usr/bin`) once, instead of warning about "several copies" and suggesting
+      the only one be removed (#1550)
 - [x] Settings says when a saved agent program is gone and which one runs in its place
       (`AiHub::replaced_programs`, read on a worker with the AI list), with "Use it" to save
       that one when it's a file of its own (#721, #1468)

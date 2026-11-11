@@ -65,6 +65,14 @@ pub struct DoctorReport {
     pub checks: Vec<Check>,
 }
 
+/// The paths that are different files, in order. Two PATH folders where one links to the other
+/// (merged /usr's `/bin -> /usr/bin`) find the same program twice; removing "the copy" would
+/// remove the only one (#1550). A path that can't be resolved is kept as it is.
+fn distinct_files(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = std::collections::BTreeSet::new();
+    paths.into_iter().filter(|p| seen.insert(std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()))).collect()
+}
+
 /// Runs the read-only checks: the CLI binary, each selected app's registration and skills, and,
 /// when asked, the engines and an MCP self-test.
 pub fn doctor(host: &Host, req: &DoctorRequest) -> DoctorReport {
@@ -79,7 +87,7 @@ pub fn doctor(host: &Host, req: &DoctorRequest) -> DoctorReport {
             Check::new("binary", CheckStatus::Fail, "craft-anything-cli was not found.").fix("Install Craft Anything; the CLI ships next to the desktop app."),
         ),
     }
-    let on_path = craft_anything_platform::which_all("craft-anything-cli");
+    let on_path = distinct_files(craft_anything_platform::which_all("craft-anything-cli"));
     if on_path.len() > 1 {
         let list: Vec<String> = on_path.iter().map(|p| p.display().to_string()).collect();
         checks.push(
@@ -401,5 +409,22 @@ mod tests {
         let hang = mcp_self_test("sleep", &["30".to_string()], Duration::from_millis(300));
         assert_eq!(hang.status, CheckStatus::Fail);
         assert_eq!(mcp_self_test("/no/such/craft-anything-cli", &[], Duration::from_secs(1)).status, CheckStatus::Fail);
+    }
+
+    /// #1550: a PATH folder that links to another (merged /usr's `/bin -> /usr/bin`) is the same
+    /// copy, while a second real file is still a second copy.
+    #[test]
+    fn a_linked_path_folder_is_not_another_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join("bin");
+        std::fs::create_dir(&bin).unwrap();
+        std::fs::write(bin.join("craft-anything-cli"), b"x").unwrap();
+        std::os::unix::fs::symlink(&bin, dir.path().join("link")).unwrap();
+        let linked = distinct_files(vec![bin.join("craft-anything-cli"), dir.path().join("link/craft-anything-cli")]);
+        assert_eq!(linked, [bin.join("craft-anything-cli")], "the first-listed path is kept");
+        let other = dir.path().join("other");
+        std::fs::create_dir(&other).unwrap();
+        std::fs::write(other.join("craft-anything-cli"), b"x").unwrap();
+        assert_eq!(distinct_files(vec![bin.join("craft-anything-cli"), other.join("craft-anything-cli")]).len(), 2);
     }
 }
