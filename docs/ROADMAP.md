@@ -84,6 +84,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 3 | R2.4 Runtime study, R2.5 Behaviour checks | scripted input (R2.4) before R2.5's sheet check | Makes "ready" mean more for apps and games |
 | 3 | R2.7, R2.8 | — | Small gaps left in finished work |
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
+| 3 | R2.14 Moving your own site off a hosted platform | — | Small and open; owners need to know what plain files can't carry |
 | 3 | R1.5 | — | Small leftovers |
 | Any | M3: R3.3, R3.9, R3.11 | — | Open lane |
 | Later | R4.1 macOS CLI, R4.2 Managed tier | **decision** | Not before M5 |
@@ -1498,6 +1499,16 @@ to the project next.
 - [ ] Opening a pin that's already running brings its window to the front, instead of a message
 - [x] How much space pins take in Settings
       — claimed: Afloat16, branch feature/r2.10-pinned-copy-storage
+
+### R2.14 Moving your own site off a hosted platform
+Owner: open · Status: todo
+A site on a platform that can't export it can be rebuilt as plain files, but its owner needs to
+know what won't come along.
+- [ ] After a website build, list what plain files can't carry over (forms, sign-ins, payments,
+      bookings), read from the capture: Clean room keeps links and form outlines. Say which
+      pictures the owner has to supply: the capture saves no picture files, only their
+      addresses, sizes and alt text, and the builder uses placeholders for photos and logos
+      unless the person confirms they own them
 
 ---
 
