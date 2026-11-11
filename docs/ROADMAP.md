@@ -912,7 +912,7 @@ Owner: open · Status: in progress
 - [ ] A table of what each adapter gets (our tool server, approvals, resume, notes mid-turn, a
       message of any length), as typed data, with a test that fails when one is left out.
       `AgentAdapter` already answers some, such as `resumes` and `prompt_on_stdin`. The lines below
-      fill it in
+      fill it in — claimed: muraa-p, branch feature/r2.2-adapter-grants
 - [ ] OpenCode's plain adapter never passes our tool server, so its builder has none of our tools
       and hunts for a setting that doesn't exist (#481). Hand it the server, or build over ACP by
       default once that passes
