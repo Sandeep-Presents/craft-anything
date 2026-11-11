@@ -97,6 +97,15 @@ pub const PROVIDERS: &[Provider] = &[
         default_model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
         catalog_id: "deepinfra",
     },
+    Provider {
+        name: "IO Intelligence",
+        kind: BackendKind::OpenaiCompatible,
+        base_url: "https://api.intelligence.io.solutions/api/v1",
+        key_env: "IONET_API_KEY",
+        alt_key_env: None,
+        default_model: "meta-llama/Llama-3.3-70B-Instruct",
+        catalog_id: "io-net",
+    },
 ];
 
 impl Provider {
