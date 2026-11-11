@@ -20,6 +20,7 @@ pub struct LangInfo {
 
 pub static LANGUAGES: &[LangInfo] = &[
     LangInfo { code: "en", name: "English", source: "" },
+    LangInfo { code: "ar", name: "العربية", source: include_str!("i18n/ar.tsv") },
     LangInfo { code: "de", name: "Deutsch", source: include_str!("i18n/de.tsv") },
     LangInfo { code: "ka", name: "ქართული", source: include_str!("i18n/ka.tsv") },
     LangInfo { code: "fr", name: "Français", source: include_str!("fr.tsv") },

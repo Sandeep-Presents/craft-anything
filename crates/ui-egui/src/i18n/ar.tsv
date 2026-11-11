@@ -1,0 +1,403 @@
+# ar: Arabic UI translations. Licensed MIT OR Apache-2.0.
+# UTF-8: English source<TAB>Arabic translation. Keep placeholders and escapes intact.
+OpenCode default	الإعداد الافتراضي لـ OpenCode
+Model default	الإعداد الافتراضي للنموذج
+Thinking depth	عمق التفكير
+OpenCode model	نموذج OpenCode
+Remote program	برنامج بعيد
+Reload models	إعادة تحميل النماذج
+Apply	تطبيق
+No chat models are visible in {agent}. Check its setup, then reload.	لا توجد نماذج دردشة مرئية في {agent}. تحقق من إعداده، ثم أعد التحميل.
+The saved model is no longer visible. Choose another model or the {agent} default.	النموذج المحفوظ لم يعد مرئيًا. اختر نموذجًا آخر أو الإعداد الافتراضي لـ {agent}.
+OpenCode has no visible chat models. Connect a provider in OpenCode, then reload.\n	لا يحتوي OpenCode على نماذج دردشة مرئية. conect موفر في OpenCode، ثم أعد التحميل.
+The saved model is no longer visible. Choose another model or the OpenCode default.	النموذج المحفوظ لم يعد مرئيًا. اختر نموذجًا آخر أو الإعداد الافتراضي لـ OpenCode.
+The saved thinking depth is unavailable for this model. Choose its default or an offered depth.	عمق التفكير المحفوظ غير متاح لهذا النموذج. اختر إعداده الافتراضي أو Depthًا معروضًا.
+List an agent's models	قائمة نماذج وكيل
+Choose an agent's model and thinking	اختر نموذج وكيل وعمق التفكير
+ GB	 غيغابايت
+ and {n} more	 و {n} أخرى
+ {ascii}	 {ascii}
+ · ${c:.2}	 · ${c:.2}
+ · ssh {h}	 · ssh {h}
+(1 picture attached)	(صورة واحدة مرفقة)
+({n} pictures attached)	({n} صور مرفقة)
+, ${c:.4}	, ${c:.4}
+.NET application graph	رسم بياني لتطبيق .NET
+.NET apps	تطبيقات .NET
+.NET assembly overview	نظرة عامة على تجميع .NET
+.NET native calls	استدعاءات .NET الأصلية
+.NET types and methods	أنواع وطرق .NET
+/btw {}	/btw {}
+0x… or number	0x… أو رقم
+A .NET program (C#, F# or VB)	برنامج .NET (C# أو F# أو VB)
+A DOS program	برنامج DOS
+A Java program	برنامج Java
+A Linux (or Unix) program	برنامج Linux (أو Unix)
+A Mac or iPhone program	برنامج Mac أو iPhone
+A SQLite database (how an app stores its data)	قاعدة بيانات SQLite (كيف يخزن التطبيق بياناته)
+A WebAssembly module (code that runs in a browser)	وحدة WebAssembly (رمز يعمل في المتصفح)
+A Windows program	برنامج Windows
+A ZIP archive	أرشيف ZIP
+A bundle of ready-made code that many programs share.	حزمة من الكود الجاهز الذي تشاركه العديد من البرامج.
+A coding agent such as Claude Code builds it, and an AI answers your questions in plain words. Change this any time in Settings → AI.	وكيل برمجي مثل Claude Code يبنيه، ويجيب الذكاء الاصطناعي على أسئلتك بلغة بسيطة. غير هذا في أي وقت في الإعدادات → الذكاء الاصطناعي.
+A command's output shows here when it finishes.	يظهر مخرج الأمر هنا عند انتهائه.
+A copy to try something else from here.	نسخة لتجربة شيء آخر من هنا.
+A file of machine code that a computer can run directly, like an .exe or an app.	ملف رمز آلي يمكن للكمبيوتر تشغيله مباشرة، مثل .exe أو تطبيق.
+A file that a computer can run as a program.	ملف يمكن للكمبيوتر تشغيله كبرنامج.
+A file that links packed web code back to the original, readable source files.	ملف يربط كائن الويب المضغوط بملفات المصدر الأصلية القابلة للقراءة.
+A file we don't recognise yet	ملف لا نتعرف عليه بعد
+A first look at a file you're unsure about, without running it.\n	نظرة أولى على ملف أنت غير متأكد منه، دون تشغيله.
+A folder	مجلد
+A folder has no bytes of its own	المجلد ليس له بايتات خاصة به
+A free reverse-engineering tool from the NSA. Deep mode uses it for extra detail; Clean room mode never does.	أداة عكس هندسي مجانية من NSA. وضع العمق يستخدمها للمزيد من التفاصيل؛ وضع الغرفة النظيفة لا يستخدمها أبدًا.
+A new project.	مشروع جديد.
+A target to study.	هدف لدراسته.
+About	حول
+About Craft Anything	حول Craft Anything
+Add	إضافة
+Add an agent	إضافة وكيل
+Add a provider	إضافة موفر
+Add folder	إضافة مجلد
+AI	الذكاء الاصطناعي
+AI assistant	مساعد الذكاء الاصطناعي
+AI build	بناء الذكاء الاصطناعي
+AI coding agent	وكيل برمجة الذكاء الاصطناعي
+AI model	نموذج الذكاء الاصطناعي
+AI provider	موفر الذكاء الاصطناعي
+AI settings	إعدادات الذكاء الاصطناعي
+All	الكل
+All done.\n	انتهى كل شيء.
+Allow	السماح
+Always allow	السماح دائمًا
+And	و
+Angles	زوايا
+API key	مفتاح واجهة برمجة التطبيقات
+Apply changes	تطبيق التغييرes
+Are you sure?\n	هل أنت متأكد?
+ArtCraft	فني الحرف
+Assets	الأصول
+Assistant	مساعد
+Auto	تلقائي
+Available	متوفر
+Back	خلف
+Back up	نسخ احتياطي
+Backup	نسخ احتياطي
+Browse	تصفح
+Build	بناء
+Build log	سجل البناء
+Building...	جاري البناء...
+Cancel	إلغاء
+Cannot undo.\n	لا يمكن التراجع.
+Change	تغيير
+Check	تحقق
+Checking...	جاري التحقق...
+Clear	مسح
+Click to edit	انقر للتحرير
+Close	إغلاق
+Code	رمز
+Collapse	طي
+Color	لون
+Column	عمود
+Command	أمر
+Comment	تعليق
+Compare	مقارنة
+Completed.\n	اكتمل.
+Continue	استمرار
+Copy	نسخ
+Copy path	نسخ المسار
+Create	إنشاء
+Create project	إنشاء 프로젝트
+Current	الحالي
+Custom	مخصص
+Cut	قص
+Data	بيانات
+Database	قاعدة بيانات
+Date	التاريخ
+Delete	حذف
+Delete project	حذف المشروع
+Description	الوصف
+Details	التفاصيل
+Developer	المطور
+Document	المستند
+Done	انتهى
+Download	تنزيل
+Download logs	تنزيل السجلات
+Edit	تحرير
+Edit project	تحرير المشروع
+Enabled	مفعل
+Enable	تفعيل
+End	نهاية
+Error	خطأ
+Errors	أخطاء
+Event	حدث
+Example	مثال
+Exit	خروج
+Expand	توسيع
+Export	تصدير
+Export project	تصدير المشروع
+Extension	امتداد
+External	خارجي
+Extra	إضافي
+Field	حقل
+File	ملف
+File size	حجم الملف
+Filename	اسم الملف
+Files	ملفات
+Filter	تصفية
+Find	البحث
+First	أول
+Folder	مجلد
+Follow	اتبع
+Font	خط
+Format	تنسيق
+From	من
+Full	كامل
+Generate	إنشاء
+Get	احصل
+Go	اذهب
+Group	مجموعة
+Help	مساعدة
+Hide	إخفاء
+History	السجل
+Home	الرئيسية
+Host	المضيف
+Hour	ساعة
+ID	المعرف
+Image	صورة
+Import	استيراد
+Import project	استيراد المشروع
+Include	تضمين
+Index	할فهرس
+Info	معلومات
+Input	إدخال
+Insert	إدراج
+Install	تثبيت
+Install now	تثبيت الآن
+Instance	مثال
+Instruction	تعليمات
+Internal	داخلي
+Invalid	غير صالح
+Item	عنصر
+Items	عناصر
+Job	وظيفة
+Join	انضمام
+Key	مفتاح
+Keyboard	لوحة المفاتيح
+Label	تسمية
+Language	اللغة
+Last	آخر
+Launch	إطلاق
+Left	يسار
+Less	أقل
+Level	المستوى
+License	الترخيص
+Line	خط
+Link	رابط
+List	قائمة
+Load	تحميل
+Local	محلي
+Lock	قفل
+Log	سجل
+Login	تسجيل الدخول
+Logout	تسجيل الخروج
+Long	طويل
+Look	انظر
+Machine	آلة
+Main	الرئيسية
+Manage	إدارة
+Manual	دليل
+Map	خريطة
+Max	أعلى
+Member	عضو
+Menu	القائمة
+Merge	دمج
+Message	رسالة
+Min	أدنى
+Mode	الوضع
+Model	النموذج
+Modify	تعديل
+More	المزيد
+Move	نقل
+Name	اسم
+New	جديد
+Next	التالي
+No	لا
+None	لا شيء
+Normal	عادي
+Not found	غير موجود
+Notice	إشعار
+Number	رقم
+Object	كائن
+Off	إيقاف
+OK	موافق
+Old	قديم
+On	تشغيل
+Open	فتح
+Open file	فتح ملف
+Open folder	فتح مجلد
+Open project	فتح مشروع
+Option	خيار
+Options	خيارات
+Output	مخرج
+Overview	نظرة عامة
+Page	صفحة
+Password	كلمة المرور
+Path	مسار
+Pause	إيقاف مؤقت
+Payment	دفع
+Pending	قيد الانتظار
+Percent	نسبة مئوية
+Permission	إذن
+Phone	هاتف
+Photo	صورة
+Pixel	بكسل
+Plus	زائد
+Point	نقطة
+Portal	بوابة
+Position	الموضع
+Power	طاقة
+Previous	السابق
+Price	السعر
+Print	طباعة
+Priority	الأولوية
+Private	خاصة
+Product	منتج
+Profile	ملف التعريف
+Project	مشروع
+Property	خاصية
+Protect	حماية
+Public	عام
+Pull	سحب
+Push	دفع
+Quality	الجودة
+Question	سؤال
+Quick	سريع
+Quit	إنهاء
+Radio	راديو
+Range	نطاق
+Read	اقرأ
+Read only	للقراءة فقط
+Record	سجل
+Redo	إعادة
+Refresh	تحديث
+Region	منطقة
+Register	تسجيل
+Remove	إزالة
+Rename	إعادة تسمية
+Repair	إصلاح
+Repeat	تكرار
+Replace	استبدال
+Report	تقرير
+Repository	مستودع
+Request	طلب
+Reset	إعادة تعيين
+Resize	تغيير الحجم
+Resource	مورد
+Response	استجابة
+Result	نتيجة
+Return	عودة
+Review	مراجعة
+Right	يمين
+Risk	خطر
+Rollback	تراجع
+Root	الجذر
+Run	تشغيل
+Run now	تشغيل الآن
+Running	جارٍ التشغيل
+Save	حفظ
+Save as	حفظ باسم
+Saved	تم الحفظ
+Saving	جارٍ الحفظ
+Scan	مسح
+Schema	مخطط
+Script	نص برمجي
+Search	بحث
+Section	قسم
+Security	الأمان
+See	انظر
+Select	تحديد
+Selected	تم التحديد
+Selection	التحديد
+Send	إرسال
+Server	خادم
+Service	خدمة
+Session	جلسة
+Set	ضبط
+Setting	إعداد
+Settings	الإعدادات
+Share	مشاركة
+Show	إظهار
+Sign in	تسجيل الدخول
+Sign out	تسجيل الخروج
+Size	الحجم
+Skip	تخطي
+Slide	الشريحة
+Slow	بطيء
+Small	صغير
+Smart	ذكي
+Sort	ترتيب
+Source	المصدر
+Space	مساحة
+Special	خاصة
+Start	بدء
+Started	تم البدء
+Starting	جارٍ البدء
+State	الحالة
+Status	الحالة
+Step	خطوة
+Stop	إيقاف
+Stopped	تم الإيقاف
+Storage	التخزين
+String	سلسلة
+Style	الأسلوب
+Subject	الموضوع
+Submit	إرسال
+Success	نجاح
+Summary	ملخص
+Support	الدعم
+Switch	تبديل
+System	النظام
+Table	جدول
+Tag	علامة
+Target	الهدف
+Task	مهمة
+Team	الفريق
+Text	نص
+Then	ثم
+This	هذا
+Time	الوقت
+Title	العنوان
+To	إلى
+Today	اليوم
+Tool	أداة
+Topic	الموضوع
+Total	المجموع
+Type	النوع
+UI	واجهة المستخدم
+Unable	غير قادر
+Understand	افهم
+Update	تحديث
+Upgrade	ترقية
+Upload	رفع
+Use	استخدام
+User	مستخدم
+Username	اسم المستخدم
+Value	القيمة
+Version	الإصدار
+View	عرض
+Visit	زر
+Wait	انتظر
+Warning	تحذير
+Watch	شاهد
+Web	الويب
+Website	موقع إلكتروني
+Welcome	مرحباً
+Width	العرض
+Write	اكتب
+Wrong	خطأ
+Yes	نعم
+Yesterday	الأمس
+You	أنت
+Your	خاصتك
+Zero	صفر
+Zoom	تكبير
