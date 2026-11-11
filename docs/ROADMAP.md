@@ -1200,6 +1200,10 @@ room throughout: nothing is pulled off the device or decoded.
       skips Study for good (seen twice on the second study of a TV player). A failed map tries
       once more, then stops the run with the reason; and Study counts as done only with a
       screens.json.
+- [ ] The device check leaves a device as it found it: after a pass the build stays in front on
+      the build device and the test device, and a player that holds the screen on kept a test TV
+      awake around the clock for days. When a pass ends, stop the build's app on each device, and
+      put back to sleep a device the check itself woke.
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
