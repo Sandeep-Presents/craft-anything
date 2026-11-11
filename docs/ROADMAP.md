@@ -1168,6 +1168,9 @@ Owner: open · Status: in progress
 - [x] System-tool and media-player phrases keep the app target: "a low level disk tool",
       "an MPEG 2 player" and "a single player app for movies". Independent game cues still apply
       — claimed: Afloat16, branch bugfix/r2.7-media-and-system-apps
+- [x] Record a Rust build under the library it used: Cargo.toml dependencies count as well as package.json,
+      and Rust's game default no longer keeps its name when the build took eframe instead (#1398).
+      — claimed: bflatastic, branch bugfix/r2.7-record-rust-stack-built
 
 ### R2.8 Clean room means clean room
 Owner: maintainers · Status: in progress

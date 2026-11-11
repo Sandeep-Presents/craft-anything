@@ -103,19 +103,33 @@ pub fn asked_for(words: &str) -> Option<&'static Stack> {
     catalogue().iter().find(|s| s.asked_by.iter().any(|p| words.contains(p.as_str())))
 }
 
-/// The stack a build in `app` uses, from its package.json dependencies (the first stack in table
-/// order whose `uses` it lists); None when it has none or names no stack in the table.
+/// The dependencies a folder's package.json and Cargo.toml list.
+fn dependencies(dir: &std::path::Path) -> Vec<String> {
+    let mut deps = craft_anything_engine::outputs::npm_dependencies(dir);
+    deps.extend(craft_anything_engine::outputs::cargo_dependencies(dir));
+    deps
+}
+
+/// The stack a build in `app` uses, from its package.json and Cargo.toml dependencies (the first
+/// stack in table order whose `uses` it lists); None when it has none or names no stack in the table.
 pub fn used_in(app: &std::path::Path) -> Option<&'static Stack> {
-    let deps = craft_anything_engine::outputs::npm_dependencies(app);
+    let deps = dependencies(app);
     catalogue().iter().find(|s| s.uses.iter().any(|d| deps.contains(d)))
+}
+
+/// The stack to record once a build shows what it uses ([`used_in`]), unless `recorded` is a game
+/// engine with an editor of its own: that says the project is a game, and its editor is found for
+/// it. Rust's game library is no editor, so a build that took another Rust library is recorded as that.
+pub fn recorded_after_build(recorded: &str, app: &std::path::Path) -> Option<&'static Stack> {
+    use craft_anything_engines::game::Builder;
+    Builder::from_stack(recorded).is_none_or(|b| b == Builder::Rust).then(|| used_in(app)).flatten()
 }
 
 /// The stack a folder of the person's own files is built with: an engine's project file says
 /// most, then the dependencies, then the other files that name a stack. None when nothing does.
 pub fn found_in(dir: &std::path::Path) -> Option<&'static Stack> {
     let by_file = |engine: bool| catalogue().iter().filter(|s| s.engine.is_some() == engine).find(|s| s.found_by.iter().any(|f| has_file(dir, f)));
-    let mut deps = craft_anything_engine::outputs::npm_dependencies(dir);
-    deps.extend(craft_anything_engine::outputs::cargo_dependencies(dir));
+    let deps = dependencies(dir);
     let by_deps = || catalogue().iter().find(|s| s.uses.iter().any(|d| deps.contains(d)) && s.needs.iter().all(|d| deps.contains(d)));
     by_file(true).or_else(by_deps).or_else(|| by_file(false))
 }
@@ -240,8 +254,11 @@ mod tests {
                 .is_some_and(|s| s.steps.as_deref().is_some_and(|t| t.starts_with("Use what their request names; otherwise choose the stack yourself")))
         );
         assert!(used_in(d.path()).is_none(), "no package.json");
-        std::fs::write(d.path().join("Cargo.toml"), "[dependencies]\neframe = \"0.30\"\n").unwrap();
-        assert!(used_in(d.path()).is_none(), "Cargo.toml never replaces a stack the request named");
+        std::fs::write(d.path().join("Cargo.toml"), "[dependencies]\nserde = \"1\"\n").unwrap();
+        assert!(used_in(d.path()).is_none(), "a Cargo.toml naming no stack's library is no stack");
+        std::fs::write(d.path().join("Cargo.toml"), "not toml [").unwrap();
+        assert!(used_in(d.path()).is_none(), "a broken Cargo.toml is no stack, not a crash");
+        std::fs::remove_file(d.path().join("Cargo.toml")).unwrap();
         std::fs::write(d.path().join("package.json"), "not json").unwrap();
         assert!(used_in(d.path()).is_none(), "a broken package.json is no stack, not a crash");
         std::fs::write(d.path().join("package.json"), r#"{"dependencies": {"next": "16", "react": "19"}, "devDependencies": {"vite": "7"}}"#).unwrap();
@@ -251,6 +268,22 @@ mod tests {
         std::fs::write(d.path().join("package.json"), r#"{"dependencies": {"astro": "5"}}"#).unwrap();
         assert!(used_in(d.path()).is_none(), "a stack the table doesn't know stays the builder's choice");
         assert_eq!(libraries_for("use shadcn", BUILDERS_CHOICE).len(), 1, "a library works with the builder's choice too");
+    }
+
+    #[test]
+    fn a_rust_build_is_recorded_under_the_library_it_used() {
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path();
+        let named = |recorded: &str| recorded_after_build(recorded, app).map(|s| s.name.as_str());
+        assert_eq!(named("Rust + macroquad"), None, "nothing built yet: the recorded stack stays");
+        std::fs::write(app.join("Cargo.toml"), "[dependencies]\neframe = \"0.37\"\negui_extras = \"0.37\"\n").unwrap();
+        assert_eq!(named("Rust + macroquad"), Some("Rust + egui (eframe)"), "the request asked for eframe and got it");
+        assert_eq!(named("Builder's choice"), Some("Rust + egui (eframe)"));
+        std::fs::write(app.join("Cargo.toml"), "[dependencies]\nmacroquad = \"0.4\"\negui = \"0.37\"\n").unwrap();
+        assert_eq!(named("Rust + macroquad"), Some("Rust + macroquad"), "a macroquad game stays one, whatever else it uses");
+        for engine in ["Unity", "Unreal Engine", "Godot"] {
+            assert_eq!(named(engine), None, "{engine} keeps its editor");
+        }
     }
 
     #[test]

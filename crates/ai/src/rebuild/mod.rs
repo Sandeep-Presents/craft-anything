@@ -997,11 +997,8 @@ impl Worker {
                     ws.manifest.last_reply = reply.trim().to_string();
                 }
                 // The stack is recorded as the one the build uses, once it shows: left to the builder,
-                // or another than the default because the request asked for it. A game engine stays
-                // (it says the project is a game, and its editor is found for it).
-                if game::Builder::from_stack(&ws.manifest.stack).is_none()
-                    && let Some(s) = stacks::used_in(&ws.app_dir())
-                {
+                // or another than the default because the request asked for it.
+                if let Some(s) = stacks::recorded_after_build(&ws.manifest.stack, &ws.app_dir()) {
                     ws.manifest.stack = s.name.clone();
                 }
                 ws.manifest.awaiting_check = true;
