@@ -1235,6 +1235,12 @@ Gaps found while using the app for real projects.
       agent setup: `AiHub::start` checks `enabled` and says how to turn it on or choose another
       — PR #1008; claimed: Codex, branch bugfix/r2.9-disabled-chat-backend
       (the API regression uses invalid tunnel settings to detect setup before the guard)
+- [x] `compare` checks both names before it builds either conversation, so an off or unknown
+      second side cannot leave a half-started comparison; a CLI regression covers `chat --backend`
+      with a turned-off agent
+      — claimed: AlexJoaquimPereira, branch `bugfix/r5.5-chat-turned-off-backend`
+- [ ] The app's chat keeps a turned-off AI as its saved choice and refuses every send; offer to
+      turn it on or choose another enabled AI
 - [x] Ctrl+V (Shift+Insert, Cmd+V) in a prompt box that takes pictures pastes a copied image (saved
       as a PNG) or copied picture files; attachments show as square picture tiles, the whole
       picture on hover, decoded on a worker

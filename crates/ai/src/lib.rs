@@ -942,9 +942,25 @@ impl AiHub {
     }
 
     fn entry(&self, name: &str) -> Result<BackendEntry, ToolError> {
-        self.config().get(name).cloned().ok_or_else(|| {
-            ToolError::invalid(format!("No AI backend named {name:?}")).with_remediation("See `craft-anything-cli ai list`, or add one in Settings → AI.")
-        })
+        let cfg = self.config();
+        cfg.get(name).cloned().ok_or_else(|| Self::no_backend(name))
+    }
+
+    fn no_backend(name: &str) -> ToolError {
+        ToolError::invalid(format!("No AI backend named {name:?}")).with_remediation("See `craft-anything-cli ai list`, or add one in Settings → AI.")
+    }
+
+    /// A backend that is named for a conversation must be on: `ai off` says nothing uses it, and
+    /// Settings treats an off AI as unusable. Listing models and testing a saved backend still
+    /// reach it through `entry`, so it can be configured before it is turned on. `cfg` is the
+    /// same snapshot the conversation is started from.
+    fn entry_on(cfg: &AiConfig, name: &str) -> Result<BackendEntry, ToolError> {
+        let e = cfg.get(name).cloned().ok_or_else(|| Self::no_backend(name))?;
+        if !e.config.enabled {
+            return Err(ToolError::new(ErrorCode::BadSettings, format!("{} is turned off.", e.config.name))
+                .with_remediation("Turn it on in Settings → AI, or run `craft-anything-cli ai on` with its name, then try again."));
+        }
+        Ok(e)
     }
 
     fn key_for(&self, e: &BackendEntry) -> Result<String, ToolError> {
@@ -1034,16 +1050,18 @@ impl AiHub {
     pub fn start(&self, backend: Option<&str>, beginner: bool) -> Result<Box<dyn Conversation>, ToolError> {
         let cfg = self.config();
         let first = match backend {
-            Some(n) => self.entry(n)?,
+            Some(n) => Self::entry_on(&cfg, n)?,
             None => cfg
                 .backend_for(Role::Lead)
                 .cloned()
                 .ok_or_else(|| ToolError::unavailable("No AI is set up yet.").with_remediation("Add one in Settings → AI."))?,
         };
-        if !first.config.enabled {
-            return Err(ToolError::new(ErrorCode::BadSettings, format!("{} is turned off.", first.config.name))
-                .with_remediation("Turn it on in Settings → AI, or choose another backend for this conversation."));
-        }
+        self.start_selected(first, &cfg, beginner)
+    }
+
+    /// Start on an entry already chosen (and, when named, checked to be on), using the same
+    /// configuration snapshot for its fallback chain.
+    fn start_selected(&self, first: BackendEntry, cfg: &AiConfig, beginner: bool) -> Result<Box<dyn Conversation>, ToolError> {
         if first.config.kind == BackendKind::AgentCli {
             return Ok(Box::new(cli_agents::SharedConversation::new(self.engine.clone(), self.keys.clone(), first, beginner)?));
         }
@@ -1116,7 +1134,12 @@ impl AiHub {
         if a == b {
             return Err(ToolError::invalid("Pick two different backends to compare."));
         }
-        Ok(vec![(a.to_string(), self.start(Some(a), beginner)?), (b.to_string(), self.start(Some(b), beginner)?)])
+        // Check both before the first conversation starts, and start from those checked entries,
+        // so an off or unknown second name cannot leave a comparison half-started.
+        let cfg = self.config();
+        let a_entry = Self::entry_on(&cfg, a)?;
+        let b_entry = Self::entry_on(&cfg, b)?;
+        Ok(vec![(a.to_string(), self.start_selected(a_entry, &cfg, beginner)?), (b.to_string(), self.start_selected(b_entry, &cfg, beginner)?)])
     }
 
     /// Live model list for a backend. Blocking (bounded); run it off the UI thread.

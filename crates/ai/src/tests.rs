@@ -317,6 +317,15 @@ fn hub() -> (AiHub, tempfile::TempDir) {
     (h, dir)
 }
 
+/// A hub whose key store never reads the environment, so a test that expects no key is
+/// deterministic even when the machine has the provider's variable set.
+fn hub_without_env() -> (AiHub, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Arc::new(Engine::new(craft_anything_engine::testing::session()));
+    let h = AiHub::with_stores(engine, dir.path().join("config.toml"), KeyStore::file_only_without_env(dir.path().join("ai-keys.toml")));
+    (h, dir)
+}
+
 /// A named backend stays off for chat, including before API or agent setup can run.
 #[test]
 fn disabled_backends_are_refused_when_chat_starts() {
@@ -573,6 +582,98 @@ fn an_app_bundle_is_refused_as_an_agents_program() {
     assert!(h.set_command("OpenCode", Some(&file.display().to_string())).unwrap());
     assert!(h.set_command("OpenCode", Some("agy")).unwrap());
     assert_eq!(program(&h).as_deref(), Some("agy"));
+}
+
+/// Two stand-in agents (one on, one off) that write a marker if run, plus an enabled API backend
+/// with no key: constructing that one would fail with "no API key" without doing any I/O.
+#[cfg(unix)]
+fn off_on_and_no_key_backends() -> (AiHub, tempfile::TempDir, std::path::PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let (h, dir) = hub_without_env();
+    let marker = dir.path().join("ran.txt");
+    let program = |name: &str| {
+        let p = dir.path().join(name);
+        std::fs::write(&p, format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> {}\nexit 0\n", marker.display())).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o700)).unwrap();
+        p
+    };
+    let agent = |name: &str, enabled: bool| BackendEntry {
+        config: BackendConfig { name: name.into(), kind: BackendKind::AgentCli, model: "claude".into(), base_url: None, ssh_host: None, enabled },
+        options: BackendOptions { command: Some(program(name).display().to_string()), ..Default::default() },
+    };
+    h.add_backend_with(agent("Off", false), None).unwrap();
+    h.add_backend_with(agent("On", true), None).unwrap();
+    let no_key = BackendConfig {
+        name: "NoKey".into(),
+        kind: BackendKind::Openrouter,
+        model: "test-model".into(),
+        base_url: Some("http://127.0.0.1:9".into()),
+        ssh_host: None,
+        enabled: true,
+    };
+    h.add_backend(no_key, None).unwrap();
+    (h, dir, marker)
+}
+
+/// R2.9: `ai off` says nothing uses an AI, so a named chat must not start one that is turned off.
+#[cfg(unix)]
+#[test]
+fn a_turned_off_ai_is_not_used_by_a_named_chat() {
+    let (h, _d, marker) = off_on_and_no_key_backends();
+    let err = h.start(Some("Off"), true).err().expect("the turned-off agent must not start");
+    assert_eq!(err.code, ErrorCode::BadSettings, "{err:?}");
+    assert!(err.message.contains("turned off"), "{}", err.message);
+    assert!(err.remediation.as_deref().is_some_and(|r| r.contains("Settings") && r.contains("ai on")), "{err:?}");
+    assert!(!marker.exists(), "the turned-off agent ran");
+}
+
+/// The off check covers both names before either comparison conversation runs.
+#[cfg(unix)]
+#[test]
+fn a_comparison_checks_both_names_before_it_starts_either() {
+    let (h, _d, marker) = off_on_and_no_key_backends();
+    for (a, b) in [("Off", "On"), ("On", "Off")] {
+        let err = h.compare(a, b, true).err().expect("a comparison with a turned-off name must not start");
+        assert_eq!(err.code, ErrorCode::BadSettings, "{err:?}");
+        assert!(err.message.contains("turned off"), "{}", err.message);
+        assert!(!marker.exists(), "compare started {a} before checking the other name");
+    }
+}
+
+/// `NoKey` is on but has no key, so constructing it would fail with a key error. The off name
+/// must be reported first, in either order, without building the other conversation.
+#[cfg(unix)]
+#[test]
+fn a_comparison_does_not_build_the_other_backend_before_rejecting_the_off_one() {
+    let (h, _d, _marker) = off_on_and_no_key_backends();
+    // The fixture's store ignores OPENROUTER_API_KEY, so this canary is deterministic.
+    let err = h.start(Some("NoKey"), true).err().expect("NoKey is meant to have no key");
+    assert!(err.message.contains("no API key"), "the test store must ignore the environment: {err:?}");
+    for (a, b) in [("NoKey", "Off"), ("Off", "NoKey")] {
+        let err = h.compare(a, b, true).err().expect("a comparison with a turned-off name must not start");
+        assert_eq!(err.code, ErrorCode::BadSettings, "{err:?}");
+        assert!(err.message.contains("turned off"), "compare built {a} before checking the off name: {err:?}");
+        assert!(!err.message.contains("no API key"), "construction was attempted: {err:?}");
+    }
+}
+
+/// A named backend that is turned off is refused before its key is looked up: the message is
+/// about the choice, not about a key the person may not have.
+#[test]
+fn a_turned_off_api_backend_is_refused_before_its_key() {
+    let (h, _d) = hub_without_env();
+    let off = BackendConfig {
+        name: "Off".into(),
+        kind: BackendKind::Openrouter,
+        model: "test-model".into(),
+        base_url: Some("http://127.0.0.1:9".into()),
+        ssh_host: None,
+        enabled: false,
+    };
+    h.add_backend(off, None).unwrap();
+    let err = h.start(Some("Off"), true).err().expect("the turned-off API backend must not start");
+    assert_eq!(err.code, ErrorCode::BadSettings, "{err:?}");
+    assert!(err.message.contains("turned off"), "the key was looked up first: {err:?}");
 }
 
 /// #423: a saved AI that is switched off isn't set up, so a copy found on the computer is offered
