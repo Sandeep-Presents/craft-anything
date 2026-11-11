@@ -154,3 +154,113 @@ fn serialized_geometry_bounds_preserve_binary_f64_precision() {
         assert!(read(&f).is_ok(), "round trip for {x}");
     }
 }
+
+#[test]
+fn legacy_bundle_has_no_source_colors() {
+    let scene = read(&fixture()).unwrap();
+    assert!(scene.source_colors.is_empty());
+    assert!(SOURCE_COLOR_POLICY.contains("unverified"));
+}
+#[test]
+fn source_candidates_follow_declared_nearest_explicit_path_policy() {
+    let mut files = fixture();
+    modify(&mut files, 1, 0, |v| {
+        v["children"] = json!([B]);
+        v["source_diffuse"] = json!([0.8, 0.1, 0.05]);
+    });
+    modify(&mut files, 1, 1, |v| v["parent_guid"] = json!(A));
+    let mut hash = Sha256::new();
+    hash.update("a".repeat(64).as_bytes());
+    for id in [A, B] {
+        hash.update(b"/");
+        hash.update(id.as_bytes());
+    }
+    modify(&mut files, 3, 1, |v| {
+        v["path"] = json!([A, B]);
+        v["instance_id"] = json!(format!("{:x}", hash.finalize()));
+    });
+    let scene = read(&files).unwrap();
+    assert_eq!(scene.source_colors.get(&0), Some(&[0.8f32, 0.1, 0.05]));
+    assert_eq!(scene.source_colors.get(&1), Some(&[0.8f32, 0.1, 0.05]));
+    modify(&mut files, 1, 1, |v| v["source_diffuse"] = json!([0.0, 0.25, 1.0]));
+    let scene = read(&files).unwrap();
+    assert_eq!(scene.source_colors.get(&0), Some(&[0.8f32, 0.1, 0.05]));
+    assert_eq!(scene.source_colors.get(&1), Some(&[0.0f32, 0.25, 1.0]));
+}
+#[test]
+fn invalid_source_diffuse_is_rejected() {
+    for rgb in [json!([-0.01, 0., 0.]), json!([0., 1.01, 0.]), json!([0., 0.]), json!(["NaN", 0., 0.])] {
+        let mut files = fixture();
+        modify(&mut files, 1, 0, |v| v["source_diffuse"] = rgb);
+        assert!(read(&files).is_err());
+    }
+    let mut files = fixture();
+    modify(&mut files, 1, 0, |v| v["source_diffuse"] = json!([0.25, 0.5, 0.75]));
+    let text = String::from_utf8(files[1].clone()).unwrap();
+    for invalid in ["[0.25,NaN,0.75]", "[0.25,1e999,0.75]"] {
+        files[1] = text.replace("[0.25,0.5,0.75]", invalid).into_bytes();
+        assert!(read(&files).is_err());
+    }
+}
+
+#[test]
+fn object_colors_use_direct_leaf_values_without_ancestor_fallback() {
+    let mut files = fixture();
+    modify(&mut files, 1, 0, |v| {
+        v["children"] = json!([B]);
+        v["source_object_color"] = json!([0.25, 0.5, 0.75]);
+    });
+    modify(&mut files, 1, 1, |v| v["parent_guid"] = json!(A));
+    let mut hash = Sha256::new();
+    hash.update("a".repeat(64).as_bytes());
+    for id in [A, B] {
+        hash.update(b"/");
+        hash.update(id.as_bytes());
+    }
+    modify(&mut files, 3, 1, |v| {
+        v["path"] = json!([A, B]);
+        v["instance_id"] = json!(format!("{:x}", hash.finalize()));
+    });
+    let scene = read(&files).unwrap();
+    assert_eq!(scene.object_colors.get(&0), Some(&[0.25f32, 0.5, 0.75]));
+    assert!(!scene.object_colors.contains_key(&1));
+    modify(&mut files, 1, 1, |v| v["source_object_color"] = json!([0.75, 0.5, 0.25]));
+    let scene = read(&files).unwrap();
+    assert_eq!(scene.object_colors.get(&1), Some(&[0.75f32, 0.5, 0.25]));
+    assert!(read(&fixture()).unwrap().object_colors.is_empty());
+}
+#[test]
+fn object_colors_reject_invalid_components() {
+    for rgb in [json!([-0.1, 0., 0.]), json!([0., 1.1, 0.]), json!([0., 0.])] {
+        let mut files = fixture();
+        modify(&mut files, 1, 0, |v| v["source_object_color"] = rgb);
+        assert!(read(&files).is_err());
+    }
+}
+
+#[test]
+fn object_color_belongs_to_entity_not_terminal_library_definition() {
+    const C: &str = "10000000-0000-0000-0000-000000000003";
+    let mut files = fixture();
+    modify(&mut files, 0, 0, |v| v["library_nodes"] = json!(1));
+    modify(&mut files, 1, 1, |v| {
+        v["mesh"] = Value::Null;
+        v["reference"] = json!(C);
+        v["source_object_color"] = json!([0.25, 0.5, 0.75]);
+    });
+    files[1].extend(line(json!({"guid":C,"section":"IncludeLibrary","name":"Synthetic definition","parent_guid":null,"children":[],"mesh":0,"reference":null,"matrix":math::IDENTITY,"source_object_color":[0.75,0.5,0.25]})));
+    let mut hash = Sha256::new();
+    hash.update("a".repeat(64).as_bytes());
+    for id in [B, C] {
+        hash.update(b"/");
+        hash.update(id.as_bytes());
+    }
+    modify(&mut files, 3, 1, |v| {
+        v["path"] = json!([B, C]);
+        v["instance_id"] = json!(format!("{:x}", hash.finalize()));
+    });
+    let scene = read(&files).unwrap();
+    assert_eq!(scene.object_colors.get(&1), Some(&[0.25f32, 0.5, 0.75]));
+    modify(&mut files, 1, 1, |v| v["source_object_color"] = Value::Null);
+    assert!(!read(&files).unwrap().object_colors.contains_key(&1));
+}

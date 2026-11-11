@@ -446,6 +446,11 @@ struct FirstFrames {
 }
 
 pub struct CraftApp {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub scene_viewer: Option<scene_viewer::SceneApp>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub scene_graphics: Option<eframe::egui_wgpu::RenderState>,
+
     pub engine: Arc<Engine>,
     pub hub: Arc<AiHub>,
     pub state: UiState,
@@ -596,6 +601,11 @@ impl CraftApp {
         let settings = engine.session().settings.clone();
         i18n::set_language(&settings.language);
         CraftApp {
+            #[cfg(not(target_arch = "wasm32"))]
+            scene_viewer: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            scene_graphics: None,
+
             engine,
             hub,
             state: UiState::default(),
@@ -1128,6 +1138,15 @@ impl CraftApp {
     /// Open a file or folder as the active target.
     pub fn open_path(&mut self, path: PathBuf) {
         let path = if path.is_absolute() { path } else { std::env::current_dir().map(|d| d.join(&path)).unwrap_or(path) };
+        #[cfg(not(target_arch = "wasm32"))]
+        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("sp")) || path.file_name().is_some_and(|n| n == "scene.json") {
+            self.state.scene_path = path.to_string_lossy().into_owned();
+            self.state.scene_viewer_open = true;
+            if let Some(scene) = &mut self.scene_viewer {
+                scene.request_open(self.state.scene_path.clone());
+            }
+            return;
+        }
         let engine = self.engine.clone();
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string());
         self.toast(i18n::trf("Opening {name}…", &[("name", &name)]), false);
@@ -1921,9 +1940,34 @@ impl CraftApp {
         // The title bar is on every screen: it is how the window moves, resizes and closes.
         titlebar::bar(self, ui);
         self.stuck_banner(ui, &ctx);
-        if !self.settings.first_run_done {
+        if !self.settings.first_run_done && !(cfg!(not(target_arch = "wasm32")) && self.state.scene_viewer_open) {
             egui::CentralPanel::default().frame(egui::Frame::new().fill(t.canvas)).show(ui, |ui| guard_ui(ui, "first run", |ui| first_run::show(self, ui)));
             // An AI added from the first run reports a failure here (a wrong address or key).
+            self.toasts(&ctx);
+            titlebar::window_edge(&ctx);
+            titlebar::resize_edges(&ctx);
+            return;
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.state.scene_viewer_open {
+            if self.scene_viewer.is_none() {
+                self.scene_viewer = Some(scene_viewer::SceneApp::with_engine(self.engine.clone(), self.scene_graphics.clone(), self.state.scene_path.clone()));
+            }
+            egui::CentralPanel::default().frame(egui::Frame::new().fill(t.canvas)).show(ui, |ui| {
+                if ui.button("Back to workspace").clicked() {
+                    self.state.scene_viewer_open = false;
+                }
+                if !self.settings.deep_mode && ui.button("Enable Deep inspection to read this project").clicked() {
+                    self.set_deep(true);
+                    if let Some(scene) = &mut self.scene_viewer {
+                        scene.request_open(self.state.scene_path.clone());
+                    }
+                }
+                if let Some(scene) = &mut self.scene_viewer {
+                    scene.show(ui);
+                }
+            });
             self.toasts(&ctx);
             titlebar::window_edge(&ctx);
             titlebar::resize_edges(&ctx);
@@ -2149,6 +2193,10 @@ impl eframe::App for CraftApp {
                 // egui only draws when something changed; keep drawing until the frames have been shown.
                 ui.ctx().request_repaint();
             }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.scene_graphics = _frame.wgpu_render_state().cloned();
         }
         self.show(ui);
     }

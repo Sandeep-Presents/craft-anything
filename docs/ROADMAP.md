@@ -2462,14 +2462,17 @@ Owner: open · Status: in progress
 
 ---
 
-### R3.14 Read-only scene bundles
-Owner: open · Status: in progress
+### R3.14 Read-only project and scene viewer
+Owner: open · Status: in progress (experimental 3D/4D/5D available; parity expansion remains open)
 - [x] Add a bounded versioned scene-bundle reader and headless inspection/picking tools, with a native experimental viewport for orbit, pan, zoom, resource selection and hide/isolate. Preserve unknown units, axes and materials in the result. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Independently verify native units, axes and visual parity before presenting engineering measurements or claiming general source-format compatibility. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Embed the validated experimental viewport in the main desktop workbench through the existing engine tools. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Add camera-frustum culling and measured large-scene rendering budgets while preserving selection parity. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Add validated time-based appearance from verified schedule and resource assignments after static viewer validation. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
-- [ ] Add validated cost and quantity evaluation after units and cost-basis evidence are independently checked. ? claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Read the admitted project layout directly without a source application or prepared bundle; retain storage provenance and reject unsupported layouts. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Independently compare native leaf coordinates and explicit object RGB using isolated controls; preserve unverified engineering measurements and full visual parity in results. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Embed the experimental viewport in the main desktop workbench through the shared engine, including normal file opening. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add conservative camera-frustum culling and measured large-scene rendering budgets, preserving picking filters and recoverable errors. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add admitted Install/Maintain intervals, calendar-derived dates and explicit custom-Install interval preview, with focus/playback and unresolved appearance. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [x] Add independently controlled Material Fixed/PerUnit cost evaluation, source quantities, working-time rates, separate direct budgets and unresolved actual costs. — claimed: Codex, branch `feature/r3.14-scene-bundle-viewport`
+- [ ] Extend native appearance parity to inherited colours, textures, directional growth and transparency after independent controls; the current interval preview explicitly omits these effects.
+- [ ] Independently validate engineering mesh quantities, further resource cost kinds, currency/unit conversion and additional source versions before admitting them.
 
 ---
 

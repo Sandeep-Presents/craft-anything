@@ -1,6 +1,8 @@
 //! Experimental scene-bundle client. Parsing and picking dispatch through the shared engine.
 pub mod camera;
+pub mod draw_plan;
 mod gpu;
+pub mod project_panel;
 use crate::{
     jobs::Jobs,
     theme::{self, ThemeKind, Tokens},
@@ -23,11 +25,25 @@ pub struct ViewState {
     pub selected_instance: Option<usize>,
     pub selected_resource: Option<usize>,
     pub search: String,
+    pub project: project_panel::State,
 }
 enum Done {
+    Evaluated {
+        key: (String, i64, bool, bool),
+        latest: Arc<craft_anything_engine::tools::scene_project_tools::LatestProjectFrame>,
+        project: Arc<craft_anything_engine::tools::scene_project_tools::CachedProject>,
+        hidden: BTreeSet<usize>,
+        phases: BTreeMap<usize, u8>,
+    },
+    Chosen(Option<String>),
     Loaded(Arc<LoadedScene>, Box<gpu::Gpu>),
-    Rendered(Box<gpu::Gpu>),
-    Picked { scene_id: String, revision: u64, selected: Option<usize>, complete: bool },
+    Rendered(Box<gpu::Gpu>, Result<(), String>),
+    Picked {
+        scene_id: String,
+        revision: u64,
+        selected: Option<usize>,
+        complete: bool,
+    },
 }
 pub struct SceneApp {
     pub state: ViewState,
@@ -44,19 +60,32 @@ pub struct SceneApp {
     revision: u64,
     size: [u32; 2],
     initial_open: bool,
+    frame_key: Option<(String, i64, bool, bool)>,
+    pub project_frame: Option<Arc<craft_anything_engine::tools::scene_project_tools::LatestProjectFrame>>,
+    project_model: Option<Arc<craft_anything_engine::tools::scene_project_tools::CachedProject>>,
+    timeline_hidden: BTreeSet<usize>,
+    timeline_phases: BTreeMap<usize, u8>,
+    last_play_tick: std::time::Instant,
+    render_error: Option<String>,
+    last_draw: Option<(draw_plan::DrawStats, u64)>,
+    evaluation_failed: bool,
 }
 impl SceneApp {
     pub fn new(cc: &eframe::CreationContext<'_>, path: String) -> Self {
         theme::install_fonts(&cc.egui_ctx);
         theme::apply(&cc.egui_ctx, ThemeKind::Studio, false);
+        Self::with_engine(Arc::new(Engine::new(Session::new(Settings { deep_mode: true, ..Default::default() }))), cc.wgpu_render_state.clone(), path)
+    }
+    /// Embedded client shares the application's engine and its Deep-mode settings.
+    pub fn with_engine(engine: Arc<Engine>, graphics: Option<RenderState>, path: String) -> Self {
         Self {
             state: ViewState::default(),
             initial_open: !path.is_empty(),
             path,
-            status: "Open a scene.json bundle to start.".into(),
+            status: "Open a .sp project or scene.json bundle to start.".into(),
             model: None,
-            engine: Arc::new(Engine::new(Session::new(Settings { deep_mode: true, ..Default::default() }))),
-            graphics: cc.wgpu_render_state.clone(),
+            engine,
+            graphics,
             jobs: Jobs::default(),
             gpu: None,
             texture: None,
@@ -64,14 +93,39 @@ impl SceneApp {
             dirty: false,
             revision: 0,
             size: [1000, 700],
+            frame_key: None,
+            project_frame: None,
+            project_model: None,
+            timeline_hidden: BTreeSet::new(),
+            timeline_phases: BTreeMap::new(),
+            last_play_tick: std::time::Instant::now(),
+            render_error: None,
+            last_draw: None,
+            evaluation_failed: false,
         }
+    }
+    pub fn request_open(&mut self, path: String) {
+        for job in self.jobs.running() {
+            job.cancel.cancel();
+        }
+        self.path = path;
+        self.initial_open = true;
     }
     pub fn ready(&self) -> bool {
         self.texture.is_some() && self.gpu.is_some() && !self.jobs.busy() && !self.dirty
     }
+    pub fn draw_stats(&self) -> Option<(&draw_plan::DrawStats, u64)> {
+        self.last_draw.as_ref().map(|(stats, ms)| (stats, *ms))
+    }
     /// The last worker error, for verification clients that must fail promptly.
     pub fn error(&self) -> Option<&str> {
-        self.jobs.list.iter().rev().find_map(|j| j.outcome.as_ref().and_then(|v| v.as_ref().err()).map(String::as_str))
+        if self.dirty || self.jobs.busy() {
+            return None;
+        }
+        if let Some(e) = &self.render_error {
+            return Some(e);
+        }
+        self.jobs.list.iter().rev().find_map(|j| j.outcome.as_ref()).and_then(|v| v.as_ref().err()).map(String::as_str)
     }
     pub fn changed(&mut self) {
         self.dirty = true;
@@ -90,9 +144,10 @@ impl SceneApp {
         self.status = "Loading and validating scene…".into();
         self.jobs.spawn("Open scene", true, move |j| {
             let report = j.reporter();
+            let tool = if path.to_ascii_lowercase().ends_with(".sp") { "formats_project_open" } else { "formats_scene_bundle_open" };
             engine
-                .call("formats_scene_bundle_open", json!({"path":path}), CallOptions::new(Caller::Ui).with_cancel(j.cancel.clone()).with_progress(&report))
-                .map_err(|e| e.message)?;
+                .call(tool, json!({"path":path}), CallOptions::new(Caller::Ui).with_cancel(j.cancel.clone()).with_progress(&report))
+                .map_err(|e| e.for_people())?;
             let model = engine.session().ext.get::<LoadedScene>().ok_or("The loaded scene is unavailable")?;
             let gpu = gpu::Gpu::new(&graphics, &model.scene, &j.cancel)?;
             Ok(Done::Loaded(model, Box::new(gpu)))
@@ -101,8 +156,47 @@ impl SceneApp {
     fn poll(&mut self) {
         for done in self.jobs.poll() {
             match done.result {
+                Ok(Done::Chosen(Some(path))) => {
+                    self.path = path;
+                    self.open();
+                }
+                Ok(Done::Chosen(None)) => {}
+                Ok(Done::Evaluated { key, latest, project, hidden, phases }) => {
+                    if self.evaluation_key().as_ref() == Some(&key) {
+                        self.frame_key = Some(key);
+                        self.project_frame = Some(latest);
+                        self.project_model = Some(project);
+                        self.timeline_hidden = hidden;
+                        self.timeline_phases = phases;
+                        self.changed();
+                    }
+                }
                 Ok(Done::Loaded(model, gpu)) => {
+                    self.last_draw = None;
+                    if let (Some(graphics), Some(old)) = (&self.graphics, self.texture.take()) {
+                        graphics.renderer.write().free_texture(&old);
+                    }
+                    if self.render_error.take().is_some() {
+                        self.status = "Scene rendering recovered.".into();
+                    }
                     self.state = ViewState::default();
+                    self.state.project.interval_preview = true;
+                    self.state.project.object_colors = !model.scene.object_colors.is_empty();
+                    self.frame_key = None;
+                    self.project_frame = None;
+                    self.project_model = None;
+                    self.timeline_hidden.clear();
+                    self.timeline_phases.clear();
+                    self.state.project.focus = model
+                        .metadata
+                        .get("tasks")
+                        .and_then(|v| v.as_array())
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|t| t.get("planned_start_wallclock_scalar").and_then(|v| v.as_i64()))
+                        .filter(|t| *t != 32535244799)
+                        .min()
+                        .unwrap_or(0);
                     self.state.camera.fit(model.scene.bounds);
                     self.rows = resource_rows(&model.scene.resources);
                     self.status = format!("{} mesh instances · {} resources", model.scene.instances.len(), model.scene.resources.len());
@@ -110,7 +204,17 @@ impl SceneApp {
                     self.gpu = Some(gpu);
                     self.changed();
                 }
-                Ok(Done::Rendered(gpu)) => {
+                Ok(Done::Rendered(gpu, result)) => {
+                    if let Err(error) = result {
+                        self.render_error = Some(error.clone());
+                        self.status = error;
+                        self.gpu = Some(gpu);
+                        continue;
+                    }
+                    if self.render_error.take().is_some() {
+                        self.status = "Scene rendering recovered.".into();
+                    }
+                    self.last_draw = gpu.stats.clone().map(|stats| (stats, gpu.elapsed_ms));
                     if let Some(graphics) = &self.graphics {
                         let mut renderer = graphics.renderer.write();
                         if let Some(old) = self.texture.take() {
@@ -133,6 +237,14 @@ impl SceneApp {
                     }
                 }
                 Err(e) => {
+                    if self.jobs.list.iter().any(|j| j.id == done.job && j.title == "Evaluate project time") {
+                        self.evaluation_failed = true;
+                        self.project_frame = None;
+                        self.timeline_hidden.clear();
+                        self.timeline_phases.clear();
+                        self.state.project.playing = false;
+                        self.changed();
+                    }
                     self.status = e;
                 }
             }
@@ -146,20 +258,92 @@ impl SceneApp {
             return;
         };
         let (origin, direction) = self.state.camera.ray(ndc, aspect);
-        let f = &self.state.visibility;
+        let effective = self.effective_visibility();
+        let f = &effective;
         let resources = |ids: &BTreeSet<usize>| ids.iter().filter_map(|id| model.scene.resources.get(*id)).map(|r| r.guid.clone()).collect::<Vec<_>>();
         let instances = |ids: &BTreeSet<usize>| ids.iter().filter_map(|id| model.scene.instances.get(*id)).map(|i| i.id.clone()).collect::<Vec<_>>();
         let params = json!({"scene_id":model.scene.id,"origin":origin,"direction":direction,"hidden_resources":resources(&f.hidden_resources),"isolate_resources":resources(&f.isolate_resources),"hidden_instances":instances(&f.hidden_instances),"isolate_instances":instances(&f.isolate_instances)});
         let engine = self.engine.clone();
         let revision = self.revision;
         self.jobs.spawn("Select surface", true, move |j| {
-            let result =
-                engine.call("formats_scene_surface_pick", params, CallOptions::new(Caller::Ui).with_cancel(j.cancel.clone())).map_err(|e| e.message)?.to_json();
+            let result = engine
+                .call("formats_scene_surface_pick", params, CallOptions::new(Caller::Ui).with_cancel(j.cancel.clone()))
+                .map_err(|e| e.for_people())?
+                .to_json();
             let result = result.get("result").ok_or("Selection result is absent")?;
             let hit = result.get("pick").ok_or("Selection details are absent")?;
             let selected = hit.get("instance").and_then(|v| v.as_u64()).and_then(|v| usize::try_from(v).ok());
             Ok(Done::Picked { scene_id: model.scene.id.clone(), revision, selected, complete: hit.get("complete").and_then(|v| v.as_bool()).unwrap_or(false) })
         });
+    }
+    fn evaluation_key(&self) -> Option<(String, i64, bool, bool)> {
+        Some((self.model.as_ref()?.scene.id.clone(), self.state.project.focus, self.state.project.best_dates, self.state.project.interval_preview))
+    }
+    fn effective_visibility(&self) -> Visibility {
+        let mut out = self.state.visibility.clone();
+        if self.state.project.mode != project_panel::Mode::Model {
+            out.hidden_instances.extend(&self.timeline_hidden);
+        }
+        out
+    }
+    fn evaluate(&mut self) {
+        if self.jobs.busy() {
+            return;
+        }
+        let Some(key) = self.evaluation_key() else {
+            return;
+        };
+        let Some(model) = self.model.clone() else {
+            return;
+        };
+        self.frame_key = Some(key.clone());
+        self.evaluation_failed = false;
+        self.project_frame = None;
+        self.timeline_hidden.clear();
+        self.timeline_phases.clear();
+        let engine = self.engine.clone();
+        self.jobs.spawn("Evaluate project time", true, move |j| {
+            engine
+                .call(
+                    "formats_project_frame_evaluate",
+                    json!({"focus_wallclock":key.1,"date_mode":if key.2 {"best"}else{"planned"},"interval_preview":key.3}),
+                    CallOptions::new(Caller::Ui).with_cancel(j.cancel.clone()),
+                )
+                .map_err(|e| e.message)?;
+            let (latest, project) = {
+                let session = engine.session();
+                (
+                    session.ext.get::<craft_anything_engine::tools::scene_project_tools::LatestProjectFrame>(),
+                    session.ext.get::<craft_anything_engine::tools::scene_project_tools::CachedProject>(),
+                )
+            };
+            let latest = latest.ok_or("Project frame is unavailable")?;
+            let project = project.ok_or("Project model is unavailable")?;
+            if latest.scene_id != model.scene.id {
+                return Err("Project changed during evaluation; reopen the source.".into());
+            }
+            let (hidden, phases) = project_panel::phase_state(&model.scene, &latest.frame);
+            Ok(Done::Evaluated { key, latest, project, hidden, phases })
+        });
+    }
+    fn select_task(&mut self, guid: &str) {
+        let Some(model) = &self.model else {
+            return;
+        };
+        let mut selected = BTreeSet::new();
+        if let Some(task) =
+            model.metadata.get("tasks").and_then(|v| v.as_array()).into_iter().flatten().find(|t| t.get("guid").and_then(|v| v.as_str()) == Some(guid))
+        {
+            for id in task.get("assignments").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|a| a.get("resource_guid").and_then(|v| v.as_str())) {
+                if let Some(index) = model.scene.resources.iter().position(|r| r.guid == id) {
+                    selected.insert(index);
+                }
+            }
+        }
+        if !selected.is_empty() {
+            self.state.visibility = Visibility { isolate_resources: selected, ..Default::default() };
+            self.changed();
+        }
     }
     fn resource_set(&self, id: usize) -> BTreeSet<usize> {
         let mut out = BTreeSet::from([id]);
@@ -190,13 +374,20 @@ impl SceneApp {
         bounds.valid().then_some(bounds)
     }
     fn sidebar(&mut self, ui: &mut egui::Ui) {
+        let height = ui.available_height();
+        egui::ScrollArea::vertical().id_salt("scene_sidebar").show(ui, |ui| self.sidebar_contents(ui, height));
+    }
+    fn sidebar_contents(&mut self, ui: &mut egui::Ui, panel_height: f32) {
         ui.heading("Resources");
         ui.add(egui::TextEdit::singleline(&mut self.state.search).hint_text("Find a resource"));
         let Some(model) = self.model.clone() else {
             ui.label("No scene loaded");
             return;
         };
+        ui.small(format!("Showing: {}", model.manifest.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()))
+            .on_hover_text(model.manifest.display().to_string());
         ui.label(format!("{} definitions · {} instances", model.scene.meshes.len(), model.scene.instances.len()));
+        ui.small(format!("{} explicit object colours", model.scene.object_colors.len()));
         ui.separator();
         let query = self.state.search.to_lowercase();
         let rows = self
@@ -205,7 +396,7 @@ impl SceneApp {
             .copied()
             .filter(|(id, _)| model.scene.resources.get(*id).is_some_and(|r| query.is_empty() || r.name.to_lowercase().contains(&query)))
             .collect::<Vec<_>>();
-        egui::ScrollArea::vertical().max_height((ui.available_height() - 235.).max(120.)).show_rows(ui, 22., rows.len(), |ui, range| {
+        egui::ScrollArea::vertical().id_salt("resource_tree").max_height((panel_height - 320.).clamp(48., 300.)).show_rows(ui, 22., rows.len(), |ui, range| {
             for row in range {
                 if let Some((id, depth)) = rows.get(row).copied()
                     && let Some(r) = model.scene.resources.get(id)
@@ -278,13 +469,19 @@ impl SceneApp {
             self.changed();
         }
         ui.separator();
-        ui.small("Placeholder shading. Source units, axes, materials and visual parity are unverified.");
-        ui.small("4D schedules and 5D costs are not evaluated in this viewport.");
+        ui.small("Experimental shading. Source material precedence and full visual parity remain unverified.");
+        if let Some((stats, ms)) = self.draw_stats() {
+            ui.small(format!(
+                "{} drawn / {} culled / {} hidden; {} triangles; {} ms",
+                stats.visible, stats.frustum_culled, stats.hidden, stats.expanded_triangles, ms
+            ));
+        }
+        ui.small("4D/5D interpretation limits remain explicit in the project panels.");
     }
     pub fn show(&mut self, ui: &mut egui::Ui) {
         self.jobs.set_repaint(ui.ctx());
         self.poll();
-        if self.initial_open {
+        if self.initial_open && !self.jobs.busy() {
             self.initial_open = false;
             self.open();
         }
@@ -302,7 +499,18 @@ impl SceneApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut self.path).desired_width((ui.available_width() - 80.).max(100.)).hint_text("Absolute path to scene.json"));
+            ui.add(
+                egui::TextEdit::singleline(&mut self.path)
+                    .desired_width((ui.available_width() - 165.).max(80.))
+                    .hint_text("Absolute path to .sp or scene.json"),
+            );
+            if ui.add_enabled(!self.jobs.busy(), egui::Button::new("Browse")).clicked() {
+                self.jobs.spawn("Choose project", true, |_| {
+                    Ok(Done::Chosen(
+                        rfd::FileDialog::new().add_filter("Project or scene", &["sp", "json"]).pick_file().map(|p| p.to_string_lossy().into_owned()),
+                    ))
+                });
+            }
             if ui.add_enabled(!self.jobs.busy(), egui::Button::new("Open")).clicked() {
                 self.open();
             }
@@ -310,19 +518,45 @@ impl SceneApp {
         ui.horizontal(|ui| {
             ui.set_min_height(26.);
             ui.label(&self.status);
-            if self.jobs.busy() {
-                ui.spinner();
-                if ui.button("Cancel").clicked() {
-                    for j in self.jobs.running() {
-                        j.cancel.cancel();
-                    }
+            let busy = self.jobs.busy();
+            ui.add_visible(busy, egui::Spinner::new().size(16.));
+            if ui.add_enabled(busy, egui::Button::new("Cancel")).clicked() {
+                for j in self.jobs.running() {
+                    j.cancel.cancel();
                 }
             }
         });
+        if project_panel::controls(ui, &mut self.state.project, self.project_frame.as_ref().map(|f| f.frame.as_ref())) {
+            self.changed();
+        }
+        if self.evaluation_failed && ui.button("Retry timeline evaluation").clicked() {
+            self.frame_key = None;
+            self.evaluation_failed = false;
+        }
+        if self.state.project.playing && self.state.project.mode != project_panel::Mode::Model {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+            if !self.jobs.busy() && self.last_play_tick.elapsed() > std::time::Duration::from_millis(100) {
+                self.last_play_tick = std::time::Instant::now();
+                self.state.project.focus = self.state.project.focus.saturating_add(43200);
+                if let Some(end) = self.project_frame.as_ref().and_then(|f| f.frame.timeline.end) {
+                    let stop = end.saturating_add(86400);
+                    if self.state.project.focus >= stop {
+                        self.state.project.focus = stop;
+                        self.state.project.playing = false;
+                    }
+                }
+                self.changed();
+            }
+        }
         ui.separator();
         let tokens = Tokens::get(ui.ctx());
         egui::Panel::left("scene_resources").resizable(true).default_size(300.).show(ui, |ui| self.sidebar(ui));
         egui::CentralPanel::default().show(ui, |ui| {
+            if let Some((frame, model)) = self.project_frame.as_ref().zip(self.project_model.as_ref())
+                && let Some(task) = project_panel::details(ui, &mut self.state.project, &frame.frame, &model.model)
+            {
+                self.select_task(&task);
+            }
             ui.small("Drag: orbit · Shift/right drag: pan · Wheel: zoom · Click: select surface");
             let size = ui.available_size().max(egui::vec2(1., 1.));
             let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
@@ -359,19 +593,29 @@ impl SceneApp {
                 self.pick([f64::from((p.x - rect.left()) / rect.width() * 2. - 1.), f64::from(1. - (p.y - rect.top()) / rect.height() * 2.)], aspect);
             }
         });
+        if self.state.project.mode != project_panel::Mode::Model && !self.jobs.busy() && self.frame_key != self.evaluation_key() {
+            self.evaluate();
+        }
         if self.dirty
             && !self.jobs.busy()
             && let (Some(mut gpu), Some(model)) = (self.gpu.take(), self.model.clone())
         {
             let camera = self.state.camera.clone();
-            let visibility = self.state.visibility.clone();
+            let visibility = self.effective_visibility();
+            let phases = if self.state.project.mode == project_panel::Mode::Model { BTreeMap::new() } else { self.timeline_phases.clone() };
+            let source_colors = self.state.project.source_colors;
+            let object_colors = self.state.project.object_colors;
             let selected = self.state.selected_instance;
             let selected_resource = self.state.selected_resource;
             let size = self.size;
             self.dirty = false;
             self.jobs.spawn("Render scene", true, move |j| {
-                gpu.render(&model.scene, &gpu::FrameData { camera, visibility, selected, selected_resource, size, tokens }, &j.cancel)?;
-                Ok(Done::Rendered(gpu))
+                let result = gpu.render(
+                    &model.scene,
+                    &gpu::FrameData { camera, visibility, selected, selected_resource, size, tokens, phases, source_colors, object_colors },
+                    &j.cancel,
+                );
+                Ok(Done::Rendered(gpu, result))
             });
         }
     }

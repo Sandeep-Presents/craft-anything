@@ -6,30 +6,46 @@ workspace clippy, layers, fmt and the secret scan of all history were clean. Chi
 
 ## What works, and how it was checked
 
-### Experimental read-only scene bundles (R3.14)
+### Experimental project and scene viewer (R3.14)
 
-Version-1 scene bundles can be inspected through the Deep-only
-`formats_scene_bundle_open`, `formats_scene_resources_list` and
-`formats_scene_surface_pick` tools. A separate native Rust example provides
-instanced GPU rendering, orbit/pan/zoom, fit, triangle picking, resource selection,
-and instance/resource hide and isolate. Parsing, picking, GPU uploads and draw
-encoding run on workers; GPU completion applies bounded backpressure. Hidden
-instances are compacted out of draws. The main desktop workbench does not yet
-embed this experimental viewer.
+The desktop Project viewer opens the admitted 6.5.5.28 `.sp` layout directly or a
+version-1 scene bundle through the same Deep-only engine tools used by CLI/MCP.
+It offers instanced 3D, orbit/pan/zoom, picking, resource filters, calendar-derived
+task dates, 4D focus/playback and 5D source quantities/costs. The main workbench
+shares its engine and settings; an existing file path routes into the viewer.
+Optional interval preview states that directional growth, transparency and native
+material effects are omitted. Missing dates, unknown profiles and unsupported
+cost inputs remain explicit. Direct task budgets are separate from experimental
+resource forecasts; partial sums are not presented as complete costs.
 
-A private real-world bundle was rendered locally on Windows with a discrete
-Vulkan GPU. Saved images and UI actions verified picking, hide/show, isolation,
-resource-tree selection and camera changes. Original synthetic fixtures cover
-malformed inputs, cancellation, graph cycles, stale selections, nearest hits,
-filtering, selection budgets and exact binary/JSON f64 bounds. An explicit
-adapter-dependent integration test checks that hiding isolated geometry changes
-viewport pixels and that the asynchronous view settles. Native source parity,
-source units/axes, materials, time-based appearance and costs remain unverified;
-this does not establish general source-format support. Local validation: 2,596 tests
-passed with 20 ignored in the normal run; the adapter-dependent scene test passed
-separately, including pointer orbit/pan and wheel zoom. All-target clippy, format,
-layers, locks, secrets and the L0?L2 WebAssembly check passed. The CLI and native
-example built successfully. See [scene bundles](scene-bundles.md).
+A private source project rendered 33,513 instances / 3,699,006 vertices on a
+discrete Vulkan GPU. All 241 tasks obtained schedule bounds; the root start/finish
+and complete direct budget matched retained native observations. Original and
+intentionally changed control copies retained their distinct totals. Direct-import
+geometry matched every frozen f64
+position, GPU byte, mesh, instance transform and resource identity. Three native
+leaf centres independently agreed in XYZ metres to four displayed decimals.
+Explicit object RGB was located using a saved/reopened single-colour control and
+three native leaf readbacks; only the admitted direct entity override is rendered.
+Inherited colours, textures and full source appearance remain unresolved.
+Native-controlled Fixed/PerUnit, actual/remaining and rate-boundary examples also
+matched the headless evaluator. These are scoped observations: no arbitrary-file
+unit guarantee, engineering takeoff, currency conversion or full visual parity.
+
+Workers own parsing, evaluation, uploads and draws; GPU completion applies bounded
+backpressure. Conservative frustum tests include f32 quantization margins, and a
+50-million expanded-triangle budget returns a recoverable error rather than an
+undisclosed partial model. Rendering errors retain GPU ownership. Headless pages
+are capped while the desktop retains a complete bounded typed frame. Synthetic
+regressions cover malformed inputs, cancellation, date/profile ambiguity,
+monetary rounding, stale selections and recovery. See [viewer details](scene-bundles.md).
+
+Local validation: 2,822 tests passed with 22 ignored in the normal selected-crate
+run. Four adapter-dependent GPU tests passed separately, including main-workbench
+file opening, consecutive idle frames with large controls, error recovery, and
+pointer-driven camera/visibility changes. All-target clippy, format, layers,
+locks, tool registration, secrets and L0–L2 WebAssembly checks passed. Desktop,
+CLI and native viewer examples built successfully.
 
 ### Local Codex discovery and sign-in (R2.2)
 

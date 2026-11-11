@@ -11,6 +11,10 @@ pub const MAX_TOTAL_BYTES: usize = 384 * 1024 * 1024;
 pub const MAX_BINARY_BYTES: usize = 256 * 1024 * 1024;
 pub const MAX_METADATA_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_RECORD_BYTES: usize = 8 * 1024 * 1024;
+/// Experimental candidate policy; native inheritance and appearance precedence are unverified.
+pub const SOURCE_COLOR_POLICY: &str = "experimental_nearest_explicit_diffuse_on_instance_path_native_precedence_unverified";
+/// Controlled active object RGB; only the explicit instance entity node supplies a value.
+pub const OBJECT_COLOR_POLICY: &str = "observed_entity_rgb_override_no_inheritance";
 const MAX_NODES: usize = 100_000;
 const MAX_INSTANCES: usize = 100_000;
 const MAX_VERTICES: usize = 10_000_000;
@@ -73,6 +77,10 @@ struct StoredNode {
     mesh: Option<usize>,
     reference: Option<String>,
     matrix: Matrix,
+    #[serde(default)]
+    source_diffuse: Option<[f64; 3]>,
+    #[serde(default)]
+    source_object_color: Option<[f64; 3]>,
 }
 #[derive(Debug, Deserialize)]
 struct StoredMesh {
@@ -137,6 +145,10 @@ pub struct Scene {
     pub source_sha256: String,
     pub unit_declaration: String,
     pub axis_declaration: String,
+    /// Optional source diffuse candidates keyed by instance index, using SOURCE_COLOR_POLICY.
+    pub source_colors: BTreeMap<usize, [f32; 3]>,
+    /// Native-controlled direct entity-node RGB only; no library/ancestor inheritance is inferred.
+    pub object_colors: BTreeMap<usize, [f32; 3]>,
     pub resources: Vec<Resource>,
     pub resource_instance_counts: Vec<usize>,
     pub meshes: Vec<Mesh>,
@@ -282,6 +294,8 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
     for (i, n) in nodes.iter().enumerate() {
         if !guid(&n.guid)
             || !math::affine(&n.matrix)
+            || n.source_diffuse.is_some_and(|rgb| rgb.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
+            || n.source_object_color.is_some_and(|rgb| rgb.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
             || n.name.len() > 65536
             || ids.insert(n.guid.as_str(), i).is_some()
             || !matches!(n.section.as_str(), "Entities" | "IncludeLibrary")
@@ -470,6 +484,8 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
     if stored.len() != m.instances {
         return Err(malformed("scene instance count"));
     }
+    let mut source_colors = BTreeMap::new();
+    let mut object_colors = BTreeMap::new();
     let mut instances = Vec::new();
     reserve(&mut instances, stored.len())?;
     let mut instance_ids = BTreeSet::new();
@@ -491,6 +507,7 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
         let mut seen = BTreeSet::new();
         let mut owners = BTreeSet::new();
         let mut matrix = math::IDENTITY;
+        let mut source_color = None;
         let mut previous: Option<&StoredNode> = None;
         let mut entity = None;
         let mut h = Sha256::new();
@@ -509,6 +526,9 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
             }
             if node.section == "Entities" {
                 entity = Some(node.guid.as_str());
+            }
+            if let Some(rgb) = node.source_diffuse {
+                source_color = Some(rgb.map(|v| v as f32));
             }
             matrix = math::multiply(&matrix, &node.matrix)?;
             if let Some(rs) = direct.get(id.as_str()) {
@@ -546,6 +566,12 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
         }
         bounds.include(b.0[0]);
         bounds.include(b.0[1]);
+        if let Some(rgb) = source_color {
+            source_colors.insert(instances.len(), rgb);
+        }
+        if let Some(rgb) = ids.get(si.entity_node_guid.as_str()).and_then(|index| nodes.get(*index)).and_then(|node| node.source_object_color) {
+            object_colors.insert(instances.len(), rgb.map(|v| v as f32));
+        }
         instances.push(Instance {
             id: si.instance_id,
             entity_guid: si.entity_node_guid,
@@ -588,6 +614,8 @@ pub fn parse(input: Inputs<'_>, mut keep_going: impl FnMut(f32) -> bool) -> Resu
         axis_declaration: m.world_axis_convention,
         resources,
         resource_instance_counts,
+        source_colors,
+        object_colors,
         meshes,
         instances,
         positions,

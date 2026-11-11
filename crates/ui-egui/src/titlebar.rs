@@ -204,6 +204,10 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
             if !app.settings.first_run_done {
                 return;
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            if icons::button(ui, "boxes", CONTROL * s, app.state.scene_viewer_open, "Project viewer").clicked() {
+                app.state.scene_viewer_open = !app.state.scene_viewer_open;
+            }
             // Simple mode keeps the bar to the essentials: Settings is in the sidebar, the mode
             // switch and AI picker are in Settings, and the Clean room switch stays in view.
             if app.beginner() {

@@ -16,9 +16,21 @@ pub struct LoadedScene {
     pub scene: Arc<Scene>,
     pub manifest: PathBuf,
     pub subject: Subject,
+    pub metadata: Arc<Value>,
 }
 pub fn specs() -> Vec<ToolSpec> {
     vec![
+        spec(
+            "formats_project_open",
+            "Open a project model",
+            "Read the admitted 6.5.5.28 project layout directly into the scene cache, including framed Tasks, Resources and geometry. No source application or pre-generated bundle is required. Unsupported layouts fail explicitly.",
+            "Open a project file for 3D, schedule and cost inspection.",
+            Toolset::Formats,
+            Effects::EVIDENCE.union(Effects::CARRIES_TARGET_CONTENT),
+            Requires::Nothing,
+            schema_of::<OpenParams>,
+            formats_project_open,
+        ),
         spec(
             "formats_scene_bundle_open",
             "Open a scene bundle",
@@ -102,6 +114,31 @@ fn member(root: &Path, name: &str, cap: usize, total: &mut usize) -> Result<Vec<
     }
     craft_anything_platform::fs::read_file_capped(&actual, cap as u64)
 }
+pub(crate) fn formats_project_open(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: OpenParams = parse_params(params.clone())?;
+    let input = load_path(&p.path, 256 * 1024 * 1024)?;
+    let imported = craft_anything_formats::sp_project::parse(&input.bytes, |progress| {
+        ctx.report(Some(progress), "Decoding project data and geometry");
+        !ctx.cancel.is_cancelled()
+    });
+    if ctx.cancel.is_cancelled() {
+        return Err(ToolError::cancelled());
+    }
+    let imported = imported.map_err(|e| format_err(e, "an admitted project model"))?;
+    let data = Arc::new(imported.scene);
+    let result = json!({"scene_id":data.id,"source_sha256":data.source_sha256,"mesh_instances":data.instances.len(),"definitions":data.meshes.len(),"vertices":data.positions.len(),"resources":data.resources.len(),"tasks":imported.metadata.get("tasks").and_then(Value::as_array).map(Vec::len),"object_colours":data.object_colors.len(),"object_colour_policy":scene_bundle::OBJECT_COLOR_POLICY,"native_units_verified":false,"native_axes_verified":false});
+    let count = data.instances.len();
+    ctx.session.ext.insert(Arc::new(LoadedScene {
+        scene: data,
+        manifest: input.path.clone(),
+        subject: input.subject.clone(),
+        metadata: Arc::new(imported.metadata),
+    }));
+    let ev=builder(ctx,"formats_project_open",input.subject,params).summary(format!("Opened a source project with {count} mesh instances"))
+        .confidence(Confidence::Derived).coverage(Coverage::complete(count as u64)).result(result).target_content(true)
+        .limitation(Limitation::new("admitted_layout_only","Only the observed serialization layout is supported; engineering units, axes, source materials and application-wide simulation parity require separate evidence." )).build()?;
+    Ok(ToolOutput::evidence(ev))
+}
 fn formats_scene_bundle_open(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
     let p: OpenParams = parse_params(params.clone())?;
     let input = load_path(&p.path, 1024 * 1024)?;
@@ -147,7 +184,12 @@ fn formats_scene_bundle_open(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOut
     let data = Arc::new(parsed.map_err(|e| format_err(e, "a version-1 scene bundle"))?);
     let result = json!({"scene_id":data.id,"source_sha256_declared":data.source_sha256,"nodes":data.node_count,"meshes":data.meshes.len(),"mesh_instances":data.instances.len(),"vertices":data.positions.len(),"triangles_in_definitions":data.triangles,"resources":data.resources.len(),"bounds":data.bounds,"coordinate_unit_declared":data.unit_declaration,"axes_declared":data.axis_declaration,"units_verified":false,"axes_verified":false,"materials_verified":false});
     let count = data.instances.len() as u64;
-    ctx.session.ext.insert(Arc::new(LoadedScene { scene: data, manifest, subject: input.subject.clone() }));
+    ctx.session.ext.insert(Arc::new(LoadedScene {
+        scene: data,
+        manifest,
+        subject: input.subject.clone(),
+        metadata: Arc::new(serde_json::from_slice(take(5)?).map_err(|_| ToolError::invalid("Project metadata is invalid JSON"))?),
+    }));
     ctx.report(Some(1.), "Scene ready");
     let ev = builder(ctx, "formats_scene_bundle_open", input.subject, params)
         .summary(format!("Loaded {} mesh instances from a validated scene bundle", count))
@@ -287,8 +329,15 @@ mod tests {
             render_origin: [0.; 3],
             triangles: 1,
             node_count: 1,
+            source_colors: Default::default(),
+            object_colors: Default::default(),
         };
-        session.ext.insert(Arc::new(LoadedScene { scene: Arc::new(scene), manifest: PathBuf::from("scene.json"), subject: target.subject() }));
+        session.ext.insert(Arc::new(LoadedScene {
+            scene: Arc::new(scene),
+            manifest: PathBuf::from("scene.json"),
+            subject: target.subject(),
+            metadata: Arc::new(json!({})),
+        }));
         Engine::new(session)
     }
     #[test]

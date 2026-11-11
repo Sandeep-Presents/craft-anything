@@ -405,6 +405,12 @@ pub struct PaletteState {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UiState {
+    /// Dedicated project viewer, independent of reverse-engineering navigation tabs.
+    #[serde(default)]
+    pub scene_viewer_open: bool,
+    #[serde(default)]
+    pub scene_path: String,
+
     /// Which half of Detect's findings is showing (a view choice, not part of the project).
     #[serde(skip)]
     pub detect_tab: Option<crate::detect_tabs::DetectTab>,
@@ -540,6 +546,8 @@ impl PluginForm {
 impl Default for UiState {
     fn default() -> Self {
         UiState {
+            scene_viewer_open: false,
+            scene_path: String::new(),
             detect_tab: None,
             screen: Screen::Home,
             first_run: FirstRunStep::Welcome,

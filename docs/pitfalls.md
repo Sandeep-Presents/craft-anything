@@ -1057,5 +1057,23 @@ float mantissas in a round-trip reader regression instead of loosening bounds si
 not a completed GPU frame. Wait with a deadline for the submitted frame before accepting the
 next one, compact hidden instances out of draws, and keep busy-status layout height constant
 so rendering cannot alternate viewport sizes forever.
+Reserving only a minimum status-row height is insufficient with larger themed
+controls: reserve the spinner and cancel button footprints in both busy and idle
+states. Cache the last draw statistics while a worker owns the renderer. Require
+several consecutive idle frames, including large-control and main-workbench
+fixtures, rather than accepting one transient idle frame.
 Large-scene snapshot runs must explicitly select a hardware adapter: the test harness
 default prefers a CPU rasterizer, which is appropriate for small UI fixtures.
+
+**A failed scene job discarded the renderer.** Moving the GPU into a worker and
+returning early on a recoverable error loses the only owner. Return ownership with
+the result, retain the previous texture only for the same model, and exercise a
+rejected frame followed by a valid pixel-changing render without reopening.
+Failed timeline evaluations must clear stale phase visibility and offer an explicit
+retry; historical errors must not survive a successful retry as the current result.
+
+**Summary storage dates were mistaken for schedule bounds.** Summary records may
+carry dummy raw start/duration values. Derive summary bounds from every child,
+propagate incomplete children, and keep zero-duration leaves as instants. Raw
+assignment rates are not monetary prices, and unset actual/remaining storage must
+remain unresolved instead of becoming zero.

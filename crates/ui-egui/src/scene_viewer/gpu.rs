@@ -1,5 +1,5 @@
 //! Worker-owned instanced renderer. No pipeline creation, uploads or draw encoding on a UI frame.
-use super::camera::Camera;
+use super::{camera::Camera, draw_plan};
 use crate::theme::Tokens;
 use craft_anything_engine::CancelToken;
 use craft_anything_formats::scene_bundle::{Scene, Visibility, math};
@@ -37,6 +37,9 @@ pub struct FrameData {
     pub selected_resource: Option<usize>,
     pub size: [u32; 2],
     pub tokens: Tokens,
+    pub phases: std::collections::BTreeMap<usize, u8>,
+    pub source_colors: bool,
+    pub object_colors: bool,
 }
 pub struct Gpu {
     device: w::Device,
@@ -55,6 +58,8 @@ pub struct Gpu {
     depth: w::TextureView,
     _depth: w::Texture,
     size: [u32; 2],
+    pub stats: Option<draw_plan::DrawStats>,
+    pub elapsed_ms: u64,
 }
 fn target(device: &w::Device, size: [u32; 2], depth: bool) -> (w::Texture, w::TextureView) {
     let texture = device.create_texture(&w::TextureDescriptor {
@@ -138,6 +143,7 @@ impl Gpu {
             w::VertexAttribute { format: w::VertexFormat::Float32x4, offset: 48, shader_location: 4 },
             w::VertexAttribute { format: w::VertexFormat::Uint32, offset: 64, shader_location: 5 },
             w::VertexAttribute { format: w::VertexFormat::Uint32, offset: 68, shader_location: 6 },
+            w::VertexAttribute { format: w::VertexFormat::Uint32, offset: 72, shader_location: 7 },
         ];
         let pipeline = device.create_render_pipeline(&w::RenderPipelineDescriptor {
             label: Some("Scene instancing"),
@@ -148,7 +154,7 @@ impl Gpu {
                 compilation_options: Default::default(),
                 buffers: &[
                     Some(w::VertexBufferLayout { array_stride: 12, step_mode: w::VertexStepMode::Vertex, attributes: &vertex_attrs }),
-                    Some(w::VertexBufferLayout { array_stride: 72, step_mode: w::VertexStepMode::Instance, attributes: &instance_attrs }),
+                    Some(w::VertexBufferLayout { array_stride: 80, step_mode: w::VertexStepMode::Instance, attributes: &instance_attrs }),
                 ],
             },
             primitive: w::PrimitiveState { cull_mode: None, ..Default::default() },
@@ -190,7 +196,7 @@ impl Gpu {
         }
         let instances = device.create_buffer(&w::BufferDescriptor {
             label: Some("Scene transforms"),
-            size: (order.len().max(1) * 72) as u64,
+            size: (order.len().max(1) * 80) as u64,
             usage: w::BufferUsages::VERTEX | w::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -214,10 +220,13 @@ impl Gpu {
             depth: depth_view,
             _depth: depth,
             size,
+            stats: None,
+            elapsed_ms: 0,
         })
     }
     pub fn render(&mut self, scene: &Scene, frame: &FrameData, cancel: &CancelToken) -> Result<(), String> {
-        let FrameData { camera, visibility, selected, selected_resource, size: requested, tokens } = frame;
+        let started = Instant::now();
+        let FrameData { camera, visibility, selected, selected_resource, size: requested, tokens, phases, source_colors, object_colors } = frame;
         if let Ok(e) = self.errors.try_recv() {
             return Err(e);
         }
@@ -229,13 +238,16 @@ impl Gpu {
             (self._depth, self.depth) = target(&self.device, size, true);
             self.size = size;
         }
+        let plan = draw_plan::plan_with_cancel(scene, camera, visibility, f64::from(size[0]) / f64::from(size[1]), draw_plan::DEFAULT_TRIANGLE_BUDGET, || {
+            cancel.is_cancelled()
+        })?;
         let mut counts = vec![0u32; self.draws.len()];
-        let mut bytes = Vec::with_capacity(self.order.len() * 72);
+        let mut bytes = Vec::with_capacity(self.order.len() * 80);
         for id in &self.order {
             if cancel.is_cancelled() {
                 return Err("Scene render cancelled.".into());
             }
-            if !scene.is_visible(*id, visibility) {
+            if !plan.visible_instances.contains(id) {
                 continue;
             }
             let i = scene.instances.get(*id).ok_or("Invalid draw instance")?;
@@ -257,6 +269,23 @@ impl Gpu {
             let picked_resource = selected_resource.is_some_and(|r| i.resources.contains(&r));
             bytes.extend_from_slice(&(if picked_resource { u32::MAX - 1 } else { checked_u32(*id)? }).to_le_bytes());
             bytes.extend_from_slice(&1u32.to_le_bytes());
+            let phase = i.resources.iter().filter_map(|r| phases.get(r)).filter(|p| **p == 1 || **p == 2).max().copied();
+            let color = if let Some(phase) = phase {
+                Some(if phase == 2 { tokens.warning.to_normalized_gamma_f32() } else { tokens.success.to_normalized_gamma_f32() })
+            } else if *object_colors {
+                scene.object_colors.get(id).map(|c| [c[0], c[1], c[2], 1.])
+            } else if *source_colors {
+                scene.source_colors.get(id).map(|c| [c[0], c[1], c[2], 1.])
+            } else {
+                None
+            };
+            let packed = color
+                .map(|c| {
+                    c.iter().enumerate().fold(0u32, |out, (n, v)| out | ((v.clamp(0., 1.) * 255.).round() as u32).checked_shl((n * 8) as u32).unwrap_or(0))
+                })
+                .unwrap_or(0);
+            bytes.extend_from_slice(&packed.to_le_bytes());
+            bytes.extend_from_slice(&0u32.to_le_bytes());
         }
         self.queue.write_buffer(&self.instances, 0, &bytes);
         let matrix = camera.projection(scene.render_origin, f64::from(size[0]) / f64::from(size[1]), scene.bounds.radius())?;
@@ -319,6 +348,8 @@ impl Gpu {
         if let Some(e) = bounded(scope.pop(), &self.device)? {
             return Err(format!("Scene rendering failed: {e}"));
         }
+        self.stats = Some(plan.stats);
+        self.elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         Ok(())
     }
 }

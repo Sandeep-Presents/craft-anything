@@ -81,6 +81,24 @@
         "matrix": {
           "$ref": "#/$defs/matrix"
         },
+        "source_diffuse": {
+          "description": "Optional candidate only; native material precedence is unverified.",
+          "type": ["array", "null"],
+          "items": {"type": "number", "minimum": 0, "maximum": 1},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "source_diffuse_origin": {"type": ["object", "null"]},
+        "source_diffuse_status": {"type": "string"},
+        "source_opacity": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "source_object_color": {
+          "description": "Optional explicit binary entity RGB override; no inheritance is inferred.",
+          "type": ["array", "null"],
+          "items": {"type": "number", "minimum": 0, "maximum": 1},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "source_object_color_origin": {"type": ["object", "null"]},
         "children": {
           "type": "array",
           "items": {

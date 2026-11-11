@@ -50,6 +50,7 @@ fn snapshot(path: String, output: &Path) -> Result<(), String> {
     h.render()?.save(output.join("scene-fit.png")).map_err(|e| e.to_string())?;
     let model = h.state().model.clone().ok_or("No scene loaded")?;
     let scene = &model.scene;
+    let initial_draw = h.state().draw_stats().map(|(s, ms)| serde_json::json!({"draw":s,"elapsed_ms":ms}));
     // Aim through a real triangle centroid rather than assuming screen centre contains geometry.
     let instance = scene.instances.iter().find(|i| scene.meshes.get(i.mesh).is_some_and(|m| m.triangle_count > 0)).ok_or("No drawable instance")?;
     let mesh = scene.meshes.get(instance.mesh).ok_or("Missing mesh")?;
@@ -126,7 +127,62 @@ fn snapshot(path: String, output: &Path) -> Result<(), String> {
         settle(&mut h)?;
         h.render()?.save(output.join("scene-resource.png")).map_err(|e| e.to_string())?;
     }
-    let report = serde_json::json!({"schema_version":1,"scene_id":scene.id,"instances":scene.instances.len(),"definitions":scene.meshes.len(),"vertices":scene.positions.len(),"triangles_in_definitions":scene.triangles,"resources":scene.resources.len(),"selected_instance":h.state().state.selected_instance,"isolate_instances":h.state().state.visibility.isolate_instances,"checks":["real bundle load","GPU render","ray surface pick","Hide UI action","Show all UI action","Isolate UI action","Fit selection UI action","camera orbit pan zoom","Resource tree selection and visibility"],"units_verified":false,"axes_verified":false,"materials_verified":false,"native_visual_parity_verified":false});
+    h.state_mut().state.visibility = Default::default();
+    h.state_mut().state.selected_instance = None;
+    h.state_mut().state.selected_resource = None;
+    h.state_mut().state.camera.target = instance.bounds.center();
+    h.state_mut().state.camera.distance = (instance.bounds.radius() * 4.).max(0.25);
+    h.state_mut().changed();
+    settle(&mut h)?;
+    let focused_draw = h.state().draw_stats().map(|(s, ms)| serde_json::json!({"draw":s,"elapsed_ms":ms}));
+    if scene.instances.len() > 100 && h.state().draw_stats().is_none_or(|(s, _)| s.frustum_culled == 0) {
+        return Err("Focused large-scene view did not cull any instance".into());
+    }
+    h.render()?.save(output.join("scene-frustum.png")).map_err(|e| e.to_string())?;
+    let mut project_draws = Vec::new();
+    if model.metadata.get("tasks").and_then(|v| v.as_array()).is_some_and(|v| !v.is_empty()) {
+        use craft_anything_ui_egui::scene_viewer::project_panel::Mode;
+        h.state_mut().state.visibility = Default::default();
+        h.state_mut().state.search.clear();
+        h.state_mut().state.camera.fit(scene.bounds);
+        h.state_mut().state.project.mode = Mode::Schedule;
+        h.state_mut().state.project.interval_preview = true;
+        h.state_mut().changed();
+        settle(&mut h)?;
+        let timeline = &h.state().project_frame.as_ref().ok_or("Project frame missing")?.frame.timeline;
+        let (start, end) = timeline.start.zip(timeline.end).ok_or("Project schedule has no resolved bounds")?;
+        let mut phase_states = Vec::new();
+        for (label, focus) in [("before", start.saturating_sub(86400)), ("middle", start + (end - start) / 2), ("after", end.saturating_add(86400))] {
+            h.state_mut().state.project.focus = focus;
+            h.state_mut().changed();
+            settle(&mut h)?;
+            let frame = &h.state().project_frame.as_ref().ok_or("Project frame missing")?.frame;
+            if let Some((draw, ms)) = h.state().draw_stats() {
+                project_draws.push(serde_json::json!({"label":label,"focus":focus,"draw":draw,"elapsed_ms":ms}));
+            }
+            phase_states.push(serde_json::to_value(&frame.resource_phases).map_err(|e| e.to_string())?);
+            std::fs::write(output.join(format!("project-{label}.json")), serde_json::to_vec_pretty(frame).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+            h.render()?.save(output.join(format!("project-4d-{label}.png"))).map_err(|e| e.to_string())?;
+        }
+        if phase_states.first() == phase_states.last() {
+            return Err("Moving the focus did not change any resource appearance state".into());
+        }
+        h.state_mut().state.project.mode = Mode::Cost;
+        h.state_mut().changed();
+        settle(&mut h)?;
+        h.render()?.save(output.join("project-5d.png")).map_err(|e| e.to_string())?;
+        h.state_mut().state.project.mode = Mode::Model;
+        h.state_mut().state.project.source_colors = true;
+        h.state_mut().state.project.object_colors = false;
+        h.state_mut().changed();
+        settle(&mut h)?;
+        h.render()?.save(output.join("project-source-diffuse.png")).map_err(|e| e.to_string())?;
+    }
+    let report = serde_json::json!({"schema_version":1,"scene_id":scene.id,"instances":scene.instances.len(),"definitions":scene.meshes.len(),"vertices":scene.positions.len(),"triangles_in_definitions":scene.triangles,"resources":scene.resources.len(),"initial_draw":initial_draw,"focused_draw":focused_draw,"source_diffuse_candidates":scene.source_colors.len(),"selected_instance":h.state().state.selected_instance,"isolate_instances":h.state().state.visibility.isolate_instances,"checks":["source or bundle load","GPU render","ray surface pick","Hide UI action","Show all UI action","Isolate UI action","Fit selection UI action","camera orbit pan zoom","Resource tree selection and visibility","focused full-scene frustum culling","project schedule and costs when source tasks are present"],"units_verified":false,"axes_verified":false,"materials_verified":false,"native_visual_parity_verified":false});
+    let mut report = report;
+    report["object_colours"] = serde_json::json!({"instances":scene.object_colors.len(),"policy":craft_anything_formats::scene_bundle::OBJECT_COLOR_POLICY});
+    report["project_draws"] = serde_json::json!(project_draws);
     std::fs::write(output.join("verification.json"), serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     println!("Verified viewport; snapshots saved in {}", output.display());
     Ok(())
