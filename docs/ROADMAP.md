@@ -329,6 +329,7 @@ Every round spends the person's money or quota. One that can't do anything shoul
       its other cases (sign-in, credit, a missing install) to the same typed signal — commit `f80a16a66834`
 - [ ] Find what repeated #64's attempts and stop it: it logged 41, about 38 s apart, on 0.2.0, but
       `turn` allows 3 retries 30, 60 and 90 s apart, there too, so something else starts them
+      — claimed: scks1, branch bugfix/r5.3-repeated-attempts-64
 - [x] A rate limit is waited for only on agents with a session: `turn` retries only when
       `agent.session_id()` is set, which API backends and OpenCode's plain adapter never set (read
       in the code, not run). So #148 didn't reach #142, which was OpenCode. Wait and send the turn
