@@ -418,7 +418,8 @@ impl CraftApp {
 
     /// Let the builder generate pictures and 3D models, or not: for the open project on its screen
     /// (through the project_assets_allow tool), else for the game being set up on Make. Turning it
-    /// on without a fal.ai key asks for one.
+    /// on without a fal.ai key asks for one; with ComfyUI as the picture model it opens Settings →
+    /// Builds instead, when its address or checkpoint is missing.
     pub fn set_generate_assets(&mut self, on: bool) {
         let project = self.workspace.as_ref().filter(|_| self.state.screen == Screen::Project).map(|w| w.root.clone());
         match project {
@@ -428,7 +429,13 @@ impl CraftApp {
             }
             None => self.state.make.generate_assets = on,
         }
-        if on && self.fal_key() == Some(false) {
+        let assets = &self.settings.assets;
+        if on && assets.comfyui_chosen() {
+            if !assets.comfyui_ready() {
+                self.state.settings_open = true;
+                self.state.settings_tab = crate::state::SettingsTab::Builds;
+            }
+        } else if on && self.fal_key() == Some(false) {
             self.state.modal = Some(Modal::Assets);
         }
     }
@@ -464,9 +471,15 @@ pub fn assets_toggle(app: &mut CraftApp, ui: &mut Ui, mut on: bool) {
     if widgets::toggle(ui, &mut on, "Generate custom pictures and models").changed() {
         app.set_generate_assets(on);
     }
-    let no_key = on && app.fal_key() == Some(false);
-    let note = if no_key {
+    let (comfy, chosen) = (app.settings.assets.comfyui_ready(), app.settings.assets.comfyui_chosen());
+    let no_key = on && app.fal_key() == Some(false) && !chosen;
+    let unready = on && chosen && !comfy;
+    let note = if unready {
+        tr("Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.")
+    } else if no_key {
         tr("Needs a fal.ai key. Until then the game is built without them.")
+    } else if comfy {
+        tr("No key needed; pictures are made on your server.")
     } else {
         let p = AssetPrices::of(app);
         trf(
@@ -475,7 +488,7 @@ pub fn assets_toggle(app: &mut CraftApp, ui: &mut Ui, mut on: bool) {
         )
     };
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(note).color(if no_key { t.warning } else { t.text_dim }).size(theme::SMALL));
+        ui.label(RichText::new(note).color(if no_key || unready { t.warning } else { t.text_dim }).size(theme::SMALL));
         if no_key && widgets::link(ui, "Add a fal.ai key").clicked() {
             app.state.modal = Some(Modal::Assets);
         }

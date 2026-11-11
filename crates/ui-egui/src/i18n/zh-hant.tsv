@@ -741,7 +741,6 @@ Not now	暫時不要
 Nothing allowed yet.	尚未允許任何操作。
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	尚無可用的建置助手：請安裝 Claude Code (並先登入一次)，或在下方新增設定了 API 金鑰的 AI。
 Nothing found	未找到內容
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	尚未找到。我們會尋找你已有的 API 金鑰、本機模型伺服器 (Ollama、LM Studio) 和代理程式應用程式。其他連接埠或其他電腦上的伺服器可以在下方依位址新增。
 Nothing inside it is read.	不會讀取其內部內容。
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	不會讀取其內部內容；Craft Anything 僅依據你能看到的內容工作。你的版本會使用自己的美術素材。
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	不會讀取原作的內部內容，包括程式碼、檔案和網頁原始碼。Craft Anything 僅根據可見內容工作：圖片、訪客所見的網頁以及執行時的表現。
@@ -1290,7 +1289,6 @@ Write the brief	撰寫需求簡報
 Write the handoff	撰寫交接說明
 Wrote {what} to {}	已將{what}寫入 {}
 You answered: {a}	你的回答：{a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	之後可以在「設定 → AI」中新增 Claude、ChatGPT 或 OpenRouter 金鑰、本機模型 (Ollama、LM Studio)，或你正在使用的代理程式。
 You chose:	你的選擇：
 You're all set	準備就緒
 Your app is ready	你的應用程式已就緒
@@ -1467,3 +1465,48 @@ Connecting to {name}… {seconds} s	正在連線 {name}… {seconds} 秒
 Stopped adding {name}.	已停止新增 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那裡，因此改用 {program}。
 Use it	使用它
+Custom endpoint	自訂端點
+Custom LLM endpoint	自訂 LLM 端點
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	任何使用 OpenAI API 的引擎(如 llama.cpp),或帶金鑰的代管服務。
+Service	服務
+Name	名稱
+Address	位址
+e.g. Home server	例如:家用伺服器
+e.g. http://192.168.1.20:8080/v1	例如: http://192.168.1.20:8080/v1
+if it needs one	如需要
+model name	模型名稱
+Custom model	自訂模型
+Custom model or alias…	自訂模型或別名…
+Looking for models…	正在尋找模型…
+{n} models found	找到 {n} 個模型
+1 model found	找到 1 個模型
+It lists no models yet.	它還沒有列出任何模型。
+Testing… a model that isn't loaded yet can take a minute	正在測試… 尚未載入的模型可能需要一分鐘
+Answered in {seconds} s	{seconds} 秒內已回覆
+Answered in {seconds} s: {reply}	{seconds} 秒內已回覆:{reply}
+Installed: {reply}	已安裝:{reply}
+Test	測試
+Testing…	正在測試…
+Test an AI	測試 AI
+Anthropic API	Anthropic API
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Gemini API	Gemini API
+Coding agent	編碼代理
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	尚未找到。我們會尋找 API 金鑰、本機模型伺服器(llama.cpp、LM Studio)以及你已有的代理應用程式。其他連接埠或其他電腦上的伺服器可在「自訂端點」分頁新增。
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	你可以稍後在 設定 → AI 中新增 Claude、ChatGPT 或 OpenRouter 金鑰、本機模型(llama.cpp、LM Studio)或你已在用的代理。依位址新增的伺服器放在「自訂端點」分頁。
+Checkpoint	檢查點
+Workflow	工作流程
+ComfyUI address	ComfyUI 位址
+ComfyUI workflow	ComfyUI 工作流程
+e.g. http://192.168.1.20:8188	例如: http://192.168.1.20:8188
+API-format workflow JSON, optional	API 格式的工作流程 JSON,選填
+on your server	在你的伺服器上
+No key needed; pictures are made on your server.	不需要金鑰;圖片在你的伺服器上產生。
+List ComfyUI's checkpoints	列出 ComfyUI 的檢查點
+Test ComfyUI	測試 ComfyUI
+Check a ComfyUI server	檢查 ComfyUI 伺服器
+Looking for checkpoints…	正在尋找檢查點…
+{n} checkpoints found	找到 {n} 個檢查點
+1 checkpoint found	找到 1 個檢查點
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	需要在 設定 → 建置 中填寫 ComfyUI 位址和檢查點。填寫之前，建置遊戲時不會產生這些素材。

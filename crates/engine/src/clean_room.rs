@@ -41,6 +41,7 @@ pub const TOOLS: &[&str] = &[
     // Generated pictures and models, and the keys that pay for them.
     "assets_image_generate",
     "assets_model_generate",
+    "assets_comfyui_check",
     "assets_key_set",
     "assets_key_remove",
     "assets_key_status",

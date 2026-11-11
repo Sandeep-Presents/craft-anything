@@ -177,18 +177,44 @@ pub struct AssetSettings {
     /// The picture model, by its id in the asset table (`nano-banana-pro`, `flux-dev`…); `None` = the
     /// table's default.
     pub image_model: Option<String>,
+    /// The ComfyUI server pictures are made on when the picture model is `comfyui`.
+    pub comfyui: ComfyUiSettings,
 }
 
 impl Default for AssetSettings {
     fn default() -> Self {
-        AssetSettings { budget_usd: crate::workspace::ASSET_BUDGET_USD, image_model: None }
+        AssetSettings { budget_usd: crate::workspace::ASSET_BUDGET_USD, image_model: None, comfyui: ComfyUiSettings::default() }
     }
+}
+
+/// A ComfyUI server of the person's own: where it is, which checkpoint makes the pictures, and
+/// an optional API-format workflow file that replaces the built-in graph.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ComfyUiSettings {
+    /// `http://host:port`. Empty = not set up.
+    pub address: String,
+    /// The checkpoint's file name as the server lists it.
+    pub checkpoint: String,
+    /// A workflow exported in API format; `None` = the built-in text-to-image graph.
+    pub workflow: Option<String>,
 }
 
 impl AssetSettings {
     /// The budget for a new project; a negative or non-number value gives the built-in default.
     pub fn budget(&self) -> f64 {
         if self.budget_usd.is_finite() && self.budget_usd >= 0.0 { self.budget_usd } else { crate::workspace::ASSET_BUDGET_USD }
+    }
+
+    /// Pictures come from the person's own ComfyUI server: it's the picture model, with the same
+    /// two fields the asset tools need before they send anything (an address and a checkpoint).
+    pub fn comfyui_ready(&self) -> bool {
+        self.comfyui_chosen() && !self.comfyui.address.trim().is_empty() && !self.comfyui.checkpoint.trim().is_empty()
+    }
+
+    /// ComfyUI is the picture model, set up or not.
+    pub fn comfyui_chosen(&self) -> bool {
+        self.image_model.as_deref() == Some(craft_anything_engines::assets::comfyui::ID)
     }
 }
 

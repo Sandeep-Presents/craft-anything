@@ -741,7 +741,6 @@ Not now	ไม่ใช่ตอนนี้
 Nothing allowed yet.	ยังไม่อนุญาตอะไร
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	ยังสร้างไม่ได้: ติดตั้ง Claude Code (และล็อกอินหนึ่งครั้ง) หรือเพิ่ม AI ที่มี API key ด้านล่าง
 Nothing found	ไม่พบสิ่งใด
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	ยังไม่พบสิ่งใด เราค้นหา API key เซิร์ฟเวอร์โมเดลในเครื่อง (Ollama, LM Studio) และแอปเอเจนต์ที่มีอยู่ ตัวที่อยู่อีกพอร์ตหรืออีกเครื่องเพิ่มได้ด้วยที่อยู่ด้านล่าง
 Nothing inside it is read.	ไม่มีการอ่านสิ่งใดข้างใน
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	ไม่มีการอ่านสิ่งใดข้างใน Craft Anything ทำงานจากสิ่งที่มองเห็น เวอร์ชันของคุณได้อาร์ตของตัวเอง
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	ไม่อ่านสิ่งใดภายในต้นฉบับ: ไม่ใช่โค้ด ไฟล์ หรือซอร์สหน้าเว็บ Craft Anything ทำงานจากสิ่งที่มองเห็น: รูป หน้าเว็บอย่างที่ผู้เยี่ยมชมเห็น และการเฝ้าดูขณะรัน
@@ -1290,7 +1289,6 @@ Write the brief	เขียนบรีฟ
 Write the handoff	เขียนเอกสารส่งต่อ
 Wrote {what} to {}	เขียน {what} ลง {}
 You answered: {a}	คุณตอบ: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	เพิ่มคีย์ Claude, ChatGPT หรือ OpenRouter โมเดลในเครื่อง (Ollama, LM Studio) หรือเอเจนต์ที่ใช้อยู่ ทีหลังได้ในการตั้งค่า → AI
 You chose:	คุณเลือก:
 You're all set	พร้อมแล้ว
 Your app is ready	แอปของคุณพร้อมแล้ว
@@ -1467,3 +1465,48 @@ Connecting to {name}… {seconds} s	กำลังเชื่อมต่อ�
 Stopped adding {name}.	หยุดเพิ่ม {name} แล้ว
 It isn't there any more, so {program} runs in its place.	ไม่มีอยู่ที่นั่นแล้ว จึงใช้ {program} แทน
 Use it	ใช้อันนี้
+1 model found	พบ 1 โมเดล
+Address	ที่อยู่
+Answered in {seconds} s	ตอบใน {seconds} วินาที
+Answered in {seconds} s: {reply}	ตอบใน {seconds} วินาที: {reply}
+Anthropic API	Anthropic API
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	เอนจินใดก็ได้ที่ใช้ OpenAI API เช่น llama.cpp หรือบริการโฮสต์พร้อมคีย์ของมัน
+Coding agent	เอเจนต์เขียนโค้ด
+Custom LLM endpoint	ปลายทาง LLM แบบกำหนดเอง
+Custom endpoint	ปลายทางแบบกำหนดเอง
+Custom model	โมเดลแบบกำหนดเอง
+Custom model or alias…	โมเดลแบบกำหนดเองหรือชื่อแทน…
+Gemini API	Gemini API
+Installed: {reply}	ติดตั้งแล้ว: {reply}
+It lists no models yet.	ยังไม่มีโมเดลในรายการ
+Looking for models…	กำลังหาโมเดล…
+Name	ชื่อ
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	ยังไม่พบสิ่งใด เราค้นหา API key เซิร์ฟเวอร์โมเดลในเครื่อง (llama.cpp, LM Studio) และแอปเอเจนต์ที่มีอยู่ ตัวที่อยู่อีกพอร์ตหรืออีกเครื่องเพิ่มได้ในแท็บปลายทางแบบกำหนดเอง
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Service	บริการ
+Test	ทดสอบ
+Test an AI	ทดสอบ AI
+Testing…	กำลังทดสอบ…
+Testing… a model that isn't loaded yet can take a minute	กำลังทดสอบ… โมเดลที่ยังไม่ได้โหลดอาจใช้เวลาหนึ่งนาที
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	เพิ่มคีย์ Claude, ChatGPT หรือ OpenRouter โมเดลในเครื่อง (llama.cpp, LM Studio) หรือเอเจนต์ที่ใช้อยู่ ทีหลังได้ในการตั้งค่า → AI เซิร์ฟเวอร์ที่เพิ่มด้วยที่อยู่อยู่ในแท็บปลายทางแบบกำหนดเอง
+e.g. Home server	เช่น เซิร์ฟเวอร์ที่บ้าน
+e.g. http://192.168.1.20:8080/v1	เช่น http://192.168.1.20:8080/v1
+if it needs one	ถ้าจำเป็น
+model name	ชื่อโมเดล
+{n} models found	พบ {n} โมเดล
+1 checkpoint found	พบ 1 เช็กพอยต์
+API-format workflow JSON, optional	JSON เวิร์กโฟลว์รูปแบบ API (ไม่บังคับ)
+Check a ComfyUI server	ตรวจสอบเซิร์ฟเวอร์ ComfyUI
+Checkpoint	เช็กพอยต์
+ComfyUI address	ที่อยู่ ComfyUI
+ComfyUI workflow	เวิร์กโฟลว์ ComfyUI
+List ComfyUI's checkpoints	แสดงรายการเช็กพอยต์ของ ComfyUI
+Looking for checkpoints…	กำลังหาเช็กพอยต์…
+No key needed; pictures are made on your server.	ไม่ต้องใช้คีย์ ภาพสร้างบนเซิร์ฟเวอร์ของคุณ
+Test ComfyUI	ทดสอบ ComfyUI
+Workflow	เวิร์กโฟลว์
+e.g. http://192.168.1.20:8188	เช่น http://192.168.1.20:8188
+on your server	บนเซิร์ฟเวอร์ของคุณ
+{n} checkpoints found	พบ {n} เช็กพอยต์
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	ต้องมีที่อยู่ ComfyUI และเช็กพอยต์ใน การตั้งค่า → บิลด์ ก่อนหน้านั้นเกมจะสร้างโดยไม่มีสิ่งเหล่านี้

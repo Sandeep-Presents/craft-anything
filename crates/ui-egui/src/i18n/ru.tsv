@@ -731,7 +731,6 @@ Not now	Не сейчас
 Nothing allowed yet.	Пока ничего не разрешено.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Пока ничего нельзя собрать: установите Claude Code (и один раз войдите в него) или добавьте ИИ с ключом API ниже.
 Nothing found	Ничего не найдено
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Пока ничего не найдено. Мы ищем ключи API, локальные серверы моделей (Ollama, LM Studio) и приложения-агенты, которые у вас уже есть. Сервер на другом порту или другом компьютере можно добавить по адресу ниже.
 Nothing inside it is read.	Внутри ничего не читается.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Внутри ничего не читается; Craft Anything работает с тем, что вы можете увидеть. Ваша версия получит собственную графику.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Внутри оригинала ничего не читается: ни код, ни файлы, ни исходник страницы. Craft Anything работает с тем, что вы можете увидеть: изображениями, страницей глазами посетителя и наблюдением за её работой.
@@ -1290,7 +1289,6 @@ Write the brief	Написать краткое описание
 Write the handoff	Написать передачу
 Wrote {what} to {}	Записано {what} в {}
 You answered: {a}	Вы ответили: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Вы можете добавить ключ Claude, ChatGPT или OpenRouter, локальную модель (Ollama, LM Studio) или агент, который уже используете, позже в Настройки → ИИ.
 You chose:	Вы выбрали:
 You're all set	Всё готово
 Your app is ready	Ваше приложение готово
@@ -1467,3 +1465,48 @@ Connecting to {name}… {seconds} s	Подключение к {name}… {seconds
 Stopped adding {name}.	Добавление {name} остановлено.
 It isn't there any more, so {program} runs in its place.	Его там больше нет, поэтому вместо него запускается {program}.
 Use it	Использовать
+Custom endpoint	Свой адрес
+Custom LLM endpoint	Свой адрес LLM
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Любой движок с API OpenAI, например llama.cpp, или облачный сервис с ключом.
+Service	Сервис
+Name	Название
+Address	Адрес
+e.g. Home server	напр. Домашний сервер
+e.g. http://192.168.1.20:8080/v1	напр. http://192.168.1.20:8080/v1
+if it needs one	если нужен
+model name	имя модели
+Custom model	Другая модель
+Custom model or alias…	Другая модель или псевдоним…
+Looking for models…	Поиск моделей…
+{n} models found	Найдено моделей: {n}
+1 model found	Найдена 1 модель
+It lists no models yet.	Пока не показывает ни одной модели.
+Testing… a model that isn't loaded yet can take a minute	Проверка… модель, которая ещё не загружена, может отвечать минуту
+Answered in {seconds} s	Ответил за {seconds} с
+Answered in {seconds} s: {reply}	Ответил за {seconds} с: {reply}
+Installed: {reply}	Установлено: {reply}
+Test	Проверить
+Testing…	Проверка…
+Test an AI	Проверить ИИ
+Anthropic API	API Anthropic
+OpenAI API	API OpenAI
+OpenRouter	OpenRouter
+Gemini API	API Gemini
+Coding agent	Кодовый агент
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Пока ничего не найдено. Мы ищем ключи API, локальные серверы моделей (llama.cpp, LM Studio) и приложения-агенты, которые у вас уже есть. Сервер на другом порту или компьютере можно добавить на вкладке «Свой адрес».
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Ключ Claude, ChatGPT или OpenRouter, локальную модель (llama.cpp, LM Studio) или уже используемого агента можно добавить позже в Настройки → ИИ. Сервер по адресу добавляется на вкладке «Свой адрес».
+Checkpoint	Чекпойнт
+Workflow	Рабочий процесс
+ComfyUI address	Адрес ComfyUI
+ComfyUI workflow	Рабочий процесс ComfyUI
+e.g. http://192.168.1.20:8188	напр. http://192.168.1.20:8188
+API-format workflow JSON, optional	JSON рабочего процесса в формате API, необязательно
+on your server	на вашем сервере
+No key needed; pictures are made on your server.	Ключ не нужен; картинки создаются на вашем сервере.
+List ComfyUI's checkpoints	Список чекпойнтов ComfyUI
+Test ComfyUI	Проверить ComfyUI
+Check a ComfyUI server	Проверить сервер ComfyUI
+Looking for checkpoints…	Поиск чекпойнтов…
+{n} checkpoints found	Найдено чекпойнтов: {n}
+1 checkpoint found	Найден 1 чекпойнт
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Нужны адрес ComfyUI и чекпойнт в разделе Настройки → Сборки. До этого игра собирается без них.

@@ -742,7 +742,6 @@ Not now	Non ora
 Nothing allowed yet.	Ancora nulla di consentito.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Non si può ancora costruire: installa Claude Code (e accedi una volta), oppure aggiungi qui sotto un'IA con una chiave API.
 Nothing found	Niente trovato
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Ancora niente. Cerchiamo chiavi API, server di modelli locali (Ollama, LM Studio) e app di agenti che hai già. Uno su un'altra porta o un altro computer si aggiunge qui sotto dal suo indirizzo.
 Nothing inside it is read.	Dentro non si legge nulla.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Dentro non si legge nulla; Craft Anything lavora da quello che puoi vedere. La tua versione ha una grafica sua.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Dentro l'originale non si legge nulla: né il codice, né i file, né il sorgente della pagina. Craft Anything lavora da quello che puoi vedere: immagini, la pagina come la vede un visitatore, e l'osservazione mentre gira.
@@ -1292,7 +1291,6 @@ Write the brief	Scrivi il brief
 Write the handoff	Scrivi il passaggio di consegne
 Wrote {what} to {}	Scritto {what} in {}
 You answered: {a}	Hai risposto: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Puoi aggiungere dopo, in Impostazioni → IA, una chiave Claude, ChatGPT o OpenRouter, un modello locale (Ollama, LM Studio) o un agente che usi già.
 You chose:	Hai scelto:
 You're all set	Sei a posto
 Your app is ready	La tua app è pronta
@@ -1469,3 +1467,48 @@ Connecting to {name}… {seconds} s	Connessione a {name}… {seconds} s
 Stopped adding {name}.	Aggiunta di {name} interrotta.
 It isn't there any more, so {program} runs in its place.	Non è più lì, quindi al suo posto si usa {program}.
 Use it	Usalo
+1 model found	1 modello trovato
+Address	Indirizzo
+Answered in {seconds} s	Ha risposto in {seconds} s
+Answered in {seconds} s: {reply}	Ha risposto in {seconds} s: {reply}
+Anthropic API	API Anthropic
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Qualsiasi motore che parli l'API di OpenAI, come llama.cpp, o un servizio in hosting con la sua chiave.
+Coding agent	Agente di codice
+Custom LLM endpoint	Endpoint LLM personalizzato
+Custom endpoint	Endpoint personalizzato
+Custom model	Altro modello
+Custom model or alias…	Altro modello o alias…
+Gemini API	API Gemini
+Installed: {reply}	Installato: {reply}
+It lists no models yet.	Non elenca ancora nessun modello.
+Looking for models…	Cerco i modelli…
+Name	Nome
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Ancora niente. Cerchiamo chiavi API, server di modelli locali (llama.cpp, LM Studio) e app di agenti che hai già. Uno su un'altra porta o un altro computer si aggiunge nella scheda Endpoint personalizzato.
+OpenAI API	API OpenAI
+OpenRouter	OpenRouter
+Service	Servizio
+Test	Prova
+Test an AI	Prova un'IA
+Testing…	Prova in corso…
+Testing… a model that isn't loaded yet can take a minute	Prova in corso… un modello non ancora caricato può richiedere un minuto
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Puoi aggiungere dopo, in Impostazioni → IA, una chiave Claude, ChatGPT o OpenRouter, un modello locale (llama.cpp, LM Studio) o un agente che usi già. Un server dal suo indirizzo va nella scheda Endpoint personalizzato.
+e.g. Home server	es. Server di casa
+e.g. http://192.168.1.20:8080/v1	es. http://192.168.1.20:8080/v1
+if it needs one	se serve
+model name	nome del modello
+{n} models found	{n} modelli trovati
+1 checkpoint found	1 checkpoint trovato
+API-format workflow JSON, optional	JSON del workflow in formato API, facoltativo
+Check a ComfyUI server	Controlla un server ComfyUI
+Checkpoint	Checkpoint
+ComfyUI address	Indirizzo di ComfyUI
+ComfyUI workflow	Workflow di ComfyUI
+List ComfyUI's checkpoints	Elenca i checkpoint di ComfyUI
+Looking for checkpoints…	Cerco i checkpoint…
+No key needed; pictures are made on your server.	Nessuna chiave necessaria; le immagini si fanno sul tuo server.
+Test ComfyUI	Prova ComfyUI
+Workflow	Workflow
+e.g. http://192.168.1.20:8188	es. http://192.168.1.20:8188
+on your server	sul tuo server
+{n} checkpoints found	{n} checkpoint trovati
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Servono un indirizzo ComfyUI e un checkpoint in Impostazioni → Costruzioni. Fino ad allora il gioco si costruisce senza.

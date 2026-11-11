@@ -1,4 +1,4 @@
-//! `chat` and `ai list|detect|add|test`.
+//! `chat` and `ai list|detect|add|models|test`.
 
 use crate::output::Format;
 use crate::{Cli, INTERRUPTED, emit, fail, make_engine, out};
@@ -94,12 +94,42 @@ pub enum AiCommand {
     /// Set how hard a Claude backend thinks (the Claude API or Claude Code): low, medium, high,
     /// xhigh or max, or `default` for the usual level; leave it out to see the level and choices.
     Effort { name: String, level: Option<String> },
-    /// Send a tiny request and report latency.
-    Test { name: String },
+    /// List the models a service or server offers, without adding it.
+    Models {
+        /// anthropic, openai, openrouter, gemini, openai_compatible
+        #[arg(long)]
+        kind: String,
+        /// The server's address (needed for openai_compatible).
+        #[arg(long)]
+        base_url: Option<String>,
+        /// Read the API key from this environment variable.
+        #[arg(long)]
+        key_env: Option<String>,
+        /// Read the API key from stdin.
+        #[arg(long)]
+        key_stdin: bool,
+    },
+    /// Send a tiny request and report latency. With a name it tests that saved backend; without
+    /// one, `--kind` (and `--base-url` for openai_compatible) tests a service that isn't added.
+    Test {
+        name: Option<String>,
+        #[arg(long)]
+        kind: Option<String>,
+        #[arg(long)]
+        base_url: Option<String>,
+        #[arg(long)]
+        model: Option<String>,
+        /// Read the API key from this environment variable.
+        #[arg(long)]
+        key_env: Option<String>,
+        /// Read the API key from stdin.
+        #[arg(long)]
+        key_stdin: bool,
+    },
     /// Choose the backend that builds (leave the name out to go back to automatic).
     Builder { name: Option<String> },
     /// Choose the backend that takes a game's own files out after the study, in Deep mode (an API
-    /// backend such as Kimi K3 through OpenRouter; leave the name out to turn it off).
+    /// backend such as one through OpenRouter; leave the name out to turn it off).
     Extractor { name: Option<String> },
 }
 
@@ -219,6 +249,12 @@ fn read_key(key_env: &Option<String>, key_stdin: bool) -> Result<Option<String>,
     }
     Ok(None)
 }
+
+fn parse_kind(kind: &str) -> Option<BackendKind> {
+    serde_json::from_value(json!(kind)).ok()
+}
+
+const KINDS: &str = "--kind must be one of anthropic, openai, openrouter, gemini, openai_compatible";
 
 /// Dispatch AI configuration, discovery and model-selection commands through the shared hub.
 /// Render results in the requested format and return an exit status for success or failure.
@@ -433,13 +469,48 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             }
             Err(e) => fail(&e, f),
         },
-        AiCommand::Test { name } => match hub.test_backend(name) {
+        AiCommand::Models { kind, base_url, key_env, key_stdin } => {
+            let Some(kind) = parse_kind(kind) else { return crate::usage_error(KINDS) };
+            let key = match read_key(key_env, *key_stdin) {
+                Ok(k) => k,
+                Err(m) => return crate::usage_error(&m),
+            };
+            match hub.list_models_at(kind, base_url.as_deref(), key) {
+                Ok(models) => {
+                    emit(&json!({"kind": kind, "models": models}), f);
+                    0
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Test { name: Some(name), .. } => match hub.test_backend(name) {
             Ok(r) => {
                 emit(&serde_json::to_value(r).unwrap_or(Value::Null), f);
                 0
             }
             Err(e) => fail(&e, f),
         },
+        AiCommand::Test { name: None, kind, base_url, model, key_env, key_stdin } => {
+            let Some(kind) = kind.as_deref().and_then(parse_kind) else {
+                return crate::usage_error("give a backend name, or --kind (and --base-url for openai_compatible)");
+            };
+            if kind == BackendKind::OpenaiCompatible && base_url.is_none() {
+                return crate::usage_error("--base-url is needed for openai_compatible");
+            }
+            let key = match read_key(key_env, *key_stdin) {
+                Ok(k) => k,
+                Err(m) => return crate::usage_error(&m),
+            };
+            let model = model.clone().or_else(|| kind.suggested_models().first().map(|m| m.to_string())).unwrap_or_default();
+            let cfg = BackendConfig { name: "Untitled".into(), kind, model, base_url: base_url.clone(), ssh_host: None, enabled: true };
+            match hub.test_config(&cfg, key) {
+                Ok(r) => {
+                    emit(&serde_json::to_value(r).unwrap_or(Value::Null), f);
+                    0
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
     }
 }
 

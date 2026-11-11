@@ -40,6 +40,16 @@ endpoint = "fal-ai/flux/schnell"
 usd_per_megapixel = 0.003
 licence = "Apache-2.0 (model weights)"
 
+# A ComfyUI server the person runs: no key and no cost. `endpoint` is unused (the checkpoint and the
+# address come from Settings) but must not be empty.
+[[image]]
+id = "comfyui"
+provider = "comfyui"
+name = "ComfyUI (your server)"
+endpoint = "checkpoint"
+usd_per_image = 0.0
+licence = "The licence of the checkpoint or workflow you load"
+
 # Game-ready 3D models (GLB) from a picture, billed per model; `faces` is the face-count range the
 # model accepts.
 [[model_3d]]

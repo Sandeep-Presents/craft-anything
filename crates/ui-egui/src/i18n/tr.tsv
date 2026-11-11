@@ -741,7 +741,6 @@ Not now	Şimdi değil
 Nothing allowed yet.	Henüz hiçbir şeye izin verilmedi.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Henüz hiçbir şey derleyemez: Claude Code'u kurun (ve bir kez oturum açın) ya da aşağıda API anahtarı olan bir AI ekleyin.
 Nothing found	Hiçbir şey bulunamadı
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Henüz bir şey bulunamadı. API anahtarlarını, yerel model sunucularını (Ollama, LM Studio) ve hâlihazırda sahip olduğunuz ajan uygulamalarını ararız. Başka bir bağlantı noktasında veya bilgisayarda olan biri aşağıda adresiyle eklenebilir.
 Nothing inside it is read.	İçindeki hiçbir şey okunmaz.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	İçindeki hiçbir şey okunmaz; Craft Anything görebildiklerinizden çalışır. Sizin sürümünüz kendi görsellerini alır.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Orijinalin içinden hiçbir şey okunmaz: kodu, dosyaları veya sayfa kaynağı. Craft Anything görebildiklerinizden çalışır: resimler, sayfanın ziyaretçinin gördüğü hâli ve çalışırken izlenmesi.
@@ -1290,7 +1289,6 @@ Write the brief	Özeti yaz
 Write the handoff	Devir notunu yaz
 Wrote {what} to {}	{what}, {} konumuna yazıldı
 You answered: {a}	Yanıtladınız: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Daha sonra Ayarlar → AI bölümünden Claude, ChatGPT veya OpenRouter anahtarı, yerel bir model (Ollama, LM Studio) ya da kullandığınız bir ajan ekleyebilirsiniz.
 You chose:	Seçtiniz:
 You're all set	Her şey hazır
 Your app is ready	Uygulamanız hazır
@@ -1467,3 +1465,48 @@ Connecting to {name}… {seconds} s	{name} sunucusuna bağlanılıyor… {second
 Stopped adding {name}.	{name} eklenmesi durduruldu.
 It isn't there any more, so {program} runs in its place.	Artık orada değil, bu yüzden yerine {program} çalışıyor.
 Use it	Bunu kullan
+1 model found	1 model bulundu
+Address	Adres
+Answered in {seconds} s	{seconds} sn'de yanıt verdi
+Answered in {seconds} s: {reply}	{seconds} sn'de yanıt verdi: {reply}
+Anthropic API	Anthropic API
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	OpenAI API'sini konuşan herhangi bir motor (llama.cpp gibi) ya da anahtarıyla barındırılan bir hizmet.
+Coding agent	Kodlama ajanı
+Custom LLM endpoint	Özel LLM uç noktası
+Custom endpoint	Özel uç nokta
+Custom model	Özel model
+Custom model or alias…	Özel model veya takma ad…
+Gemini API	Gemini API
+Installed: {reply}	Yüklü: {reply}
+It lists no models yet.	Henüz hiç model listelemiyor.
+Looking for models…	Modeller aranıyor…
+Name	Ad
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Henüz bir şey bulunamadı. API anahtarlarını, yerel model sunucularını (llama.cpp, LM Studio) ve hâlihazırda sahip olduğunuz ajan uygulamalarını ararız. Başka bir bağlantı noktasında veya bilgisayarda olan biri Özel uç nokta sekmesinden eklenebilir.
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Service	Hizmet
+Test	Test et
+Test an AI	Bir AI'yı test et
+Testing…	Test ediliyor…
+Testing… a model that isn't loaded yet can take a minute	Test ediliyor… henüz yüklenmemiş bir model bir dakika sürebilir
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Daha sonra Ayarlar → AI bölümünden Claude, ChatGPT veya OpenRouter anahtarı, yerel bir model (llama.cpp, LM Studio) ya da kullandığınız bir ajan ekleyebilirsiniz. Adresiyle eklenen bir sunucu Özel uç nokta sekmesine gider.
+e.g. Home server	örn. Ev sunucusu
+e.g. http://192.168.1.20:8080/v1	örn. http://192.168.1.20:8080/v1
+if it needs one	gerekiyorsa
+model name	model adı
+{n} models found	{n} model bulundu
+1 checkpoint found	1 checkpoint bulundu
+API-format workflow JSON, optional	API biçiminde iş akışı JSON'u, isteğe bağlı
+Check a ComfyUI server	Bir ComfyUI sunucusunu denetle
+Checkpoint	Checkpoint
+ComfyUI address	ComfyUI adresi
+ComfyUI workflow	ComfyUI iş akışı
+List ComfyUI's checkpoints	ComfyUI'nin checkpoint'lerini listele
+Looking for checkpoints…	Checkpoint'ler aranıyor…
+No key needed; pictures are made on your server.	Anahtar gerekmez; resimler sizin sunucunuzda yapılır.
+Test ComfyUI	ComfyUI'yi test et
+Workflow	İş akışı
+e.g. http://192.168.1.20:8188	örn. http://192.168.1.20:8188
+on your server	sunucunuzda
+{n} checkpoints found	{n} checkpoint bulundu
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Ayarlar → Derlemeler bölümünde bir ComfyUI adresi ve checkpoint gerekir. O zamana kadar oyun bunlar olmadan derlenir.

@@ -10,7 +10,7 @@ use crate::inbox::Inbox;
 use crate::tool::{Ctx, Effects, Requires, ToolOutput, ToolSpec, Toolset, parse_params, schema_of};
 use crate::tools::interaction_tools::{Verdict, ask_approval, inbox, inside, resolve, workspace_of};
 use crate::workspace::{AssetRecord, Workspace};
-use craft_anything_engines::assets::{AssetProvider, AssetProviders, AssetRequest, Catalogue, Generated, Shape, about_usd, fal, usd};
+use craft_anything_engines::assets::{AssetProvider, AssetProviders, AssetRequest, Catalogue, Generated, ImageModel, Shape, about_usd, comfyui, fal, usd};
 use craft_anything_evidence::{ErrorCode, ToolError};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -58,6 +58,17 @@ pub fn specs() -> Vec<ToolSpec> {
             requires: Requires::Nothing,
             input_schema: schema_of::<ModelParams>,
             run: assets_model_generate,
+        },
+        ToolSpec {
+            id: "assets_comfyui_check",
+            title: "Check a ComfyUI server",
+            summary: "Ask a ComfyUI server (the address given, else the one in Settings → Builds) what it is and which checkpoints it has: its version, its graphics cards and the checkpoint names a picture can be made with. Needs no key.",
+            beginner: "Checks that your ComfyUI server is running and lists the models it can make pictures with.",
+            toolset: Toolset::Core,
+            effects: Effects::ACCESSES_NETWORK,
+            requires: Requires::Nothing,
+            input_schema: schema_of::<ComfyCheckParams>,
+            run: assets_comfyui_check,
         },
     ]
 }
@@ -115,6 +126,14 @@ pub struct ModelParams {
     pub faces: Option<u32>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ComfyCheckParams {
+    /// The server's address (http://host:port); empty = the one in Settings.
+    #[serde(default)]
+    pub address: Option<String>,
+}
+
 /// A mid-sized game prop: detailed enough up close, cheap to draw many of.
 const DEFAULT_FACES: u32 = 3000;
 
@@ -134,8 +153,20 @@ fn job(ctx: &Ctx<'_>) -> Result<Job, ToolError> {
     let ws = workspace_of(&inbox).ok_or_else(not_project)?;
     let keys = ctx.session.ext.get::<AssetKeys>().unwrap_or_default();
     // A session can bring its own providers (a fork, a test); otherwise the built-in ones.
-    let providers = ctx.session.ext.get::<AssetProviders>().map(|p| p.as_ref().clone()).unwrap_or_default();
-    if !providers.ids().iter().any(|id| keys.get(id).is_some()) {
+    let mut providers = ctx.session.ext.get::<AssetProviders>().map(|p| p.as_ref().clone()).unwrap_or_default();
+    // The person's ComfyUI server, when one is set up: it needs no key.
+    let comfy = &ctx.session.settings.assets.comfyui;
+    if !comfy.address.trim().is_empty() {
+        providers.register(std::sync::Arc::new(comfyui::ComfyUi::new(
+            comfy.address.trim(),
+            comfy.checkpoint.trim(),
+            comfy.workflow.as_deref().map(str::trim).filter(|w| !w.is_empty()).map(PathBuf::from),
+        )));
+    }
+    // No way to make anything (no saved key, no ComfyUI server): say so before the permission check (#923).
+    // ComfyUI chosen as the picture model says what it's missing itself, so it passes here.
+    let comfy_chosen = ctx.session.settings.assets.image_model.as_deref() == Some(comfyui::ID);
+    if !comfy_chosen && !providers.ids().into_iter().any(|id| keys.get(id).is_some() || providers.get(id).is_some_and(|p| !p.needs_key())) {
         return Err(no_key("fal.ai"));
     }
     if !ws.manifest.generate_assets {
@@ -146,6 +177,23 @@ fn job(ctx: &Ctx<'_>) -> Result<Job, ToolError> {
     Ok(Job { keys, providers, inbox, ws })
 }
 
+/// ComfyUI chosen but not set up: say where to set it up, before anything is asked.
+fn comfy_ready(s: &crate::settings::ComfyUiSettings, model: &ImageModel) -> Result<(), ToolError> {
+    if model.provider != comfyui::ID {
+        return Ok(());
+    }
+    let missing = if s.address.trim().is_empty() {
+        "address"
+    } else if s.checkpoint.trim().is_empty() {
+        "checkpoint"
+    } else {
+        return Ok(());
+    };
+    Err(ToolError::new(ErrorCode::BadSettings, format!("The ComfyUI picture model has no {missing} set.")).with_remediation(
+        "Make these assets with simple shapes and colours instead, and tell the person they can set the ComfyUI address and checkpoint in Settings → Builds.",
+    ))
+}
+
 fn no_key(provider: &str) -> ToolError {
     ToolError::new(ErrorCode::BadSettings, format!("No {provider} key is set up, so pictures and 3D models can't be generated.")).with_remediation(format!(
         "Make these assets with simple shapes and colours instead, and tell the person they can add a {provider} key in Settings → AI for realistic ones."
@@ -153,8 +201,12 @@ fn no_key(provider: &str) -> ToolError {
 }
 
 impl Job {
-    /// The key for `provider`, checked before anything is asked or spent.
+    /// The key for `provider`, checked before anything is asked or spent. A provider that needs
+    /// none (a server of the person's own) gets "".
     fn key(&self, provider: &dyn AssetProvider) -> Result<String, ToolError> {
+        if !provider.needs_key() {
+            return Ok(String::new());
+        }
         self.keys.get(provider.id()).map(str::to_string).ok_or_else(|| no_key(provider.name()))
     }
 }
@@ -242,6 +294,7 @@ fn assets_image_generate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let mut j = job(ctx)?;
     let (path, rel) = save_path(&j.ws, &p.save_as, "png")?;
     let model = Catalogue::built_in().image_model(ctx.session.settings.assets.image_model.as_deref())?;
+    comfy_ready(&ctx.session.settings.assets.comfyui, model)?;
     let req = AssetRequest::Image { model, prompt, shape };
     let provider = j.providers.for_request(&req)?;
     let key = j.key(provider.as_ref())?;
@@ -250,6 +303,25 @@ fn assets_image_generate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let g = provider.generate(&key, &req)?;
     keep(&j.ws, &path, &rel, "image", prompt, &g)?;
     Ok(summary(&j.ws, &rel, g.cost_usd, json!({})))
+}
+
+fn assets_comfyui_check(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
+    let p: ComfyCheckParams = parse_params(params)?;
+    let given = p.address.as_deref().map(str::trim).filter(|a| !a.is_empty());
+    let address = given.unwrap_or(ctx.session.settings.assets.comfyui.address.trim()).to_string();
+    if address.is_empty() {
+        return Err(ToolError::new(ErrorCode::BadSettings, "No ComfyUI address is set.")
+            .with_remediation("Give the address, for example http://192.168.1.20:8188, in Settings → Builds → Picture model."));
+    }
+    ctx.report(None, "Asking the ComfyUI server…");
+    let status = comfyui::check(&address)?;
+    Ok(ToolOutput::Value(json!({
+        "version": status.version,
+        "devices": status.devices,
+        "vram_gb": status.vram_gb,
+        "checkpoints": status.checkpoints,
+        "words": status.words(),
+    })))
 }
 
 fn assets_model_generate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolError> {
@@ -275,6 +347,7 @@ fn assets_model_generate(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
     let mut picture_maker = None;
     if from_prompt {
         let image_model = catalogue.image_model(ctx.session.settings.assets.image_model.as_deref())?;
+        comfy_ready(&ctx.session.settings.assets.comfyui, image_model)?;
         let picture_req = AssetRequest::Image { model: image_model, prompt: &p.prompt, shape: Shape::Square };
         let picture_provider = j.providers.for_request(&picture_req)?;
         let picture_key = j.key(picture_provider.as_ref())?;
@@ -481,6 +554,177 @@ mod tests {
         let err =
             e.call("assets_model_generate", json!({"prompt": "a crate", "save_as": "crate.glb", "faces": 40_000}), crate::CallOptions::new(crate::Caller::Mcp));
         assert!(err.err().unwrap().message.contains("faces must be 48 to 20000"), "Tripo P1's face limit");
+    }
+
+    /// A stand-in ComfyUI server: accepts any job, finishes it at once and serves a few bytes.
+    fn comfy_server() -> String {
+        use std::io::{BufRead, BufReader, Read, Write};
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", l.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut stream in l.incoming().flatten() {
+                let mut r = BufReader::new(stream.try_clone().unwrap());
+                let mut line = String::new();
+                if r.read_line(&mut line).unwrap_or(0) == 0 {
+                    continue;
+                }
+                let mut len = 0usize;
+                loop {
+                    let mut h = String::new();
+                    r.read_line(&mut h).unwrap();
+                    if let Some(v) = h.to_ascii_lowercase().strip_prefix("content-length:") {
+                        len = v.trim().parse().unwrap();
+                    }
+                    if h == "\r\n" {
+                        break;
+                    }
+                }
+                let mut body = vec![0; len];
+                r.read_exact(&mut body).unwrap();
+                let (kind, out): (&str, Vec<u8>) = if line.starts_with("POST /prompt") {
+                    ("application/json", json!({"prompt_id": "p1"}).to_string().into_bytes())
+                } else if line.starts_with("GET /history/p1") {
+                    let image = json!({"filename": "a.png", "subfolder": "", "type": "output"});
+                    (
+                        "application/json",
+                        json!({"p1": {"status": {"status_str": "success", "completed": true}, "outputs": {"7": {"images": [image]}}}}).to_string().into_bytes(),
+                    )
+                } else if line.starts_with("GET /view") {
+                    ("image/png", b"comfy-png".to_vec())
+                } else if line.starts_with("GET /system_stats") {
+                    (
+                        "application/json",
+                        json!({"system": {"comfyui_version": "0.3.10"}, "devices": [{"name": "cuda:0 NVIDIA GeForce RTX 3060 : cudaMallocAsync"}]})
+                            .to_string()
+                            .into_bytes(),
+                    )
+                } else if line.starts_with("GET /object_info/CheckpointLoaderSimple") {
+                    (
+                        "application/json",
+                        json!({"CheckpointLoaderSimple": {"input": {"required": {"ckpt_name": [["a.safetensors"], {}]}}}}).to_string().into_bytes(),
+                    )
+                } else {
+                    ("text/plain", b"no".to_vec())
+                };
+                let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", out.len());
+                let _ = stream.write_all(&out);
+            }
+        });
+        base
+    }
+
+    /// An engine for a project that may generate assets, with no key of any kind, set to make
+    /// pictures with ComfyUI at `address` (checkpoint `checkpoint`).
+    fn comfy_engine(w: &Workspace, address: &str, checkpoint: &str) -> crate::Engine {
+        let mut session = crate::testing::session();
+        session.settings.assets.image_model = Some("comfyui".into());
+        session.settings.assets.comfyui.address = address.into();
+        session.settings.assets.comfyui.checkpoint = checkpoint.into();
+        let e = crate::Engine::new(session);
+        e.session().ext.insert(std::sync::Arc::new(InboxDir(w.inbox_dir())));
+        e
+    }
+
+    #[test]
+    fn a_picture_from_comfyui_needs_no_key_and_costs_nothing() {
+        let (_d, w) = ws();
+        let e = comfy_engine(&w, &comfy_server(), "a.safetensors");
+        let out =
+            e.call("assets_image_generate", json!({"prompt": "a crate", "save_as": "Assets/crate.png"}), crate::CallOptions::new(crate::Caller::Mcp)).unwrap();
+        let ToolOutput::Value(v) = out else { panic!("{out:?}") };
+        assert_eq!((v["saved"].as_str(), v["cost_usd"].as_f64()), (Some("Assets/crate.png"), Some(0.0)));
+        assert_eq!(std::fs::read(w.app_dir().join("Assets/crate.png")).unwrap(), b"comfy-png");
+        assert!(w.assets_spent().abs() < 1e-12 && w.assets().len() == 1, "listed, at no cost");
+    }
+
+    /// The gate is per provider: the same project with a key for nothing still refuses fal.ai's pictures.
+    #[test]
+    fn the_keyless_pass_is_only_for_a_provider_that_needs_no_key() {
+        let (_d, w) = ws();
+        let mut session = crate::testing::session();
+        session.settings.assets.comfyui.address = "http://127.0.0.1:9".into();
+        session.settings.assets.comfyui.checkpoint = "a.safetensors".into();
+        let e = crate::Engine::new(session);
+        e.session().ext.insert(std::sync::Arc::new(InboxDir(w.inbox_dir())));
+        // The picture model is the default (fal.ai): a ComfyUI address being set is no reason to go on without a key.
+        let err =
+            e.call("assets_image_generate", json!({"prompt": "a crate", "save_as": "crate.png"}), crate::CallOptions::new(crate::Caller::Mcp)).err().unwrap();
+        assert_eq!(err.code, ErrorCode::BadSettings);
+        assert!(err.message.contains("No fal.ai key"), "{}", err.message);
+    }
+
+    #[test]
+    fn comfyui_chosen_but_not_set_up_points_at_settings() {
+        let (_d, w) = ws();
+        for (address, checkpoint, missing) in [("", "a.safetensors", "address"), ("http://127.0.0.1:9", " ", "checkpoint")] {
+            let e = comfy_engine(&w, address, checkpoint);
+            let err = e
+                .call("assets_image_generate", json!({"prompt": "a crate", "save_as": "crate.png"}), crate::CallOptions::new(crate::Caller::Mcp))
+                .err()
+                .unwrap();
+            assert_eq!(err.code, ErrorCode::BadSettings);
+            assert!(err.message.contains(missing), "{}", err.message);
+            assert!(err.remediation.unwrap_or_default().contains("Settings → Builds"));
+            e.session().ext.insert(std::sync::Arc::new(AssetKeys([("fal".to_string(), "k-1".to_string())].into())));
+            let err = e
+                .call("assets_model_generate", json!({"prompt": "a crate", "save_as": "crate.glb"}), crate::CallOptions::new(crate::Caller::Mcp))
+                .err()
+                .unwrap();
+            assert!(err.message.contains(missing), "the picture step of a model says so too: {}", err.message);
+        }
+        assert!(w.assets().is_empty(), "nothing spent");
+    }
+
+    /// Makes the 3D model from the picture a server of the person's own made: sent as data, since
+    /// the server's address means nothing to fal.ai.
+    struct Model3dFromData;
+
+    impl craft_anything_engines::assets::AssetProvider for Model3dFromData {
+        fn id(&self) -> &'static str {
+            "fal"
+        }
+        fn name(&self) -> &'static str {
+            "stand-in"
+        }
+        fn generate(&self, _key: &str, req: &AssetRequest) -> Result<Generated, ToolError> {
+            let AssetRequest::Model3d { image_url, .. } = req else { return Err(ToolError::invalid("3D only")) };
+            assert!(image_url.starts_with("data:image/png;base64,"), "{image_url}");
+            Ok(Generated { url: String::new(), bytes: b"glb".to_vec(), cost_usd: req.listed_cost() })
+        }
+    }
+
+    #[test]
+    fn the_picture_step_of_a_3d_model_can_be_comfyui() {
+        let (_d, w) = ws();
+        let e = comfy_engine(&w, &comfy_server(), "a.safetensors");
+        let mut providers = AssetProviders::built_in();
+        providers.register(std::sync::Arc::new(Model3dFromData));
+        e.session().ext.insert(std::sync::Arc::new(providers));
+        e.session().ext.insert(std::sync::Arc::new(AssetKeys([("fal".to_string(), "k-1".to_string())].into())));
+        let out =
+            e.call("assets_model_generate", json!({"prompt": "a crate", "save_as": "Assets/crate.glb"}), crate::CallOptions::new(crate::Caller::Mcp)).unwrap();
+        let ToolOutput::Value(v) = out else { panic!("{out:?}") };
+        assert_eq!(v["picture"], "Assets/crate.png");
+        assert_eq!(std::fs::read(w.app_dir().join("Assets/crate.png")).unwrap(), b"comfy-png");
+        assert!((w.assets_spent() - 0.50).abs() < 1e-9, "the picture was free, the model wasn't: {}", w.assets_spent());
+    }
+
+    #[test]
+    fn the_comfyui_check_tool_reads_the_server_and_falls_back_to_settings() {
+        let (_d, w) = ws();
+        let base = comfy_server();
+        let e = comfy_engine(&w, &base, "");
+        for params in [json!({}), json!({"address": base})] {
+            let ToolOutput::Value(v) = e.call("assets_comfyui_check", params, crate::CallOptions::new(crate::Caller::Mcp)).unwrap() else { panic!() };
+            assert_eq!(
+                (v["version"].as_str(), v["checkpoints"][0].as_str(), v["devices"][0].as_str()),
+                (Some("0.3.10"), Some("a.safetensors"), Some("NVIDIA GeForce RTX 3060"))
+            );
+            assert_eq!(v["words"], "ComfyUI 0.3.10 · NVIDIA GeForce RTX 3060 · 1 checkpoint");
+        }
+        let none = crate::Engine::new(crate::testing::session());
+        let err = none.call("assets_comfyui_check", json!({}), crate::CallOptions::new(crate::Caller::Mcp)).err().unwrap();
+        assert_eq!(err.code, ErrorCode::BadSettings);
     }
 
     #[test]

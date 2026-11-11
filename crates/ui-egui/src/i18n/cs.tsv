@@ -741,7 +741,6 @@ Not now	Teď ne
 Nothing allowed yet.	Zatím není nic povoleno.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Zatím nelze sestavovat: nainstalujte Claude Code (a jednou se v něm přihlaste), nebo níže přidejte AI s klíčem API.
 Nothing found	Nic nenalezeno
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Zatím nic nenalezeno. Hledáme klíče API, místní servery modelů (Ollama, LM Studio) a aplikace agentů, které už máte. Server na jiném portu nebo jiném počítači můžete přidat podle adresy níže.
 Nothing inside it is read.	Nic uvnitř se nečte.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Nic uvnitř se nečte; Craft Anything vychází z toho, co vidíte. Vaše verze dostane vlastní grafiku.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Nic uvnitř originálu se nečte: ani jeho kód, ani soubory, ani zdrojový kód stránek. Craft Anything vychází z toho, co vidíte: obrázky, stránka z pohledu návštěvníka a pozorování běhu.
@@ -1290,7 +1289,6 @@ Write the brief	Napsat zadání
 Write the handoff	Napsat předávací zprávu
 Wrote {what} to {}	Zapsáno {what} do {}
 You answered: {a}	Vaše odpověď: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Klíč Claude, ChatGPT nebo OpenRouter, místní model (Ollama, LM Studio) či agenta, kterého již používáte, můžete později přidat v Nastavení → AI.
 You chose:	Vaše volba:
 You're all set	Vše je připraveno
 Your app is ready	Vaše aplikace je hotová
@@ -1467,3 +1465,48 @@ Connecting to {name}… {seconds} s	Připojování k {name}… {seconds} s
 Stopped adding {name}.	Přidávání {name} bylo zastaveno.
 It isn't there any more, so {program} runs in its place.	Už tam není, proto se místo něj spouští {program}.
 Use it	Použít
+Custom endpoint	Vlastní koncový bod
+Custom LLM endpoint	Vlastní koncový bod LLM
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Libovolný engine mluvící API OpenAI, například llama.cpp, nebo hostovaná služba s klíčem.
+Service	Služba
+Name	Název
+Address	Adresa
+e.g. Home server	např. Domácí server
+e.g. http://192.168.1.20:8080/v1	např. http://192.168.1.20:8080/v1
+if it needs one	pokud ho vyžaduje
+model name	název modelu
+Custom model	Jiný model
+Custom model or alias…	Jiný model nebo alias…
+Looking for models…	Hledám modely…
+{n} models found	Nalezeno modelů: {n}
+1 model found	Nalezen 1 model
+It lists no models yet.	Zatím nenabízí žádné modely.
+Testing… a model that isn't loaded yet can take a minute	Testuji… model, který ještě není načtený, může trvat minutu
+Answered in {seconds} s	Odpověděl za {seconds} s
+Answered in {seconds} s: {reply}	Odpověděl za {seconds} s: {reply}
+Installed: {reply}	Nainstalováno: {reply}
+Test	Vyzkoušet
+Testing…	Testuji…
+Test an AI	Vyzkoušet AI
+Anthropic API	API Anthropic
+OpenAI API	API OpenAI
+OpenRouter	OpenRouter
+Gemini API	API Gemini
+Coding agent	Programovací agent
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Zatím nic nenalezeno. Hledáme klíče API, místní servery modelů (llama.cpp, LM Studio) a aplikace agentů, které už máte. Server na jiném portu nebo jiném počítači můžete přidat na kartě Vlastní koncový bod.
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Klíč Claude, ChatGPT nebo OpenRouter, místní model (llama.cpp, LM Studio) či agenta, kterého již používáte, můžete později přidat v Nastavení → AI. Server podle adresy patří na kartu Vlastní koncový bod.
+Checkpoint	Checkpoint
+Workflow	Workflow
+ComfyUI address	Adresa ComfyUI
+ComfyUI workflow	Workflow ComfyUI
+e.g. http://192.168.1.20:8188	např. http://192.168.1.20:8188
+API-format workflow JSON, optional	Workflow JSON ve formátu API, volitelné
+on your server	na vašem serveru
+No key needed; pictures are made on your server.	Klíč není potřeba; obrázky vznikají na vašem serveru.
+List ComfyUI's checkpoints	Vypsat checkpointy ComfyUI
+Test ComfyUI	Vyzkoušet ComfyUI
+Check a ComfyUI server	Zkontrolovat server ComfyUI
+Looking for checkpoints…	Hledám checkpointy…
+{n} checkpoints found	Nalezeno checkpointů: {n}
+1 checkpoint found	Nalezen 1 checkpoint
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Vyžaduje adresu ComfyUI a checkpoint v Nastavení → Sestavení. Do té doby se hra sestavuje bez nich.
