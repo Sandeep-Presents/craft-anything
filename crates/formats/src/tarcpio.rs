@@ -358,11 +358,17 @@ fn pax_record(data: &[u8]) -> Option<(&[u8], &[u8], &[u8])> {
 }
 
 fn hex_field(f: &[u8]) -> Option<u64> {
+    if !f.iter().all(u8::is_ascii_hexdigit) {
+        return None;
+    }
     let s = std::str::from_utf8(f).ok()?;
     u64::from_str_radix(s, 16).ok()
 }
 
 fn oct_field(f: &[u8]) -> Option<u64> {
+    if !f.iter().all(|b| (b'0'..=b'7').contains(b)) {
+        return None;
+    }
     let s = std::str::from_utf8(f).ok()?;
     u64::from_str_radix(s, 8).ok()
 }
@@ -537,6 +543,14 @@ pub fn member_data<'a>(data: &'a [u8], m: &Member) -> Option<&'a [u8]> {
 mod tests {
     use super::*;
     use craft_anything_testkit::firmware as fx;
+
+    #[test]
+    fn plus_sign_in_cpio_fields_is_rejected() {
+        assert_eq!(hex_field(b"+000000A"), None);
+        assert_eq!(oct_field(b"+00012"), None);
+        assert_eq!(hex_field(b"0000000A"), Some(10));
+        assert_eq!(oct_field(b"00012"), Some(10));
+    }
 
     fn global_record(key: &str, value: &str) -> String {
         let tail = format!(" {key}={value}\n");
