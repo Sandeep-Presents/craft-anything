@@ -64,7 +64,7 @@ pub fn env_keys(get: impl Fn(&str) -> Option<String>) -> Vec<Detected> {
         reason: if found {
             "Kimi K3.1 Pro through OpenRouter, with the OPENROUTER_API_KEY in your environment".into()
         } else {
-            "Kimi K3.1 Pro through OpenRouter: paste your OpenRouter key".into()
+            "Kimi K3.1 Pro through OpenRouter: paste your OpenRouter key (it starts with sk-or-)".into()
         },
         needs_key: !found,
     });

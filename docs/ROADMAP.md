@@ -568,6 +568,9 @@ Owner: open · Status: todo
       is sent, so a key with $35 left of a daily limit got 402 "You requested up to 131072 tokens, but
       can only afford 35063" (#1213): ask again once with the answer capped at what it can afford
       — claimed: justinjohn0306, branch bugfix/r5.5-openrouter-afford-tokens
+- [x] A key from the model's maker pasted for OpenRouter (Kimi's own, for Kimi K3.1 Pro) got only
+      "OpenRouter answered 401: Missing Authentication header" (#1506): OpenRouter's 401 now says
+      it takes its own key (`sk-or-…`), and Detect's hint says so before it's pasted
 - [x] A saved fal.ai key reaches an API-key build's asset tools; every call said "No fal.ai key"
       (#923). Outside a project the tools now say that instead. Not checked with a real fal.ai key
       or API build

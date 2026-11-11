@@ -82,6 +82,10 @@ pub struct OpenAi {
 /// An answer cap smaller than this would cut a builder's file writes short: such a refusal stays one.
 const MIN_AFFORDABLE_ANSWER: u64 = 4096;
 
+/// OpenRouter answers a key that isn't its own (one from the model's maker, such as Kimi's) with
+/// 401 "Missing Authentication header", so say which key it takes (#1506).
+const OPENROUTER_KEY_HELP: &str = "OpenRouter takes its own key, which starts with sk-or- (make one at openrouter.ai/keys). A key from the model's maker, such as Kimi's own site, doesn't work here. Replace it in Settings → AI.";
+
 impl OpenAi {
     pub fn official(base: Option<&str>, key: String, model: &str) -> Self {
         Self::compatible("OpenAI", base.unwrap_or(OPENAI_BASE), Some(key), if model.is_empty() { OPENAI_DEFAULT_MODEL } else { model })
@@ -116,6 +120,12 @@ impl OpenAi {
 
     fn url(&self, path: &str) -> String {
         format!("{}/{path}", self.base_url)
+    }
+
+    /// A rejected key gets OpenRouter's own fix; any other error is left as it is.
+    fn explain_key(&self, e: ToolError) -> ToolError {
+        let status = e.details.as_ref().and_then(|d| d.get("status")).and_then(Value::as_u64);
+        if self.openrouter && status == Some(401) { e.with_remediation(OPENROUTER_KEY_HELP) } else { e }
     }
 
     pub fn headers(&self) -> Vec<(&'static str, String)> {
@@ -238,7 +248,7 @@ impl OpenAi {
     /// take a while to answer, and an address nothing listens at shouldn't hold the person as long.
     pub fn list_models_within(&self, connect: std::time::Duration, wait: std::time::Duration) -> Result<Vec<String>, ToolError> {
         let agent = http::agent(connect, wait, wait);
-        let v = http::get_json(&agent, &self.label, &self.url("models"), &self.headers())?;
+        let v = http::get_json(&agent, &self.label, &self.url("models"), &self.headers()).map_err(|e| self.explain_key(e))?;
         let arr = v.get("data").or_else(|| v.get("models")).and_then(Value::as_array).cloned().unwrap_or_default();
         // A catalogue may list a model only for another API (Responses, Messages): such an entry
         // would fail on a chat-completions client, so skip it when the entry says which APIs it
@@ -258,7 +268,7 @@ impl OpenAi {
 
     fn stream_once(&self, req: &TurnRequest<'_>, on_delta: &mut dyn FnMut(Delta), stop: &Stop) -> Result<TurnResult, ToolError> {
         let agent = http::stream_agent(self.stream_limit);
-        let reader = http::post_json(&agent, &self.label, &self.url("chat/completions"), &self.headers(), &self.body(req))?;
+        let reader = http::post_json(&agent, &self.label, &self.url("chat/completions"), &self.headers(), &self.body(req)).map_err(|e| self.explain_key(e))?;
         let mut st = ChatStream::default();
         http::parse_sse(reader, |ev| {
             stop.check()?;
@@ -1346,6 +1356,17 @@ mod tests {
         let other = OpenAi::compatible("Ollama", "http://127.0.0.1:11434/v1", None, "llama3");
         assert!(other.body(&with_tools).get("provider").is_none(), "only OpenRouter knows `provider`");
         assert_eq!(router.body(&with_tools)["tool_choice"], "auto");
+    }
+
+    #[test]
+    fn a_key_openrouter_rejects_gets_told_which_key_it_takes() {
+        // What OpenRouter answers a key that isn't its own (checked against the live service).
+        let rejected = || http::status_error("OpenRouter", 401, r#"{"error":{"message":"Missing Authentication header","code":401}}"#);
+        let help = |e: ToolError| e.remediation.unwrap_or_default();
+        let router = OpenAi::openrouter(None, "k".into(), "");
+        assert!(help(router.explain_key(rejected())).contains("sk-or-"));
+        assert!(!help(OpenAi::official(None, "k".into(), "").explain_key(rejected())).contains("sk-or-"));
+        assert!(!help(router.explain_key(http::status_error("OpenRouter", 429, "{}"))).contains("sk-or-"));
     }
 
     #[test]
