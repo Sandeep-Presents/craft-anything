@@ -274,7 +274,14 @@ fn notes_left_waiting_start_the_limits_again() {
     progress.save(&ws.root).unwrap();
     ws.manifest.not_working_checks = NOT_WORKING_CHECK_LIMIT;
     ws.save().unwrap();
+    // The run ahead of a queued one saves its session after the queued run's copy was opened.
+    let mut ahead = Workspace::open(&ws.root).unwrap();
+    ahead.manifest.agent_session = Some("session-ahead".into());
+    ahead.save().unwrap();
     left_notes_are_a_request(&mut ws);
     assert!(!BuildProgress::load(&ws.root).unwrap().stalled());
-    assert_eq!(Workspace::open(&ws.root).unwrap().manifest.not_working_checks, 0);
+    assert_eq!(ws.manifest.not_working_checks, 0, "the run itself starts from zero too");
+    let saved = Workspace::open(&ws.root).unwrap().manifest;
+    assert_eq!(saved.not_working_checks, 0);
+    assert_eq!(saved.agent_session.as_deref(), Some("session-ahead"), "an older copy doesn't undo the newer session");
 }

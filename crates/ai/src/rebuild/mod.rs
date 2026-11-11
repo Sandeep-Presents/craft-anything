@@ -1420,18 +1420,22 @@ impl Worker {
 /// Notes an earlier run left are a request the person made, as a message is: they start the counts
 /// of unchanged turns and of checks that found no working build again, or a run carrying on from a
 /// build that reached either limit would stop before its builder reads them. Their files are gone
-/// by now, so a count that can't be saved is logged and the run starts anyway.
+/// by now, so a count that can't be saved is logged and the run starts anyway. The count is saved
+/// on the project as it is on disk: a run that waited in the queue holds a copy from before the
+/// run ahead of it finished, and saving that would undo what that run recorded (its session).
 fn left_notes_are_a_request(ws: &mut Workspace) {
     let progress = BuildProgress::load(&ws.root).and_then(|mut p| {
         p.reset();
         p.save(&ws.root)
     });
-    let checks = if ws.manifest.not_working_checks == 0 {
-        Ok(())
-    } else {
-        ws.manifest.not_working_checks = 0;
-        ws.save()
-    };
+    ws.manifest.not_working_checks = 0;
+    let checks = Workspace::open(&ws.root).and_then(|mut now| {
+        if now.manifest.not_working_checks == 0 {
+            return Ok(());
+        }
+        now.manifest.not_working_checks = 0;
+        now.save()
+    });
     if let Err(e) = progress.and(checks) {
         log::warn!("Couldn't start the build's counts again for the notes left waiting: {}", e.message);
     }
