@@ -741,7 +741,6 @@ Not now	Mitte praegu
 Nothing allowed yet.	Veel pole midagi lubatud.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Veel ei saa midagi ehitada: paigalda Claude Code (ja logi sinna üks kord sisse) või lisa allpool AI API võtmega.
 Nothing found	Midagi ei leitud
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Veel ei leitud midagi. Otsime API võtmeid, kohalikke mudeliservereid (Ollama, LM Studio) ja agendirakendusi, mis sul juba on. Teise pordi või arvuti oma saab allpool aadressi järgi lisada.
 Nothing inside it is read.	Selle sees ei loeta midagi.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Selle sees ei loeta midagi; Craft Anything töötab selle põhjal, mida sa näed. Sinu versioon saab oma graafika.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Originaali sees ei loeta midagi: ei koodi, faile ega lehe lähteteksti. Craft Anything töötab selle põhjal, mida sa näed: pildid, leht nii, nagu külastaja seda näeb, ja selle töötamise jälgimine.
@@ -1290,7 +1289,6 @@ Write the brief	Kirjuta kokkuvõte
 Write the handoff	Kirjuta üleandmine
 Wrote {what} to {}	Kirjutasin {what} asukohta {}
 You answered: {a}	Vastasid: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Hiljem saad jaotises Seaded → AI lisada Claude'i, ChatGPT või OpenRouteri võtme, kohaliku mudeli (Ollama, LM Studio) või agendi, mida juba kasutad.
 You chose:	Valisid:
 You're all set	Kõik on valmis
 Your app is ready	Sinu rakendus on valmis
@@ -1467,3 +1465,33 @@ Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
 Stopped adding {name}.	{name} lisamine peatati.
 It isn't there any more, so {program} runs in its place.	Seda pole enam seal, nii et selle asemel käivitub {program}.
 Use it	Kasuta seda
+1 model found	Leiti 1 mudel
+Address	Aadress
+Answered in {seconds} s	Vastas {seconds} s-ga
+Answered in {seconds} s: {reply}	Vastas {seconds} s-ga: {reply}
+Anthropic API	Anthropicu API
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Iga mootor, mis räägib OpenAI API-t, näiteks llama.cpp, või majutatud teenus oma võtmega.
+Coding agent	Kodeerimisagent
+Custom LLM endpoint	Oma LLM-i otspunkt
+Custom endpoint	Oma otspunkt
+Custom model	Muu mudel
+Custom model or alias…	Muu mudel või alias…
+Gemini API	Gemini API
+Installed: {reply}	Paigaldatud: {reply}
+It lists no models yet.	See ei loetle veel ühtegi mudelit.
+Looking for models…	Otsin mudeleid…
+Name	Nimi
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Veel ei leitud midagi. Otsime API võtmeid, kohalikke mudeliservereid (llama.cpp, LM Studio) ja agendirakendusi, mis sul juba on. Teise pordi või arvuti oma saab lisada vahekaardil Oma otspunkt.
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Service	Teenus
+Test	Testi
+Test an AI	Testi AI-d
+Testing…	Testin…
+Testing… a model that isn't loaded yet can take a minute	Testin… mudel, mis pole veel laaditud, võib võtta minuti
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Hiljem saad jaotises Seaded → AI lisada Claude'i, ChatGPT või OpenRouteri võtme, kohaliku mudeli (llama.cpp, LM Studio) või agendi, mida juba kasutad. Aadressi järgi server käib vahekaardile Oma otspunkt.
+e.g. Home server	nt Koduserver
+e.g. http://192.168.1.20:8080/v1	nt http://192.168.1.20:8080/v1
+if it needs one	kui vaja
+model name	mudeli nimi
+{n} models found	Leiti {n} mudelit

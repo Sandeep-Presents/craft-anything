@@ -1,6 +1,7 @@
 //! Splitting what Detect found into the two things a person is choosing between: an API provider
 //! (a key, billed per token) and a harness (a coding agent already installed). Without the split,
-//! eight more providers push the harnesses off the screen.
+//! eight more providers push the harnesses off the screen. A third tab holds the form for an
+//! endpoint Detect can't find.
 
 use craft_anything_ai::Detected;
 
@@ -10,6 +11,8 @@ pub enum DetectTab {
     #[default]
     Providers,
     Harnesses,
+    /// The form for any endpoint. Nothing found belongs here, and it is never chosen for the person.
+    Custom,
 }
 
 /// The tab a found backend belongs to: an agent program is a harness, everything else answers over
@@ -23,6 +26,7 @@ pub fn counts(detected: &[Detected]) -> (usize, usize) {
     detected.iter().fold((0, 0), |(p, h), d| match tab_of(d) {
         DetectTab::Providers => (p + 1, h),
         DetectTab::Harnesses => (p, h + 1),
+        DetectTab::Custom => (p, h),
     })
 }
 
@@ -37,7 +41,7 @@ pub fn resolve(chosen: Option<DetectTab>, providers: usize, harnesses: usize) ->
     }
 }
 
-/// Draw the two tabs and return the one that is showing. An empty tab is dimmed, not disabled: it
+/// Draw the tabs and return the one that is showing. An empty tab is dimmed, not disabled: it
 /// still opens, and says what is missing.
 pub fn bar(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
     ui.horizontal_wrapped(|ui| buttons(ui, chosen, detected)).inner
@@ -47,9 +51,16 @@ pub fn bar(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detect
 pub fn buttons(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
     let (providers, harnesses) = counts(detected);
     let showing = resolve(*chosen, providers, harnesses);
-    for (tab, label, count) in [(DetectTab::Providers, "Providers", providers), (DetectTab::Harnesses, "Harnesses", harnesses)] {
-        let mut text = egui::RichText::new(format!("{} ({count})", crate::i18n::tr(label)));
-        if count == 0 {
+    for (tab, label, count) in [
+        (DetectTab::Providers, "Providers", Some(providers)),
+        (DetectTab::Harnesses, "Harnesses", Some(harnesses)),
+        (DetectTab::Custom, "Custom endpoint", None),
+    ] {
+        let mut text = match count {
+            Some(count) => egui::RichText::new(format!("{} ({count})", crate::i18n::tr(label))),
+            None => egui::RichText::new(crate::i18n::tr(label)),
+        };
+        if count == Some(0) {
             text = text.weak();
         }
         if ui.selectable_label(showing == tab, text).clicked() {
@@ -89,5 +100,17 @@ mod tests {
         assert_eq!(resolve(Some(DetectTab::Harnesses), 2, 0), DetectTab::Harnesses, "a clicked empty tab stays");
         assert_eq!(resolve(Some(DetectTab::Providers), 0, 3), DetectTab::Providers, "a clicked empty tab stays");
         assert_eq!(resolve(Some(DetectTab::Harnesses), 2, 3), DetectTab::Harnesses);
+    }
+
+    /// The form's tab holds nothing Detect found and is never chosen for the person, but a click stays.
+    #[test]
+    fn the_custom_tab_is_only_ever_clicked() {
+        for kind in [BackendKind::AgentCli, BackendKind::Openai, BackendKind::OpenaiCompatible, BackendKind::Openrouter] {
+            assert_ne!(tab_of(&detected(kind)), DetectTab::Custom);
+        }
+        for (p, h) in [(0, 0), (0, 3), (2, 0), (2, 3)] {
+            assert_ne!(resolve(None, p, h), DetectTab::Custom);
+            assert_eq!(resolve(Some(DetectTab::Custom), p, h), DetectTab::Custom);
+        }
     }
 }

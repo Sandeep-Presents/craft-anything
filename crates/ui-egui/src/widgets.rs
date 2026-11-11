@@ -186,11 +186,16 @@ pub fn primary_sized(ui: &mut Ui, icon: Option<&str>, label: &str, enabled: bool
 
 /// Secondary button: a card-coloured box with a soft edge and an optional icon.
 pub fn secondary(ui: &mut Ui, icon: Option<&str>, label: &str) -> Response {
+    secondary_min(ui, icon, label, 30.0)
+}
+
+/// [`secondary`] at least `min_height` tall, to match a button beside it that is taller.
+pub fn secondary_min(ui: &mut Ui, icon: Option<&str>, label: &str, min_height: f32) -> Response {
     let t = Tokens::get(ui.ctx());
     let galley = label_galley(ui, &tr(label), 12.0, t.text);
     let icon_w = if icon.is_some() { BUTTON_ICON_W } else { 0.0 };
     let pad = ui.spacing().button_padding;
-    let size = Vec2::new(galley.size().x + icon_w + pad.x * 2.0 + 6.0, (galley.size().y + pad.y * 2.0 + 6.0).max(30.0));
+    let size = Vec2::new(galley.size().x + icon_w + pad.x * 2.0 + 6.0, (galley.size().y + pad.y * 2.0 + 6.0).max(min_height));
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let h = hover_t(ui, &resp);
     let fill = if resp.is_pointer_button_down_on() { t.pressed } else { theme::mix(t.card, t.hover, h) };
@@ -300,6 +305,21 @@ pub fn pill_sized(ui: &mut Ui, text: &str, fg: Color32, bg: Color32, text_size: 
     ui.painter().rect_filled(rect, t.r_sm(), bg);
     ui.painter().galley_with_override_text_color(rect.center() - g.size() / 2.0, g, fg);
     // Painted text: say it to screen readers too.
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label));
+    resp
+}
+
+/// A status label as tall as a [`secondary`] button, with the same padding and corners, so it sits
+/// level with the buttons beside it in a row. [`pill`] stays the small one for running text.
+pub fn status_chip(ui: &mut Ui, text: &str, fg: Color32, bg: Color32) -> Response {
+    let t = Tokens::get(ui.ctx());
+    let label = tr(text);
+    let g = label_galley(ui, &label, 12.0, fg);
+    let pad = ui.spacing().button_padding;
+    let size = Vec2::new(g.size().x + pad.x * 2.0 + 6.0, (g.size().y + pad.y * 2.0 + 6.0).max(30.0));
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
+    ui.painter().rect_filled(rect, t.radius, bg);
+    ui.painter().galley_with_override_text_color(rect.center() - g.size() / 2.0, g, fg);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &label));
     resp
 }

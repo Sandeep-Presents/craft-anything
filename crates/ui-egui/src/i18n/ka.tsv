@@ -760,7 +760,6 @@ Not now	ახლა არა
 Nothing allowed yet.	ჯერ არაფერია დაშვებული.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	ჯერ ვერაფერი აიწყობა: დააინსტალირეთ Claude Code (და ერთხელ შედით მასში) ან ქვემოთ დაამატეთ AI API გასაღებით.
 Nothing found	ვერაფერი მოიძებნა
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	ჯერ ვერაფერი მოიძებნა. ვეძებთ API გასაღებებს, მოდელების ლოკალურ სერვერებს (Ollama, LM Studio) და აგენტის აპებს, რომლებიც უკვე გაქვთ. სხვა პორტზე ან კომპიუტერზე არსებულის დამატება ქვემოთ მისი მისამართით შეიძლება.
 Nothing inside it is read.	შიგნით არაფერი იკითხება.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	შიგნით არაფერი იკითხება; Craft Anything მუშაობს იმით, რასაც თქვენ ხედავთ. თქვენი ვერსია საკუთარ გრაფიკას მიიღებს.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	ორიგინალის შიგნით არაფერი იკითხება: არც მისი კოდი, არც ფაილები, არც გვერდის წყარო. Craft Anything მუშაობს იმით, რასაც თქვენ ხედავთ: სურათებით, გვერდით ისე, როგორც მას ვიზიტორი ხედავს, და მისი მუშაობის დაკვირვებით.
@@ -1310,7 +1309,6 @@ Write the brief	მოკლე აღწერის დაწერა
 Write the handoff	გადაცემის ჩანაწერის დაწერა
 Wrote {what} to {}	{what} ჩაიწერა აქ: {}
 You answered: {a}	თქვენ უპასუხეთ: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Claude-ის, ChatGPT-ის ან OpenRouter-ის გასაღების, ლოკალური მოდელის (Ollama, LM Studio) ან უკვე გამოყენებული აგენტის დამატება მოგვიანებით შეგიძლიათ აქ: პარამეტრები → AI.
 You chose:	თქვენ აირჩიეთ:
 You're all set	ყველაფერი მზადაა
 Your app is ready	თქვენი აპი მზადაა
@@ -1467,3 +1465,33 @@ Connecting to {name}… {seconds} s	{name}-თან დაკავშირე
 Stopped adding {name}.	{name}-ის დამატება შეჩერდა.
 It isn't there any more, so {program} runs in its place.	ის აღარ არის იქ, ამიტომ მის ნაცვლად {program} ეშვება.
 Use it	გამოყენება
+1 model found	ნაპოვნია 1 მოდელი
+Address	მისამართი
+Answered in {seconds} s	უპასუხა {seconds} წმ-ში
+Answered in {seconds} s: {reply}	უპასუხა {seconds} წმ-ში: {reply}
+Anthropic API	Anthropic API
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	ნებისმიერი ძრავა, რომელიც OpenAI-ის API-ს იყენებს, მაგალითად llama.cpp, ან ჰოსტინგზე გაშვებული სერვისი თავისი გასაღებით.
+Coding agent	კოდის აგენტი
+Custom LLM endpoint	საკუთარი LLM endpoint
+Custom endpoint	საკუთარი endpoint
+Custom model	სხვა მოდელი
+Custom model or alias…	სხვა მოდელი ან ფსევდონიმი…
+Gemini API	Gemini API
+Installed: {reply}	დაინსტალირებულია: {reply}
+It lists no models yet.	მოდელები ჯერ არ ჩამოთვლილა.
+Looking for models…	ვეძებთ მოდელებს…
+Name	სახელი
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	ჯერ ვერაფერი მოიძებნა. ვეძებთ API გასაღებებს, მოდელების ლოკალურ სერვერებს (llama.cpp, LM Studio) და აგენტის აპებს, რომლებიც უკვე გაქვთ. სხვა პორტზე ან კომპიუტერზე არსებულის დამატება შეიძლება ჩანართზე „საკუთარი endpoint“.
+OpenAI API	OpenAI API
+OpenRouter	OpenRouter
+Service	სერვისი
+Test	შემოწმება
+Test an AI	AI-ის შემოწმება
+Testing…	მოწმდება…
+Testing… a model that isn't loaded yet can take a minute	მოწმდება… ჯერ ჩაუტვირთავ მოდელს შეიძლება ერთი წუთი დასჭირდეს
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Claude-ის, ChatGPT-ის ან OpenRouter-ის გასაღების, ლოკალური მოდელის (llama.cpp, LM Studio) ან უკვე გამოყენებული აგენტის დამატება მოგვიანებით შეგიძლიათ აქ: პარამეტრები → AI. სერვერი მისამართით ემატება ჩანართზე „საკუთარი endpoint“.
+e.g. Home server	მაგ. სახლის სერვერი
+e.g. http://192.168.1.20:8080/v1	მაგ. http://192.168.1.20:8080/v1
+if it needs one	თუ სჭირდება
+model name	მოდელის სახელი
+{n} models found	ნაპოვნია {n} მოდელი
