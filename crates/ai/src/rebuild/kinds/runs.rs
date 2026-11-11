@@ -262,15 +262,25 @@ fn run_comparison(original: &Value, built: &Value, names: &[String]) -> (Vec<Cla
                 } else {
                     (0.0, false, "numeric output could not be compared".to_string())
                 }
-            } else if original_words.trim().is_empty() && built_words.trim().is_empty() {
-                // Nothing but numbers: word likeness has nothing to weigh (it drops one-character
-                // words), so two different numbers would read as identical output. Without a repeat
-                // to say which numbers vary, compare the numbers themselves.
+            } else if website::words(&original_words).is_empty() && website::words(&built_words).is_empty() {
+                // Nothing but numbers, beside punctuation: word likeness has nothing to weigh (it
+                // keeps only words of two characters or more), so two different numbers would read
+                // as identical output. Without a repeat to say which numbers vary, compare the
+                // numbers themselves.
                 let matches = original_numbers == built_numbers;
                 let detail = if matches {
                     format!("only numbers were printed, and they match in order ({})", listed(&original_numbers))
+                } else if let Some(at) = original_numbers.iter().zip(&built_numbers).position(|(a, b)| a != b) {
+                    // Name the first difference, not the whole lists: a long output would only say
+                    // "and n more" on both sides.
+                    format!(
+                        "only numbers were printed: number {} is {} where the original prints {}",
+                        at + 1,
+                        built_numbers.get(at).copied().unwrap_or("missing"),
+                        original_numbers.get(at).copied().unwrap_or_default()
+                    )
                 } else {
-                    format!("only numbers were printed: {} where the original prints {}", listed(&built_numbers), listed(&original_numbers))
+                    format!("only numbers were printed: it prints {} numbers where the original prints {}", built_numbers.len(), original_numbers.len())
                 };
                 (legacy_score, matches, detail)
             } else {
@@ -396,6 +406,13 @@ mod tests {
         // Printing nothing where the original printed a number isn't alike either.
         let (claims, detail) = run_comparison(&run("4.5"), &run(""), &[]);
         assert!(!claims[1].passed, "{detail}");
+        assert!(detail.contains("0 numbers where the original prints 1"), "{detail}");
+        // Punctuation around the numbers doesn't make them text.
+        let (claims, detail) = run_comparison(&run("[4.5]"), &run(""), &[]);
+        assert!(!claims[1].passed, "brackets aren't words: {detail}");
+        // A long output names where it first differs, not "and n more" on both sides.
+        let (claims, detail) = run_comparison(&run("1 2 3 4 5"), &run("1 2 9 4 5"), &[]);
+        assert!(!claims[1].passed && detail.contains("number 3 is 9 where the original prints 3"), "{detail}");
         // Words beside the numbers still decide: a timing that differs is not a failed build.
         let (claims, detail) = run_comparison(&run("Result 42 completed in 123 ms"), &run("Result 42 completed in 987 ms"), &[]);
         assert!(claims.iter().all(|c| c.passed), "{detail}");
