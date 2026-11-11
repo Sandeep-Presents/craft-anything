@@ -3332,3 +3332,26 @@ fn a_very_long_app_file_name_keeps_start_inside_the_window() {
     let start = h.get_by_label("Start").rect();
     assert!(start.left() >= 0.0 && start.right() <= content.right(), "Start ({start:?}) stays inside the window ({content:?})");
 }
+
+/// The version is in Settings → General on every system, and its button opens the About dialog
+/// (only macOS has a menu bar to open it from, #1300).
+#[test]
+fn settings_show_the_version_and_open_about() {
+    use craft_anything_ui_egui::state::Modal;
+    let mut h = harness(|| demo::app(demo::engine(Mode::Beginner, true)));
+    h.run_steps(3);
+    h.state_mut().state.settings_open = true;
+    h.run_steps(3);
+    h.get_by_label(&format!("Craft Anything {}", env!("CARGO_PKG_VERSION")));
+    h.get_by_label("About Craft Anything").hover();
+    h.run_steps(2);
+    h.get_by_label("About Craft Anything").click();
+    h.run_steps(3);
+    assert_eq!(h.state().state.modal, Some(Modal::About));
+    h.get_by_label(&format!("Version {}", env!("CARGO_PKG_VERSION")));
+    // Settings has a Close too; the dialog's is drawn last, on top.
+    h.query_all_by_label("Close").last().unwrap().click();
+    h.run_steps(3);
+    assert_eq!(h.state().state.modal, None);
+    assert!(h.state().state.settings_open, "closing About leaves Settings open");
+}

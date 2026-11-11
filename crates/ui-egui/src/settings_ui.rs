@@ -195,6 +195,12 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
             app.settings_changed();
         }
     });
+    // Only macOS has a menu bar with "About", so the version is shown here everywhere.
+    row(ui, "Version", &format!("Craft Anything {}", env!("CARGO_PKG_VERSION")), |ui| {
+        if widgets::secondary(ui, Some("info"), "About Craft Anything").clicked() {
+            app.state.modal = Some(crate::state::Modal::About);
+        }
+    });
 }
 
 fn language(app: &mut CraftApp, ui: &mut Ui) {
