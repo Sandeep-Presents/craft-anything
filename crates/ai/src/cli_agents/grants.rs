@@ -82,8 +82,9 @@ const DECLARED: &[Declared] = &[
     Declared { id: "aider", path: Path::Argv, tool_server: Given::No, approvals: Given::No, mid_turn_notes: Given::No },
     Declared { id: "copilot", path: Path::Acp, tool_server: Given::Yes, approvals: Given::Yes, mid_turn_notes: Given::No },
     Declared { id: "grok", path: Path::Acp, tool_server: Given::Yes, approvals: Given::Yes, mid_turn_notes: Given::No },
-    // A build runs over ACP, where the server and its permission requests come to us.
-    Declared { id: "devin", path: Path::Acp, tool_server: Given::Yes, approvals: Given::Yes, mid_turn_notes: Given::No },
+    // Its print path gets neither; ACP (`acp = true` on the backend) hands over the server and
+    // its permission requests, but isn't what a run does unless the person turned it on.
+    Declared { id: "devin", path: Path::Argv, tool_server: Given::No, approvals: Given::No, mid_turn_notes: Given::No },
     // Its headless profile takes a patch overlay that holds the server, but no run has checked
     // that what it wants to do reaches our approval policy.
     Declared {
@@ -197,11 +198,10 @@ mod tests {
                         row.tool_server,
                         if carried { "hands over our server" } else { "hands over none" }
                     );
-                    assert!(!a.requires_acp(), "{} runs per message, so it can't be ACP-only", row.id);
+                    assert!(!a.requires_acp(), "{} runs per message by default, so its row can't be ACP", row.id);
                 }
                 Path::Acp => {
-                    let has_acp = a.requires_acp() || super::super::acp::acp_args(row.id).is_some();
-                    assert!(has_acp, "{} is declared as ACP, so it has an ACP mode", row.id);
+                    assert!(a.requires_acp(), "{} is declared as ACP, so every run of it is one", row.id);
                     assert_eq!(row.tool_server, Given::Yes, "{}: an ACP session always carries our server", row.id);
                     assert_eq!(row.approvals, Given::Yes, "{}: ACP asks us before a change", row.id);
                     assert_eq!(row.mid_turn_notes, Given::No, "{}: no ACP run takes a note mid-turn", row.id);
