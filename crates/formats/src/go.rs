@@ -550,7 +550,12 @@ pub fn unquote_prefix(s: &str) -> Option<(String, usize)> {
     }
     let mut out: Vec<u8> = Vec::new();
     let mut i = 1usize;
-    let hex = |b: &[u8]| -> Option<u32> { u32::from_str_radix(std::str::from_utf8(b).ok()?, 16).ok() };
+    let hex = |b: &[u8]| -> Option<u32> {
+        if !b.iter().all(u8::is_ascii_hexdigit) {
+            return None;
+        }
+        u32::from_str_radix(std::str::from_utf8(b).ok()?, 16).ok()
+    };
     while let Some(&c) = bytes.get(i) {
         match c {
             b'"' => return String::from_utf8(out).ok().map(|v| (v, i + 1)),
@@ -1306,6 +1311,10 @@ mod tests {
         assert!(!r.is_go);
         assert_eq!(unquote_prefix("\"a\\tb\\x41\\u00e9\\101\" rest"), Some(("a\tbA\u{e9}A".to_string(), 20)));
         assert_eq!(unquote_prefix("\"open"), None);
+        assert_eq!(unquote_prefix("\"\\x+a\""), None);
+        assert_eq!(unquote_prefix("\"\\u+041\""), None);
+        assert_eq!(unquote_prefix("\"\\U+0000041\""), None);
+        assert_eq!(unquote_prefix("\"\\x0a\""), Some(("\n".to_string(), 6)));
         assert_eq!(package_of("github.com/a/b.(*T).M"), "github.com/a/b");
         assert_eq!(package_of("main.main"), "main");
         assert_eq!(base64(b"hi!?"), "aGkhPw==");
