@@ -304,6 +304,11 @@ impl AgentAdapters {
         self.adapters.push(adapter);
     }
 
+    /// Every registered adapter, in the order they were registered.
+    pub fn all(&self) -> &[Arc<dyn AgentAdapter>] {
+        &self.adapters
+    }
+
     /// The adapter for an agent id; one it doesn't know gets the plain adapter.
     pub fn for_agent(&self, agent: &str) -> Arc<dyn AgentAdapter> {
         self.adapters.iter().find(|a| a.ids().contains(&agent)).cloned().unwrap_or_else(|| Arc::new(Plain))

@@ -909,10 +909,18 @@ Owner: open · Status: in progress
 
 "Found on this computer" has to mean "can do the job". Today only Claude Code gets everything.
 **Every builder gets the same tools:**
-- [ ] A table of what each adapter gets (our tool server, approvals, resume, notes mid-turn, a
+- [x] A table of what each adapter gets (our tool server, approvals, resume, notes mid-turn, a
       message of any length), as typed data, with a test that fails when one is left out.
       `AgentAdapter` already answers some, such as `resumes` and `prompt_on_stdin`. The lines below
-      fill it in — claimed: muraa-p, branch feature/r2.2-adapter-grants
+      fill it in. `cli_agents::grants` states the columns an adapter can't answer (our tool server,
+      approvals, notes mid-turn, and whether the run is per message or ACP), reports resume and a
+      long message from the adapter itself, and four tests hold every row to what the adapter
+      actually hands a builder: a run's arguments and environment (or the file an argument names,
+      for the harness's overlay) must carry the server it claims, the notes hook must be in the
+      arguments exactly when a note mid-turn is claimed, and a claimed approval channel must be
+      there. A cell nobody has checked says `NotYet` with the gap in words rather than guessing;
+      today that is DeepSeek Harness's approvals and every agent with no adapter of its own
+      — claimed: muraa-p, branch feature/r2.2-adapter-grants
 - [ ] OpenCode's plain adapter never passes our tool server, so its builder has none of our tools
       and hunts for a setting that doesn't exist (#481). Hand it the server, or build over ACP by
       default once that passes

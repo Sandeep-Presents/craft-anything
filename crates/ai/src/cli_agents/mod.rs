@@ -11,6 +11,7 @@
 pub mod acp;
 pub mod adapters;
 pub mod claude_cost;
+pub mod grants;
 pub mod models;
 mod shared;
 pub mod unfinished;
