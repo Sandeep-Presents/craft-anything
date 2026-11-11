@@ -1103,6 +1103,7 @@ Owner: open · Status: in progress
 - [ ] Hold the self-test to what the check can see too: picture the game after its scripted
       input and require it to differ from the `--screenshot` picture (a report alone is the
       build's own word)
+      — claimed: junhyun-dev, branch feature/r2.5-self-test-picture
 
 ### R2.7 The request decides how to build
 Owner: open · Status: in progress
