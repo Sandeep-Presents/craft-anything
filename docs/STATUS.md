@@ -678,6 +678,16 @@ the project's folder), the next check, the builder's own `rebuild_check` include
 results instead of building and starting the app again, and the feed says so. A round with any
 failure is never kept, so Try again always looks again. Not run live.
 
+On Windows, a check's own runs of the build (`--screenshot`, the self-test) and a runtime study's
+`native_window_capture` keep the program's windows behind the person's (`Process::behind_other_windows`):
+a PowerShell helper lowers each window of its process tree to the bottom without activating it,
+whatever the build does, so builds made before the `--screenshot` contract asked for it stay out
+of the way too. A program busy starting (its graphics device) can't be moved until it answers, so
+the person's foreground window is raised above it meanwhile. Run on Windows 10 with an eframe app
+that opens normally: on top for one 40 ms sample, against the whole run without the helper; the
+picture was still drawn. A program that takes focus keeps it (behind), and macOS and Linux open
+the window as before.
+
 Scripted API turns and executable CLI stand-ins cover the stop, persistence, fresh requests and
 check recovery. This change has not been verified with a paid model or a live provider. Copying a
 whole project keeps its progress record; Duplicate creates a new attempt with a fresh conversation

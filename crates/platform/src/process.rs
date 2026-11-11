@@ -87,6 +87,7 @@ pub struct Process {
     label: Option<String>,
     remediation: Option<String>,
     hands_off: bool,
+    behind: bool,
 }
 
 impl std::fmt::Debug for Process {
@@ -159,6 +160,7 @@ impl Process {
             label: None,
             remediation: None,
             hands_off: false,
+            behind: false,
         }
     }
 
@@ -217,6 +219,15 @@ impl Process {
     /// drop or the deadline, then all of it is stopped. A failed exit still ends the run at once.
     pub fn hands_off(mut self) -> Self {
         self.hands_off = true;
+        self
+    }
+
+    /// Keep the program's windows behind every other window, without activating them, for as long
+    /// as it runs (Windows; elsewhere it opens as usual): for a run we picture while the person
+    /// works, so its window never lands on top of what they're doing. Starting it waits for a
+    /// helper (about a second); a helper that can't start leaves the program to open as usual.
+    pub fn behind_other_windows(mut self) -> Self {
+        self.behind = true;
         self
     }
 
@@ -297,6 +308,8 @@ impl Process {
     /// Start the child and supervise it on a background thread.
     pub fn spawn(self) -> Result<RunningProcess, ToolError> {
         let name = self.display();
+        // Ready before the program starts, so its first window is lowered as it shows.
+        let mut behind = if self.behind { crate::behind::KeepBehind::start(self.wall).map(Box::new) } else { None };
         let (program, lead) = crate::which::launch_target(&self.program);
         let mut wrap = CommandWrap::with_new(&program, |cmd| {
             cmd.args(&lead).args(&self.args);
@@ -329,6 +342,9 @@ impl Process {
         wrap.wrap(process_wrap::std::JobObject).wrap(process_wrap::std::CreationFlags(windows::Win32::System::Threading::CREATE_NO_WINDOW));
         let mut child = spawn_retrying(|| wrap.spawn()).map_err(|e| spawn_error(&name, &self.program, self.cwd.as_deref(), e, self.remediation.as_deref()))?;
         let pid = child.id();
+        if let Some(b) = &mut behind {
+            b.watch(pid);
+        }
         let start = Instant::now();
         let activity = Arc::new(AtomicU64::new(0));
 
@@ -382,7 +398,7 @@ impl Process {
         if let Err(e) = spawned {
             return Err(ToolError::new(ErrorCode::ProgramFailed, format!("Could not start a thread to watch {name}: {e}")));
         }
-        Ok(RunningProcess { pid, name, stdin: user_stdin, kill, rx, result: None, hands_off: self.hands_off })
+        Ok(RunningProcess { pid, name, stdin: user_stdin, kill, rx, result: None, hands_off: self.hands_off, _behind: behind })
     }
 }
 
@@ -622,6 +638,8 @@ pub struct RunningProcess {
     rx: Receiver<Result<Output, ToolError>>,
     result: Option<Result<Output, ToolError>>,
     hands_off: bool,
+    /// The helper keeping its windows behind ([`Process::behind_other_windows`]), stopped with it.
+    _behind: Option<Box<crate::behind::KeepBehind>>,
 }
 
 impl std::fmt::Debug for RunningProcess {

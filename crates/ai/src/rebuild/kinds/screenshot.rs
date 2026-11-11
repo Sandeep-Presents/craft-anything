@@ -318,7 +318,9 @@ pub(super) fn run_with(cx: &CheckCx, option: &str, file: &Path) -> Result<OwnRun
     let stop = cx.stop();
     let timeout = stop.time_left().map_or(RUN_LIMIT, |left| RUN_LIMIT.min(left));
     stop.check()?;
-    let out = Process::new(&program).args(&with).cwd(&app).timeout(timeout).stdout_cap(256 * 1024).cancel_when(move || stop.paused()).run();
+    // Behind the person's work: a build made before the contract asked for that opens on top.
+    let out =
+        Process::new(&program).args(&with).cwd(&app).timeout(timeout).stdout_cap(256 * 1024).cancel_when(move || stop.paused()).behind_other_windows().run();
     let Ok(bytes) = std::fs::read(file) else {
         let why = match &out {
             Ok(o) if !o.success => {

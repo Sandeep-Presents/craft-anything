@@ -5,6 +5,7 @@
 //! and the whole process group (Unix) or Job Object (Windows) is killed on timeout, cancel or drop.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+mod behind;
 pub mod cancel;
 pub mod capture;
 pub mod display;

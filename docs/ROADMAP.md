@@ -1216,10 +1216,14 @@ Gaps found while using the app for real projects.
       drawing unfocused (Unity's `runInBackground`). Play still opens it in front. It's the builder's
       to do, so a build made before reads it only in a new brief, and nothing checks it was done.
       Not run live — claimed: tanish2k09, branch feature/r2.9-check-window-behind
-- [ ] A runtime study's check also starts the build normally (`native_window_capture`) to picture
+- [x] A runtime study's check also starts the build normally (`native_window_capture`) to picture
       it beside the original, and that start still comes up in front with focus. Starting a program
       without focus needs `STARTUPINFO`'s show mode, which std has only unstable
-      (`CommandExt::show_window`, rust-lang/rust#127544), or a safe window crate to send it back
+      (`CommandExt::show_window`, rust-lang/rust#127544), or a safe window crate to send it back.
+      Builds made before the contract (in-progress and old projects) also still open their check
+      window on top, unfocused, where it catches a stray click: on Windows, send every check's
+      windows behind from our side, whatever the build does
+      — claimed: tanish2k09, branch feature/r2.9-keep-check-windows-behind
 - [x] Keep New project's content column fixed while the vertical scrollbar animates in or out,
       hiding it when there is nothing to scroll, so switching tabs never shifts the page horizontally
       — claimed: Codex, branch bugfix/r2.9-home-scrollbar-gutter

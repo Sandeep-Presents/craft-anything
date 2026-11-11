@@ -92,6 +92,7 @@ fn native_window_capture(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput,
         .stdout_cap(64 * 1024)
         .cancel_when(move || cancel.is_cancelled())
         .label("the program")
+        .behind_other_windows()
         .spawn()?;
     let started = Instant::now();
     while started.elapsed() < wait {

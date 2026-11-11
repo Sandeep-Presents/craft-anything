@@ -465,6 +465,16 @@ at the wrong tree (the cargo commands `ci` runs use the folder they're started i
 worktree its own `CARGO_TARGET_DIR`, and rebuild `xtask` (or delete it from `target/`) after
 sharing one.
 
+**A window moved from outside waits for its program.** A helper lowered each new window of a
+check's program to the bottom, and the window still sat on top for half a second: `SetWindowPos`
+on another program's window waits for that program's UI thread, which was busy starting its
+graphics device while the window already showed. The PowerShell steps around it hid this at first
+(`Get-Process` takes half a second the first time; the console reader's `ReadLineAsync` blocks in
+Windows PowerShell). Time a helper against the real program with a timeline, not a start-to-end
+check; queue moves of another program's window (`SWP_ASYNCWINDOWPOS`) and act on a window whose
+program answers (the person's) when it can't wait; keep a helper's work in compiled code once it's
+ready.
+
 **A helper stopped only by a destructor.** The keep-awake helper was stopped when its guard was
 dropped; closing the desktop app during a build ended the process without dropping it, and the
 PowerShell loop kept the computer awake (its time limit was a week). A helper that outlives a
