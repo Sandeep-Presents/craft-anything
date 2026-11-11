@@ -514,6 +514,16 @@ been run live.
       llama.cpp routers don't answer it
 - [x] The first run's AI step can add a model server on another computer by its address (llama.cpp,
       Ollama or LM Studio on a home server), the same form as Settings → AI
+- [x] A custom endpoint tab in the first run and Settings → AI: pick a service or your own server,
+      its models load from its model list, a custom model or alias can be typed, and Test checks it
+      before adding; key cards pick their model from the service's list instead of a fixed one, and
+      each added AI has a Test button (claimed: ghzgod, branch feature/r5.4-endpoint-models)
+- [ ] An OpenRouter card that is ready because `OPENROUTER_API_KEY` is set adds the default model
+      with no picker; offer the service's model list there too, read with the environment key
+      (found in review of #845; the saved row's Change… picks one after adding)
+- [x] Pictures from your own ComfyUI server: pick it as the picture model, give its address, pick a
+      checkpoint from the server's list (or an API-format workflow file), and Test checks the server
+      before a build spends anything; no key, no cost (claimed: ghzgod, branch feature/r5.4-comfyui-pictures)
 - [ ] A chat sent while a llama.cpp router is still loading the model ended after 31 s with "The
       answer stream ended early." and no next step (seen once live, 27B model); say the server may
       still be loading it and to try again in a minute
@@ -1400,6 +1410,12 @@ Gaps found while using the app for real projects.
 - [x] A Traditional Chinese README (`README.zh-hant.md`) translated from `README.md` and linked
       from the language switcher in every README
       — claimed: monarchsofchaos004-gif, branch docs/readme-zh-hant; PR #926
+- [x] Choice tiles in a row keep every title on one line and the same height as their neighbours
+      (the start-fresh tile wrapped to two lines beside one-line tiles), in every language
+      (claimed: ghzgod, branch bugfix/r2.9-sibling-tiles-one-line)
+- [x] Every control (button, switch, drop-down, field, chip, link) is one height and one font, and
+      Settings rows line their title up with the control's middle; checked in both modes and German
+      (claimed: ghzgod, branch bugfix/r2.9-one-control-size)
 - [ ] macOS: an Edit menu (Undo, Cut, Copy, Paste, Select All). The keys work in text boxes, but
       the system's Edit items need the text box to answer them, so they'd show greyed out today
 - [x] The Advanced console's prompt box starts tall enough to read what's typed (#942)

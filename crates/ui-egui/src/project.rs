@@ -863,7 +863,7 @@ fn asset_line(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
     ui.add_space(6.0);
     let budget = ws.manifest.asset_budget_usd;
     let amount = trf("{n} · ${spent} of ${budget}", &[("n", &n.to_string()), ("spent", &format!("{spent:.2}")), ("budget", &format!("{budget:.2}"))]);
-    ui.label(RichText::new(amount).font(theme::mono(12.5)).color(if spent >= budget { t.warning } else { t.text_dim }));
+    ui.label(RichText::new(amount).font(theme::mono(theme::CAPTION)).color(if spent >= budget { t.warning } else { t.text_dim }));
     let step = craft_anything_engines::assets::usd(app.asset_budget_step());
     if widgets::link(ui, &trf("Raise the budget by {amount}", &[("amount", &step)])).clicked() {
         app.raise_asset_budget();
@@ -982,32 +982,54 @@ fn side(app: &mut CraftApp, ui: &mut Ui, ws: &Workspace) {
     // Pictures of the original: the look the builder matches (websites are photographed for it).
     if !matches!(m.target, TargetRef::Website { .. }) {
         let n = app.facts.references;
-        if widgets::secondary(ui, Some("paperclip"), "Add pictures of the original")
-            .on_hover_text(tr("Screenshots of how it should look. The builder opens each one and matches it."))
-            .clicked()
-        {
+        let full = ui.available_width();
+        let add = ui.scope(|ui| {
+            ui.spacing_mut().interact_size.x = full;
+            widgets::secondary(ui, Some("paperclip"), "Add pictures of the original")
+        });
+        if add.inner.on_hover_text(tr("Screenshots of how it should look. The builder opens each one and matches it.")).clicked() {
             app.pick(crate::Pick::Pictures);
         }
         let note = if n == 0 { tr("None yet. Screenshots help it look right.") } else { trf("{n} picture(s) to match.", &[("n", &n.to_string())]) };
         ui.label(RichText::new(note).color(Tokens::get(ui.ctx()).text_dim).size(theme::SMALL));
         ui.add_space(8.0);
     }
+    // The page's actions, all one width: two to a row when every label fits half, else one.
+    let mut actions: Vec<(&str, &str, &str)> =
+        vec![("folder-open", "Open folder", ""), ("pencil", "Rename", ""), ("copy", "Duplicate", "A copy to try something else from here.")];
+    if !app.runs.is_busy(&ws.root) {
+        actions.push(("trash-2", "Delete…", "Delete the project"));
+    }
+    if matches!(outcome(app), Some(Outcome::Program)) {
+        actions.push(("pin", "Pin this build", "Keep this version in the sidebar to open any time."));
+    }
+    if !app.beginner() {
+        actions.push(("microscope", "Open in the workbench", "The full toolset, evidence and logs."));
+    }
+    let gap = ui.spacing().item_spacing.x;
+    let full = ui.available_width();
+    let half = ((full - gap) / 2.0).floor();
+    let width = if actions.iter().all(|(icon, label, _)| widgets::secondary_width(ui, Some(icon), label) <= half) { half } else { full };
+    let mut clicked = None;
     ui.horizontal_wrapped(|ui| {
-        if widgets::secondary(ui, Some("folder-open"), "Open folder").clicked() {
-            open_folder(app, ws);
-        }
-        if matches!(outcome(app), Some(Outcome::Program))
-            && widgets::secondary(ui, Some("pin"), "Pin this build").on_hover_text(tr("Keep this version in the sidebar to open any time.")).clicked()
-        {
-            app.ask_pin(&ws.root);
-        }
-        crate::manage::buttons(app, ui, ws);
-        if !app.beginner()
-            && widgets::secondary(ui, Some("microscope"), "Open in the workbench").on_hover_text(tr("The full toolset, evidence and logs.")).clicked()
-        {
-            app.state.screen = Screen::Workbench;
+        ui.spacing_mut().interact_size.x = width;
+        for (icon, label, tip) in actions {
+            let r = widgets::secondary(ui, Some(icon), label);
+            let r = if tip.is_empty() { r } else { r.on_hover_text(tr(tip)) };
+            if r.clicked() {
+                clicked = Some(label);
+            }
         }
     });
+    match clicked {
+        Some("Open folder") => open_folder(app, ws),
+        Some("Rename") => crate::manage::ask_rename(app, ws),
+        Some("Duplicate") => app.duplicate_project(&ws.root),
+        Some("Delete…") => app.state.modal = Some(crate::state::Modal::Delete(ws.root.clone())),
+        Some("Pin this build") => app.ask_pin(&ws.root),
+        Some("Open in the workbench") => app.state.screen = Screen::Workbench,
+        _ => {}
+    }
 }
 
 /// How to see what was made: open the built site, or start the built program.
@@ -1061,7 +1083,8 @@ fn open_questions(app: &CraftApp, ui: &mut Ui) {
         ui.add_space(6.0);
         const SHOWN: usize = 5;
         for q in app.facts.open_questions.iter().take(SHOWN) {
-            ui.horizontal_wrapped(|ui| {
+            // Top-aligned so a long question wraps beside the icon, not under it.
+            ui.horizontal_top(|ui| {
                 icons::show(ui, "info", 14.0, t.text_dim);
                 ui.add(egui::Label::new(RichText::new(q).size(theme::SMALL).color(t.text)).wrap());
             });
@@ -1191,7 +1214,7 @@ fn steps(app: &CraftApp, ui: &mut Ui, ws: &Workspace) {
 /// two would overlap: a right-to-left layout doesn't make room for what's already on the row.
 fn stat_row(ui: &mut Ui, label: &str, value: &str) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let text = RichText::new(value).font(theme::mono(13.0)).color(t.text);
+    let text = RichText::new(value).font(theme::mono(theme::CAPTION)).color(t.text);
     let value_width =
         egui::WidgetText::from(text.clone()).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::FontSelection::Default).size().x;
     let caption_width = widgets::label_galley(ui, &tr(label), 12.0, t.text_faint).size().x;
@@ -1495,7 +1518,7 @@ fn work(ui: &mut Ui, tools: &[(String, Option<bool>)], notes: &[String], advance
                         Some(false) => ("triangle-alert", t.warning),
                     };
                     icons::show(ui, icon, 12.0, col);
-                    ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(12.5)).color(t.text_dim));
+                    ui.label(RichText::new(tool.replace('_', " ")).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                 });
             }
             for n in notes {
@@ -1594,7 +1617,7 @@ fn ask_card(app: &mut CraftApp, ui: &mut Ui, r: &Request, answered: Option<&str>
                     .id_salt(("detail", &r.id))
                     .icon(widgets::disclosure_icon)
                     .show(ui, |ui| {
-                        ui.label(RichText::new(&r.detail).font(theme::mono(12.5)).color(t.text_dim));
+                        ui.label(RichText::new(&r.detail).font(theme::mono(theme::CAPTION)).color(t.text_dim));
                     });
             } else {
                 ui.add(egui::Label::new(RichText::new(&r.detail).color(t.text_dim)).wrap());
@@ -1636,12 +1659,8 @@ fn ask_card(app: &mut CraftApp, ui: &mut Ui, r: &Request, answered: Option<&str>
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 let text = app.state.answers.entry(r.id.clone()).or_default();
-                let resp = ui.add(
-                    egui::TextEdit::singleline(text)
-                        .hint_text(tr("Or type your answer…"))
-                        .desired_width(ui.available_width() - 120.0)
-                        .frame(widgets::text_field_frame(&t)),
-                );
+                let w = ui.available_width() - 120.0;
+                let resp = ui.add(widgets::field(ui, text, "Or type your answer…").desired_width(w));
                 let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 let ready = !text.trim().is_empty();
                 if (widgets::primary_icon(ui, Some("send"), "Send", ready).clicked() || enter) && ready {
@@ -1688,7 +1707,7 @@ fn claims_list(ui: &mut Ui, c: &CheckResult, t: &Tokens) {
         });
     };
     for claim in c.claims.iter().filter(|x| !x.passed) {
-        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{} — {}", claim.title, claim.detail) };
+        let text = if claim.detail.is_empty() { claim.title.clone() } else { format!("{}: {}", claim.title, claim.detail) };
         row(ui, "triangle-alert", t.warning, text);
     }
     for u in &c.unknowns {
@@ -1729,7 +1748,7 @@ fn check_card(app: &mut CraftApp, ui: &mut Ui, ctx: &egui::Context, ws: &Workspa
             for (i, p) in c.pages.iter().enumerate() {
                 let text = format!("{}  {:.0}%", if p.dir.is_empty() { tr("start page") } else { p.name.clone() }, p.similarity);
                 let colour = if p.similarity >= app.settings.build.good_enough { t.text_dim } else { t.warning };
-                if ui.selectable_label(i == picked, RichText::new(text).font(theme::mono(12.5)).color(colour)).clicked() {
+                if ui.selectable_label(i == picked, RichText::new(text).font(theme::mono(theme::CAPTION)).color(colour)).clicked() {
                     picked = i;
                     ui.data_mut(|d| d.insert_temp(picked_id, i));
                 }
@@ -1778,7 +1797,10 @@ fn waiting_notes(app: &mut CraftApp, ui: &mut Ui, waiting: &[Note], t: &Tokens) 
                 }
                 // Said once, under the last note.
                 if i + 1 == waiting.len() {
-                    if widgets::link(ui, "Send now").on_hover_text(tr("Stops the current step and sends your notes straight away.")).clicked() {
+                    if widgets::link_sized(ui, "Send now", theme::SMALL)
+                        .on_hover_text(tr("Stops the current step and sends your notes straight away."))
+                        .clicked()
+                    {
                         app.pause();
                     }
                     let line = if waiting.len() == 1 {
@@ -1933,32 +1955,43 @@ fn questions_switch(app: &mut CraftApp, ui: &mut Ui) {
     let (sending, asking) = (["Change it", "Just ask"], ["Ask me", "Decide yourself"]);
     let title = widgets::label_galley(ui, &tr(QUESTIONS_TITLE), theme::SMALL, t.text_dim).size().x;
     // The approvals menu's link, the space before it and one more item gap.
-    let approvals = widgets::label_galley(ui, &tr("Approvals"), theme::BODY, t.text).size().x + 8.0;
+    let approvals = widgets::label_galley(ui, &tr("Approvals"), theme::SMALL, t.text).size().x + 8.0;
     let gaps = ui.spacing().item_spacing.x * 4.0;
     let title = title + approvals;
     // Side by side when both switches fit, else one under the other (a longer language, a narrow window).
     let fits = widgets::segmented_width(ui, &sending) + widgets::segmented_width(ui, &asking) + title + gaps <= ui.available_width();
-    let hint = |ui: &mut Ui| {
-        ui.add(egui::Label::new(RichText::new(tr("or start with /btw to just ask")).color(t.text_faint).size(theme::SMALL)).truncate());
+    // Shown whole, never cut short ("or start with /b…" names no command): beside the switches
+    // when it fits, else on a line of its own under them.
+    let hint = RichText::new(tr("or start with /btw to just ask")).color(t.text_faint).size(theme::SMALL);
+    let hint_width = widgets::label_galley(ui, hint.text(), theme::SMALL, t.text_faint).size().x + ui.spacing().item_spacing.x;
+    let mut hint_shown = false;
+    let mut beside = |ui: &mut Ui| {
+        if hint_width <= ui.available_width() {
+            ui.label(hint.clone());
+            hint_shown = true;
+        }
     };
     let right = egui::Layout::right_to_left(egui::Align::Center);
     ui.horizontal(|ui| {
         // What sending does: ask for a change, or just ask about the build.
-        if let Some(i) = widgets::segmented(ui, &sending, usize::from(app.state.just_ask), 24.0) {
+        if let Some(i) = widgets::segmented_sized(ui, &sending, usize::from(app.state.just_ask), 24.0, widgets::CONTROL_TEXT) {
             app.state.just_ask = i == 1;
         }
         if fits {
             ui.with_layout(right, |ui| {
                 questions_controls(app, ui, now, &root, &t);
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), hint);
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| beside(ui));
             });
         } else {
-            hint(ui);
+            beside(ui);
         }
     });
     if !fits {
         ui.add_space(4.0);
         ui.horizontal(|ui| ui.with_layout(right, |ui| questions_controls(app, ui, now, &root, &t)));
+    }
+    if !hint_shown {
+        ui.add(egui::Label::new(hint).wrap());
     }
 }
 
@@ -1971,7 +2004,7 @@ fn questions_controls(app: &mut CraftApp, ui: &mut Ui, now: craft_anything_engin
     ui.add_space(8.0);
     {
         let sel = usize::from(now == Questions::Decide);
-        if let Some(i) = widgets::segmented(ui, &["Ask me", "Decide yourself"], sel, 24.0) {
+        if let Some(i) = widgets::segmented_sized(ui, &["Ask me", "Decide yourself"], sel, 24.0, widgets::CONTROL_TEXT) {
             let mode = if i == 0 { Questions::Ask } else { Questions::Decide };
             app.set_questions(root, mode);
         }

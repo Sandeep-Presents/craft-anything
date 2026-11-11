@@ -705,6 +705,23 @@ Its replacement nearly repeated it: hard-linking dependencies saved almost nothi
 projects, because 85% of a Rust pin was a `.pdb` nothing needs. Measure on real data before
 designing around where you assume the size is.
 
+**Tiles sized one by one, beside each other.** Each choice tile grew to fit its own words, and the
+start tiles were four columns at any width, so the start-fresh tile wrapped to two lines and
+stood taller than the three one-line tiles beside it (and German wrapped more). Siblings go through
+`widgets::choice_tiles`, which picks the columns from the widest title in the current language and
+gives the row one height; a test measures them in every language. The same held for rows that put a
+value after a caption, or a hint between two switches: place what can't move first and give the
+rest what's left, or a longer translation runs into it.
+
+**Controls sized one by one.** Drop-downs, fields, links and switches each took their own font
+and height (egui's defaults, a size passed at the call, a style a parent card had set), so one
+Settings row showed a 24-point switch, a 30-point drop-down and a 36-point button in three text
+sizes, and titles sat above the control's middle. Every control takes its height from
+`widgets::control_height` and its text from `CONTROL_TEXT`: drop-downs go through `widgets::combo`
+(which also clears a parent's text style), one-line fields through `widgets::field`, rows through
+`control_row`/`control_line`, and a link beside small text through `link_sized`. Measure the
+rendered pixels of a whole screen in both modes, not one control.
+
 **Long content above a fixed prompt box.** Answers to questions were cards between the feed and
 the prompt box, sized to their text; the feed got what was left, so a long answer squeezed it and
 pushed the box off the window. Content of any length belongs inside the scroll area. And an X on
@@ -1047,3 +1064,9 @@ child. Preserve ordinary output paths and put collisions in an independent input
 directory; keep complete source identities in the manifest. Check both prefix orders and
 same-named input scripts through the real recovery tool, and retain the writer's symlink and
 exclusive-creation checks after selecting a name.
+
+**A key check in front of every provider locked out the one that needs none.** The asset tools
+refused to start unless some provider had a key, so a ComfyUI server on the person's own network
+could not make a picture until they pasted a key they had no use for. The check belongs per
+provider, at the point the key is read (`AssetProvider::needs_key`), not once up front for all of
+them. A test for it must run with no key of any kind and must fail when the check is put back.

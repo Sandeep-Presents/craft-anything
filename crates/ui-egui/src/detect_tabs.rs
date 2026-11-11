@@ -1,6 +1,7 @@
 //! Splitting what Detect found into the two things a person is choosing between: an API provider
 //! (a key, billed per token) and a harness (a coding agent already installed). Without the split,
-//! eight more providers push the harnesses off the screen.
+//! eight more providers push the harnesses off the screen. A third tab holds the form for an
+//! endpoint Detect can't find.
 
 use craft_anything_ai::Detected;
 
@@ -10,6 +11,8 @@ pub enum DetectTab {
     #[default]
     Providers,
     Harnesses,
+    /// The form for any endpoint. Nothing found belongs here, and it is never chosen for the person.
+    Custom,
 }
 
 /// The tab a found backend belongs to: an agent program is a harness, everything else answers over
@@ -23,6 +26,7 @@ pub fn counts(detected: &[Detected]) -> (usize, usize) {
     detected.iter().fold((0, 0), |(p, h), d| match tab_of(d) {
         DetectTab::Providers => (p + 1, h),
         DetectTab::Harnesses => (p, h + 1),
+        DetectTab::Custom => (p, h),
     })
 }
 
@@ -37,24 +41,23 @@ pub fn resolve(chosen: Option<DetectTab>, providers: usize, harnesses: usize) ->
     }
 }
 
-/// Draw the two tabs and return the one that is showing. An empty tab is dimmed, not disabled: it
-/// still opens, and says what is missing.
+/// Draw the tabs (the shared segmented switch, so they match every other switch) and return the
+/// one that is showing. An empty tab still opens, and says what is missing; its count says "(0)".
 pub fn bar(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
     ui.horizontal_wrapped(|ui| buttons(ui, chosen, detected)).inner
 }
 
 /// Draw the tab buttons in the caller's layout, so adjacent actions share its spacing and wrapping.
 pub fn buttons(ui: &mut egui::Ui, chosen: &mut Option<DetectTab>, detected: &[Detected]) -> DetectTab {
+    use crate::i18n::tr;
     let (providers, harnesses) = counts(detected);
     let showing = resolve(*chosen, providers, harnesses);
-    for (tab, label, count) in [(DetectTab::Providers, "Providers", providers), (DetectTab::Harnesses, "Harnesses", harnesses)] {
-        let mut text = egui::RichText::new(format!("{} ({count})", crate::i18n::tr(label)));
-        if count == 0 {
-            text = text.weak();
-        }
-        if ui.selectable_label(showing == tab, text).clicked() {
-            *chosen = Some(tab);
-        }
+    let tabs = [DetectTab::Providers, DetectTab::Harnesses, DetectTab::Custom];
+    let labels = [format!("{} ({providers})", tr("Providers")), format!("{} ({harnesses})", tr("Harnesses")), tr("Custom endpoint")];
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let at = tabs.iter().position(|t| *t == showing).unwrap_or_default();
+    if let Some(i) = crate::widgets::segmented(ui, &labels, at) {
+        *chosen = tabs.get(i).copied();
     }
     showing
 }
@@ -89,5 +92,17 @@ mod tests {
         assert_eq!(resolve(Some(DetectTab::Harnesses), 2, 0), DetectTab::Harnesses, "a clicked empty tab stays");
         assert_eq!(resolve(Some(DetectTab::Providers), 0, 3), DetectTab::Providers, "a clicked empty tab stays");
         assert_eq!(resolve(Some(DetectTab::Harnesses), 2, 3), DetectTab::Harnesses);
+    }
+
+    /// The form's tab holds nothing Detect found and is never chosen for the person, but a click stays.
+    #[test]
+    fn the_custom_tab_is_only_ever_clicked() {
+        for kind in [BackendKind::AgentCli, BackendKind::Openai, BackendKind::OpenaiCompatible, BackendKind::Openrouter] {
+            assert_ne!(tab_of(&detected(kind)), DetectTab::Custom);
+        }
+        for (p, h) in [(0, 0), (0, 3), (2, 0), (2, 3)] {
+            assert_ne!(resolve(None, p, h), DetectTab::Custom);
+            assert_eq!(resolve(Some(DetectTab::Custom), p, h), DetectTab::Custom);
+        }
     }
 }

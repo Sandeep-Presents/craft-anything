@@ -4,6 +4,7 @@
 //! ([`Catalogue`]), so a cost is known before anything is spent, and every generation reports
 //! what it cost. Audio would be one more [`AssetRequest`] variant and table.
 
+pub mod comfyui;
 pub mod fal;
 
 use craft_anything_evidence::{ErrorCode, ToolError};
@@ -285,6 +286,10 @@ pub trait AssetProvider: Send + Sync {
     fn keys_page(&self) -> Option<&'static str> {
         None
     }
+    /// Whether the provider needs the person's key (a server on their own computer doesn't).
+    fn needs_key(&self) -> bool {
+        true
+    }
     /// What `req` will cost, before anything is spent (the budget is checked against it).
     fn estimate(&self, req: &AssetRequest) -> Result<f64, ToolError> {
         Ok(req.listed_cost())
@@ -369,8 +374,12 @@ mod tests {
         assert_eq!((nano.id.as_str(), nano.endpoint.as_str(), nano.size_by), ("nano-banana-pro", "fal-ai/nano-banana-pro", SizeBy::AspectRatio));
         assert_eq!(t.image_model(Some("flux-dev")).unwrap().size_by, SizeBy::ImageSize, "a named size unless the table says otherwise");
         for m in t.images() {
-            assert!(AssetProviders::built_in().get(&m.provider).is_some(), "{} names an unknown provider", m.id);
+            // ComfyUI is added by the engine from the person's settings (it has an address to set).
+            assert!(AssetProviders::built_in().get(&m.provider).is_some() || m.provider == comfyui::ID, "{} names an unknown provider", m.id);
         }
+        let comfy = t.image_model(Some("comfyui")).unwrap();
+        assert_eq!((comfy.cost(Shape::Square), comfy.cost(Shape::Wide)), (0.0, 0.0), "a server of your own costs nothing");
+        assert!(!comfy.endpoint.is_empty() && comfy.name.contains("your server"));
     }
 
     #[test]

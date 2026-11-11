@@ -216,7 +216,7 @@ pub fn show(app: &mut CraftApp, ui: &mut Ui) {
             }
             rule(ui);
             let sel = usize::from(app.mode() == Mode::Experienced);
-            if let Some(i) = widgets::segmented_scaled(ui, &["Simple", "Advanced"], sel, CONTROL - 2.0, 12.0, s) {
+            if let Some(i) = widgets::segmented_scaled(ui, &["Simple", "Advanced"], sel, CONTROL, 12.0, s) {
                 app.set_mode(if i == 0 { Mode::Beginner } else { Mode::Experienced });
             }
             rule(ui);
@@ -241,7 +241,12 @@ fn usage_pill(app: &CraftApp, ui: &mut Ui) {
     }
     let t = Tokens::get(ui.ctx());
     let text = if u.priced { crate::usage::cost_short(u) } else { crate::usage::tokens_words(u.tokens()) };
-    let r = widgets::pill_sized(ui, &text, t.text_dim, t.raised, label(11.0, scale(ui.ctx())));
+    // As tall as the controls beside it, at the bar's scale.
+    let s = scale(ui.ctx());
+    let g = widgets::label_galley(ui, &text, label(12.0, s), t.text_dim);
+    let (rect, r) = ui.allocate_exact_size(Vec2::new(g.size().x + 16.0 * s, CONTROL * s), egui::Sense::hover());
+    ui.painter().rect_filled(rect, t.r_sm(), t.raised);
+    ui.painter().galley_with_override_text_color(rect.center() - g.size() / 2.0, g, t.text_dim);
     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, &text));
     r.on_hover_ui(|ui| {
         ui.label(RichText::new(tr("AI use this session")).font(theme::semibold(theme::SMALL)));
@@ -258,7 +263,7 @@ fn download_pill(ui: &mut Ui, title: &str, fraction: Option<f32>) -> egui::Respo
     };
     let s = scale(ui.ctx());
     let g = widgets::label_galley(ui, &text, label(12.0, s), t.text);
-    let size = Vec2::new(g.size().x + (26.0 + 52.0) * s, 26.0 * s);
+    let size = Vec2::new(g.size().x + (26.0 + 52.0) * s, CONTROL * s);
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let h = widgets::hover_t(ui, &resp);
     ui.painter().rect(rect, t.radius, crate::theme::mix(t.raised, t.hover, h), egui::Stroke::new(s, t.card_border), egui::StrokeKind::Inside);

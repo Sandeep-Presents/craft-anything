@@ -539,8 +539,8 @@ struct Worker {
     editor: Option<PathBuf>,
     notes: Arc<Mutex<Vec<Note>>>,
     feed: Arc<Mutex<feed::FeedLog>>,
-    /// An asset provider's key is set up, so the builder can generate pictures and 3D models if the
-    /// project allows it.
+    /// An asset provider's key is set up (or a ComfyUI server, which needs none), so the builder can
+    /// generate pictures and 3D models if the project allows it.
     assets: bool,
     /// Where this run adds its working time, tokens and cost (`None` in tests that don't build).
     usage: Option<UsageClock>,
@@ -673,8 +673,10 @@ impl Worker {
         session.label("Load the asset keys");
         let providers = session.ext.get::<craft_anything_engines::assets::AssetProviders>().map(|p| p.as_ref().clone()).unwrap_or_default();
         let keys = crate::keys::asset_keys(store, &providers);
-        // The brief offers the built-in models, so a key for another provider doesn't count.
-        self.assets = craft_anything_engines::assets::AssetProviders::built_in().ids().into_iter().any(|id| keys.get(id).is_some());
+        // The brief offers the built-in models, so a key for another provider doesn't count; the
+        // person's own ComfyUI server needs no key.
+        self.assets = session.settings.assets.comfyui_ready()
+            || craft_anything_engines::assets::AssetProviders::built_in().ids().into_iter().any(|id| keys.get(id).is_some());
         session.ext.insert(Arc::new(keys));
     }
 

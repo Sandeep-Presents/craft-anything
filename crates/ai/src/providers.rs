@@ -106,6 +106,43 @@ impl Provider {
     }
 }
 
+/// One entry of the endpoint form's Service dropdown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Service {
+    pub name: &'static str,
+    pub kind: BackendKind,
+    /// Where it answers; `None` when the person types the address ("Your own server") or the kind
+    /// has its own built-in one.
+    pub base_url: Option<&'static str>,
+    pub default_model: &'static str,
+    /// The person types the address.
+    pub needs_address: bool,
+    /// The environment variable that conventionally holds its key.
+    pub key_env: Option<&'static str>,
+}
+
+/// What the endpoint form's Service dropdown offers, in order: your own server, the named API
+/// services, then every hosted provider in [`PROVIDERS`].
+pub fn services() -> Vec<Service> {
+    let named = |name, kind, default_model| Service { name, kind, base_url: None, default_model, needs_address: false, key_env: crate::keys::env_var(kind) };
+    let mut out = vec![
+        Service { name: "Your own server", kind: BackendKind::OpenaiCompatible, base_url: None, default_model: "", needs_address: true, key_env: None },
+        named("OpenRouter", BackendKind::Openrouter, crate::openai::OPENROUTER_DEFAULT_MODEL),
+        named("OpenAI", BackendKind::Openai, crate::openai::OPENAI_DEFAULT_MODEL),
+        named("Anthropic native", BackendKind::Anthropic, crate::anthropic::DEFAULT_MODEL),
+        named("Gemini", BackendKind::Gemini, crate::openai::GEMINI_DEFAULT_MODEL),
+    ];
+    out.extend(PROVIDERS.iter().map(|p| Service {
+        name: p.name,
+        kind: p.kind,
+        base_url: Some(p.base_url).filter(|b| !b.is_empty()),
+        default_model: p.default_model,
+        needs_address: false,
+        key_env: Some(p.key_env),
+    }));
+    out
+}
+
 /// Split a base URL into scheme, host and path, lowercasing the host.
 fn split(base: &str) -> Option<(&str, String, &str)> {
     let (scheme, rest) = base.trim().split_once("://")?;
@@ -162,6 +199,21 @@ mod tests {
         names.sort_unstable();
         names.dedup();
         assert_eq!(names.len(), PROVIDERS.len(), "two providers share a name");
+    }
+
+    /// The dropdown's names are unique, it starts with the person's own server, and none is an agent app.
+    #[test]
+    fn services_are_unique_and_none_is_an_agent_app() {
+        let all = services();
+        assert_eq!(all[0].name, "Your own server");
+        assert!(all[0].needs_address && all[0].base_url.is_none());
+        let mut names: Vec<&str> = all.iter().map(|s| s.name).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), all.len(), "two services share a name");
+        assert!(all.iter().all(|s| s.kind != BackendKind::AgentCli));
+        assert_eq!(all.len(), 5 + PROVIDERS.len());
+        assert!(all.iter().skip(1).all(|s| !s.needs_address && !s.default_model.is_empty()));
     }
 
     /// Two rows must never share a key or a base: one key would be sent to two services.

@@ -132,6 +132,12 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
             ui.add_space(8.0);
         }
         ui.add_space(4.0);
+        if tab == crate::detect_tabs::DetectTab::Custom {
+            crate::settings_ui::server_form(app, ui);
+            ui.add_space(8.0);
+            none_row(app, ui);
+            return;
+        }
         let mut shown = 0;
         for d in detected.iter().filter(|d| crate::detect_tabs::tab_of(d) == tab) {
             brain_card(app, ui, d);
@@ -149,22 +155,13 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
                     icons::show(ui, "radar", 22.0, t.text_faint);
                     ui.vertical(|ui| {
                         ui.label(RichText::new(tr("We didn't find an AI on this computer yet")).font(theme::medium(theme::BODY)));
-                        ui.label(RichText::new(tr("You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.")).color(t.text_dim));
+                        ui.label(RichText::new(tr("You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.")).color(t.text_dim));
                     });
                 });
             });
             ui.add_space(8.0);
         }
-        // A model server on another computer can't be found by looking here (#54, #98).
-        crate::settings_ui::server_form(app, ui);
-        ui.add_space(8.0);
-        // "No AI for now"
-        let none_on = app.state.backend.is_none();
-        let r = option_row(ui, "circle-stop", "No AI for now", "The built-in engines still show you everything they find.", none_on);
-        if r.clicked() {
-            app.choose_backend(None);
-            app.state.first_run = FirstRunStep::Purpose;
-        }
+        none_row(app, ui);
     });
     ui.add_space(16.0);
     ui.horizontal(|ui| {
@@ -176,6 +173,16 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
             app.state.first_run = FirstRunStep::Purpose;
         }
     });
+}
+
+fn none_row(app: &mut CraftApp, ui: &mut Ui) {
+    ui.add_space(8.0);
+    let none_on = app.state.backend.is_none();
+    let r = option_row(ui, "circle-stop", "No AI for now", "The built-in engines still show you everything they find.", none_on);
+    if r.clicked() {
+        app.choose_backend(None);
+        app.state.first_run = FirstRunStep::Purpose;
+    }
 }
 
 fn kind_icon(k: BackendKind) -> &'static str {
@@ -223,21 +230,20 @@ fn brain_card(app: &mut CraftApp, ui: &mut Ui, d: &Detected) {
         let pastable = d.needs_key || d.suggestion.base_url.as_deref().is_some_and(craft_anything_ai::openai::is_opencode_go);
         if pastable && !configured {
             ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                let key = app.key_inputs.entry(name.clone()).or_default();
-                ui.add(
-                    egui::TextEdit::singleline(key)
-                        .password(true)
-                        .hint_text(tr("Paste your API key (kept in your system keychain)"))
-                        .desired_width(ui.available_width() - 140.0)
-                        .frame(widgets::text_field_frame(&t)),
-                );
-                let key = key.trim().to_string();
-                if widgets::primary_icon(ui, None, "Connect", !key.is_empty()).clicked() && !key.is_empty() {
-                    // The key goes to the keychain; the app keeps no copy of it.
-                    app.key_inputs.remove(&name);
-                    app.add_backend(d.suggestion.clone(), Some(key));
-                }
+            // In the words' column, not centred in the card: the field starts under the name and
+            // ends where Connect does.
+            ui.horizontal_top(|ui| {
+                // The icon's 40 points and the gap after it, as in the row above.
+                ui.add_space(40.0 + ui.spacing().item_spacing.x);
+                ui.vertical(|ui| {
+                    let card = crate::settings_ui::KeyCard {
+                        hint: "Paste your API key (kept in your system keychain)",
+                        width: ui.available_width(),
+                        compact: false,
+                        connect: "Connect",
+                    };
+                    crate::settings_ui::key_controls(app, ui, d, card);
+                });
             });
         }
     });
@@ -254,8 +260,10 @@ fn option_row(ui: &mut Ui, icon: &str, title: &str, sub: &str, on: bool) -> egui
     let ir = egui::Rect::from_min_size(rect.min + Vec2::new(14.0, 12.0), Vec2::splat(40.0));
     ui.painter().rect_filled(ir, t.radius, t.raised);
     icons::paint(ui, ir, icon, 20.0, if on { t.accent_ink } else { t.icon });
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 14.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::BODY), t.text);
-    ui.painter().text(egui::pos2(ir.right() + 14.0, rect.top() + 35.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
+    // The words start and size as in the detected AI cards above it: one column, one title size.
+    let x = ir.right() + ui.spacing().item_spacing.x;
+    ui.painter().text(egui::pos2(x, rect.top() + 10.0), Align2::LEFT_TOP, tr(title), theme::semibold(theme::CARD), t.text);
+    ui.painter().text(egui::pos2(x, rect.top() + 36.0), Align2::LEFT_TOP, tr(sub), egui::FontId::proportional(theme::SMALL), t.text_dim);
     if on {
         icons::paint(ui, egui::Rect::from_center_size(egui::pos2(rect.right() - 26.0, rect.center().y), Vec2::splat(20.0)), "check", 18.0, t.accent);
     }

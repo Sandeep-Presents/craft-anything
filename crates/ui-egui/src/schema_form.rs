@@ -134,7 +134,7 @@ pub fn show(ui: &mut Ui, fields: &[Field], values: &mut BTreeMap<String, String>
         for f in fields {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(&f.name).font(theme::mono(12.5)));
+                    ui.label(RichText::new(&f.name).font(theme::mono(theme::CAPTION)));
                     if f.required {
                         ui.label(RichText::new("*").color(t.accent));
                     }
@@ -150,17 +150,18 @@ pub fn show(ui: &mut Ui, fields: &[Field], values: &mut BTreeMap<String, String>
                         }
                     }
                     _ if !f.choices.is_empty() => {
-                        egui::ComboBox::from_id_salt(("choice", &f.name))
-                            .icon(widgets::combo_icon)
-                            .selected_text(if v.is_empty() { "—".to_string() } else { v.clone() })
-                            .show_ui(ui, |ui| {
+                        widgets::combo(
+                            ui,
+                            egui::ComboBox::from_id_salt(("choice", &f.name)).selected_text(if v.is_empty() { "—".to_string() } else { v.clone() }),
+                            |ui| {
                                 if !f.required {
                                     ui.selectable_value(v, String::new(), "—");
                                 }
                                 for c in &f.choices {
                                     ui.selectable_value(v, c.clone(), c);
                                 }
-                            });
+                            },
+                        );
                     }
                     FieldKind::Json => {
                         ui.add(
@@ -178,12 +179,7 @@ pub fn show(ui: &mut Ui, fields: &[Field], values: &mut BTreeMap<String, String>
                             FieldKind::Number => "number",
                             _ => "",
                         };
-                        ui.add(
-                            egui::TextEdit::singleline(v)
-                                .desired_width(320.0)
-                                .hint_text(tr(hint))
-                                .frame(widgets::text_field_frame_compact(&Tokens::get(ui.ctx()))),
-                        );
+                        ui.add(widgets::field(ui, v, hint).desired_width(320.0));
                     }
                 }
                 if !f.description.is_empty() {

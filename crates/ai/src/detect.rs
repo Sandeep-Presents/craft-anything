@@ -57,19 +57,17 @@ pub fn env_keys(get: impl Fn(&str) -> Option<String>) -> Vec<Detected> {
         },
         needs_key: !gemini,
     });
-    // Kimi K3.1 Pro builds through OpenRouter: with its key found, or one the person pastes.
-    let found = get("OPENROUTER_API_KEY").is_some_and(|v| !v.trim().is_empty());
-    out.push(Detected {
-        suggestion: cfg(KIMI_NAME, BackendKind::Openrouter, crate::openai::KIMI_K3_1),
-        reason: if found {
-            "Kimi K3.1 Pro through OpenRouter, with the OPENROUTER_API_KEY in your environment".into()
-        } else {
-            "Kimi K3.1 Pro through OpenRouter: paste your OpenRouter key".into()
-        },
-        needs_key: !found,
-    });
+    // OpenRouter reaches many models with one key: when its key isn't set the card is offered to
+    // paste it (with the key set, the first loop above already offers it).
+    if !get("OPENROUTER_API_KEY").is_some_and(|v| !v.trim().is_empty()) {
+        out.push(Detected {
+            suggestion: cfg("OpenRouter", BackendKind::Openrouter, crate::openai::OPENROUTER_DEFAULT_MODEL),
+            reason: "OpenRouter: paste your key, then choose any model it offers".into(),
+            needs_key: true,
+        });
+    }
     // OpenCode Go: a paid subscription, so it is offered only when its key is already set. Gemini
-    // and Kimi are offered keyless because they are general model APIs.
+    // and OpenRouter are offered keyless because they are general model APIs.
     let go = ["OPENCODEGO_API_KEY", "OPENCODE_GO_API_KEY"].iter().any(|v| get(v).is_some_and(|k| !k.trim().is_empty()));
     if go {
         out.push(Detected {
@@ -81,8 +79,6 @@ pub fn env_keys(get: impl Fn(&str) -> Option<String>) -> Vec<Detected> {
     out
 }
 
-/// The name Kimi K3.1 Pro is added under.
-pub const KIMI_NAME: &str = "Kimi K3.1 Pro (OpenRouter)";
 /// Name given to a Google AI Studio (Gemini API key) backend.
 pub const GEMINI_NAME: &str = "Gemini (Google AI Studio)";
 
@@ -113,6 +109,11 @@ pub(crate) fn chat_model(models: &[String]) -> Option<String> {
         !(specialised(name) || generic_gguf && specialised(model_directory))
     };
     models.iter().find(chats).cloned()
+}
+
+/// The first model in a list that can chat, for a picker to start on.
+pub fn first_chat_model(models: &[String]) -> Option<String> {
+    chat_model(models)
 }
 
 /// One local server: connect, then list models.
@@ -440,16 +441,20 @@ mod tests {
         assert!(find("OpenRouter").reason.contains("OPENROUTER_API_KEY"));
         // Gemini is always offered; without its key it asks for one.
         assert!(find(GEMINI_NAME).needs_key);
-        // Kimi K3.1 Pro rides on the OpenRouter key, so it needs none of its own.
-        assert!(!find(KIMI_NAME).needs_key);
+        // With its key found, OpenRouter is offered once, as ready.
+        assert!(!find("OpenRouter").needs_key);
+        assert_eq!(d.iter().filter(|x| x.suggestion.name == "OpenRouter").count(), 1);
         // A paid subscription is not advertised to someone who has no key for it.
         assert!(d.iter().all(|x| x.suggestion.name != OPENCODE_GO_NAME));
         // Without any key, everything that can be pasted is still offered.
         let none = env_keys(|_| Some("  ".into()));
         assert!(none.iter().all(|x| x.needs_key));
-        for name in [GEMINI_NAME, KIMI_NAME] {
+        for name in [GEMINI_NAME, "OpenRouter"] {
             assert!(none.iter().any(|x| x.suggestion.name == name), "{name} offered");
         }
+        let card = none.iter().find(|x| x.suggestion.name == "OpenRouter").expect("OpenRouter card");
+        assert_eq!((card.suggestion.kind, card.suggestion.model.as_str()), (BackendKind::Openrouter, crate::openai::OPENROUTER_DEFAULT_MODEL));
+        assert_eq!(none.iter().filter(|x| x.suggestion.name == "OpenRouter").count(), 1);
     }
 
     /// OpenCode Go is offered when its key is set, under either of its environment names.

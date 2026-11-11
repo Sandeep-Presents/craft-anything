@@ -74,7 +74,7 @@ pub struct BriefCx<'a> {
     pub ghidra: bool,
     /// The game engine's editor for engine stacks.
     pub editor: Option<&'a Path>,
-    /// An asset provider's key is set up; assets are offered only if the project also allows them
+    /// An asset provider's key (or a ComfyUI server) is set up; assets are offered only if the project also allows them
     /// (`Manifest::generate_assets`).
     pub assets: bool,
     /// The picture model chosen in Settings (an asset-table id); `None` = the table's default.

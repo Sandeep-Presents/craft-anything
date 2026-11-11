@@ -741,7 +741,6 @@ Not now	Agora não
 Nothing allowed yet.	Nenhuma permissão concedida ainda.
 Nothing can build yet: install Claude Code (and sign in to it once), or add an AI with an API key below.	Ainda não é possível criar: instale o Claude Code (e entre na sua conta nele), ou adicione abaixo uma IA com chave de API.
 Nothing found	Nada encontrado
-Nothing found yet. We look for API keys, local model servers (Ollama, LM Studio) and agent apps you already have. One on another port or computer can be added by its address below.	Ainda não encontramos nada. Procuramos chaves de API, servidores de modelos locais (Ollama, LM Studio) e aplicativos de agentes já instalados. Você pode adicionar abaixo, pelo endereço, um servidor em outra porta ou outro computador.
 Nothing inside it is read.	Nada do conteúdo interno é lido.
 Nothing inside it is read; Craft Anything works from what you can see. Your version gets its own art.	Nada do conteúdo interno é lido; o Craft Anything trabalha com o que é visível. Sua versão terá sua própria arte.
 Nothing inside the original is read: not its code, files or page source. Craft Anything works from what you can see: pictures, the page as a visitor sees it, and watching it run.	Nada do interior do original é lido: nem o código, nem os arquivos, nem o código-fonte das páginas. O Craft Anything trabalha com o que é visível: imagens, a página como aparece ao visitante e a observação da execução.
@@ -754,7 +753,6 @@ Nothing open yet	Nenhum item aberto ainda
 Nothing selected	Nada selecionado
 Nothing to show	Nada a exibir
 Nothing uses it until it's on again; it keeps its key.	Esta IA não será usada até ser reativada. A chave será mantida.
-Nothing — start fresh	Nada — começar do zero
 Now	Agora
 Now: {what} ({time})	Agora: {what} ({time})
 Objective-C classes	Classes Objective-C
@@ -1032,7 +1030,6 @@ Show the folder	Mostrar a pasta
 Show the ones that are met	Mostrar os requisitos atendidos
 Show the sidebar	Mostrar a barra lateral
 Show the welcome again	Mostrar as boas-vindas novamente
-Showing	Exibindo
 Sign in and add the Unity Editor	Entrar e adicionar o Unity Editor
 Sign in and install Unreal Engine	Entrar e instalar o Unreal Engine
 Simple	Simples
@@ -1290,7 +1287,6 @@ Write the brief	Registrar o briefing da investigação
 Write the handoff	Registrar as informações para continuar o trabalho
 Wrote {what} to {}	Salvo: {what} em {}
 You answered: {a}	Você respondeu: {a}
-You can add a Claude, ChatGPT or OpenRouter key, a local model (Ollama, LM Studio) or an agent you already use, later in Settings → AI.	Você pode adicionar depois uma chave do Claude, ChatGPT ou OpenRouter, um modelo local (Ollama, LM Studio) ou um agente que já utiliza em Configurações → IA.
 You chose:	Você escolheu:
 You're all set	Tudo pronto
 Your app is ready	Seu aplicativo está pronto
@@ -1406,7 +1402,6 @@ your files there are the app, edited in place	os arquivos dessa pasta são o apl
 {}: {state}	{}: {state}
 {}h {:02}m	{}h {:02}min
 {}m {:02}s	{}min {:02}s
-— use the filter to find the rest.	— use o filtro para encontrar o restante.
 … {n} more	… mais {n}
 … {n} older	… {n} anteriores
 … {} more	… mais {}
@@ -1467,3 +1462,50 @@ Connecting to {name}… {seconds} s	Conectando a {name}… {seconds} s
 Stopped adding {name}.	A adição de {name} foi interrompida.
 It isn't there any more, so {program} runs in its place.	Ele não está mais lá, então {program} é usado no lugar.
 Use it	Usar este
+1 model found	1 modelo encontrado
+Address	Endereço
+Answered in {seconds} s	Respondeu em {seconds} s
+Answered in {seconds} s: {reply}	Respondeu em {seconds} s: {reply}
+Anthropic API	API da Anthropic
+Any engine that speaks the OpenAI API, such as llama.cpp, or a hosted service with its key.	Qualquer mecanismo que fale a API da OpenAI, como o llama.cpp, ou um serviço hospedado com a chave dele.
+Coding agent	Agente de código
+Custom LLM endpoint	Endpoint de LLM próprio
+Custom endpoint	Endpoint próprio
+Custom model	Outro modelo
+Custom model or alias…	Outro modelo ou alias…
+Gemini API	API do Gemini
+Installed: {reply}	Instalado: {reply}
+It lists no models yet.	Ainda não lista nenhum modelo.
+Looking for models…	Procurando modelos…
+Name	Nome
+Nothing found yet. We look for API keys, local model servers (llama.cpp, LM Studio) and agent apps you already have. One on another port or computer can be added on the Custom endpoint tab.	Ainda não encontramos nada. Procuramos chaves de API, servidores de modelos locais (llama.cpp, LM Studio) e aplicativos de agentes já instalados. Um servidor em outra porta ou outro computador pode ser adicionado na aba Endpoint próprio.
+OpenAI API	API da OpenAI
+OpenRouter	OpenRouter
+Service	Serviço
+Test	Testar
+Test an AI	Testar uma IA
+Testing…	Testando…
+Testing… a model that isn't loaded yet can take a minute	Testando… um modelo que ainda não foi carregado pode levar um minuto
+You can add a Claude, ChatGPT or OpenRouter key, a local model (llama.cpp, LM Studio) or an agent you already use, later in Settings → AI. A server by its address goes on the Custom endpoint tab.	Você pode adicionar depois uma chave do Claude, ChatGPT ou OpenRouter, um modelo local (llama.cpp, LM Studio) ou um agente que já utiliza em Configurações → IA. Um servidor pelo endereço vai na aba Endpoint próprio.
+e.g. Home server	ex.: Servidor de casa
+e.g. http://192.168.1.20:8080/v1	ex.: http://192.168.1.20:8080/v1
+if it needs one	se precisar
+model name	nome do modelo
+{n} models found	{n} modelos encontrados
+1 checkpoint found	1 checkpoint encontrado
+API-format workflow JSON, optional	JSON de fluxo de trabalho no formato da API, opcional
+Check a ComfyUI server	Verificar um servidor ComfyUI
+Checkpoint	Checkpoint
+ComfyUI address	Endereço do ComfyUI
+ComfyUI workflow	Fluxo de trabalho do ComfyUI
+List ComfyUI's checkpoints	Listar os checkpoints do ComfyUI
+Looking for checkpoints…	Procurando checkpoints…
+No key needed; pictures are made on your server.	Nenhuma chave necessária; as imagens são feitas no seu servidor.
+Test ComfyUI	Testar ComfyUI
+Workflow	Fluxo de trabalho
+e.g. http://192.168.1.20:8188	ex.: http://192.168.1.20:8188
+on your server	no seu servidor
+{n} checkpoints found	{n} checkpoints encontrados
+Needs a ComfyUI address and checkpoint in Settings → Builds. Until then the game is built without them.	Requer um endereço do ComfyUI e um checkpoint em Configurações → Criação. Até lá, o jogo é criado sem esses recursos.
+Showing {n}. Use the filter to find the rest.	Exibindo {n}. Use o filtro para encontrar o restante.
+Start fresh	Começar do zero
