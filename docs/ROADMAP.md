@@ -1237,6 +1237,8 @@ Gaps found while using the app for real projects.
       note's hand-over file carries the answers, and the after-turn path puts them before the
       notes; only answers the run's mode may show, marked told when read or sent
       — claimed: AlexJoaquimPereira, branch bugfix/r2.9-note-just-ask; commit 78d3963
+- [ ] A note still waiting when the app closes is sent by the next run instead of deleted when it
+      starts (#1620) — claimed: justinjohn0306, branch `bugfix/r2.9-notes-survive-restart`
 - [x] Record which mode a builder's session ran in: `agent_session` is kept across modes, so a Clean
       room build or question can resume a session from a Deep build and carry what it read, and such
       a question's answer is recorded as asked in Clean room. Don't resume one for Clean room
