@@ -84,6 +84,7 @@ Issues are ranked by people affected and how badly, after leaving out what's alr
 | 3 | R2.4 Runtime study, R2.5 Behaviour checks | scripted input (R2.4) before R2.5's sheet check | Makes "ready" mean more for apps and games |
 | 3 | R2.7, R2.8 | — | Small gaps left in finished work |
 | 3 | R2.9 Everyday use, R2.10 Pinned builds | — | Open to anyone at any time; most lines stand alone |
+| 3 | R2.13 A rebuild can be better than the original | — | Small and open; a faithful rebuild otherwise keeps the original's barriers and weight |
 | 3 | R1.5 | — | Small leftovers |
 | Any | M3: R3.3, R3.9, R3.11 | — | Open lane |
 | Later | R4.1 macOS CLI, R4.2 Managed tier | **decision** | Not before M5 |
@@ -1499,6 +1500,25 @@ to the project next.
 - [ ] Opening a pin that's already running brings its window to the front, instead of a message
 - [x] How much space pins take in Settings
       — claimed: Afloat16, branch feature/r2.10-pinned-copy-storage
+
+### R2.13 A rebuild can be better than the original
+Owner: open · Status: todo
+Website checks compare the build with the original, so a faithful rebuild keeps the original's
+barriers, weight and language. A person who asks for more should get a check that holds the
+build to it.
+- [ ] An accessibility floor the person can turn on: unnamed controls, pictures without alt text
+      and a missing page language judged on the build alone. `health_notes` (`kinds/website.rs`)
+      flags them only where the build is worse ("Problems the original has too aren't the
+      build's to fix."). The `a11y` block survives Clean room (`visitor_view` keeps it).
+      Test on a page where the original and the build share a barrier
+- [ ] **decision** Whether a deliberate fix (better contrast, a named control, alt text) counts
+      against likeness, and how the check tells a fix from drift
+- [ ] A page-weight limit the person sets, failing a build over it. Clean room strips the request
+      list from every capture in the session, the build's own included, so measure the built
+      files and call the result file size, not bytes downloaded
+- [ ] When the request names a language, check the page's declared language rather than the
+      original's words: the check lists missing words and the refine message tells the builder
+      to add them (`kinds/website.rs`), so a translated rebuild is told to put them back
 
 ---
 
