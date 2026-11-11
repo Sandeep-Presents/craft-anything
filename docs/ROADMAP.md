@@ -1088,8 +1088,12 @@ Owner: maintainers · Status: in progress
 Owner: open · Status: in progress
 - [x] Keep mechanics behavior unverified when only the sheet has been read: no literal-use claims,
       persisted unknowns and an explicit usable-build summary; no builder retries for a missing oracle
-- [ ] Give console run comparisons a numeric-output oracle when needed: word likeness drops
-      single-character tokens, so bare `4.5` and `9.0` both compare as empty output
+- [x] Give console run comparisons a numeric-output oracle when needed: word likeness drops
+      single-character tokens, so bare `4.5` and `9.0` both compare as empty output. An output
+      that is only numbers is now compared as numbers, in order, when the original's repeated run
+      can't say which ones vary: `4.5` against `9.0` fails the claim and says both, the same number
+      still matches, and printing nothing where the original prints a number fails too. With words
+      beside the numbers, likeness still decides, so a differing timing isn't a failed build
       — claimed: muraa-p, branch bugfix/r2.5-numbers-only-output
 - [x] Compare console output's numeric spelling and order at positions stable across two
       original runs, and explain when varying numbers or unavailable repeats limit comparison
