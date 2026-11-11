@@ -42,6 +42,15 @@ pub struct ArgsCx<'a> {
     pub question: bool,
 }
 
+/// What an adapter knows about a run that failed: the kind of failure, why in plain words, and the
+/// fix when the person can make one ([`AgentAdapter::explain_exit`]).
+#[derive(Debug)]
+pub struct ExitExplanation {
+    pub failure: crate::TurnFailure,
+    pub message: String,
+    pub remediation: Option<String>,
+}
+
 /// One way of driving an agent CLI.
 pub trait AgentAdapter: Send + Sync {
     /// The agent id this adapter is registered under (`claude-code`), plus any other names.
@@ -162,6 +171,12 @@ pub trait AgentAdapter: Send + Sync {
     /// Events for one parsed JSON line.
     fn parse(&self, _p: &mut StreamParser, _v: &Value) -> Vec<AgentEvent> {
         Vec::new()
+    }
+    /// A run that exited with a failure, explained by the adapter when it can tell what happened
+    /// from the output alone (a version too old to take a task, #1005's Harness before
+    /// 0.2.2-rc.1). `None`: the general exit message is the best one there is.
+    fn explain_exit(&self, _out: &craft_anything_platform::Output) -> Option<ExitExplanation> {
+        None
     }
     /// It can continue a saved session.
     fn resumes(&self) -> bool {
