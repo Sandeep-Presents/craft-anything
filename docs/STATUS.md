@@ -613,7 +613,7 @@ launch or preview was run for this documentation correction.
   Copilot builds, model discovery and real-account session
   resume were confirmed by the person using the app. Other agent programs
   without an adapter get plain text in and out. API-key
-  backends (Anthropic, OpenRouter, OpenAI, Gemini through a Google AI Studio key, local; Kimi K3.1 Pro through OpenRouter is offered by Detect; a backend chosen as the Extractor takes a Deep-mode game's own files out into `app/Original/` after the study) build with our own loop and the Build tools,
+  backends (Anthropic, OpenRouter, OpenAI, Gemini through a Google AI Studio key, local; the Claude models offered are 5.5/5.1 and the older Opus 4.6–4.8, Sonnet 4.6 and Haiku 4.5, each sent only the request fields it takes (`anthropic::PROFILES`, #1289; Haiku 4.5 gets no thinking or effort, Haiku 5.5 no fallback field), priced from the same table; Kimi K3.1 Pro through OpenRouter is offered by Detect; a backend chosen as the Extractor takes a Deep-mode game's own files out into `app/Original/` after the study) build with our own loop and the Build tools,
   trim and summarise long conversations and keep them in `transcript.json`, resumed only in the
   mode that saved it (one saved before the mode was kept counts as Deep); no live API build has
   been run yet.

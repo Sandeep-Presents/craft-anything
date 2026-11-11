@@ -8,9 +8,19 @@ const fn p(input: f64, output: f64, cache_read: f64) -> Price {
     Price { input_per_mtok: input, output_per_mtok: output, cache_read_per_mtok: Some(cache_read), cache_write_per_mtok: None }
 }
 
+/// Input and output list prices only; cache reads and writes take `cost`'s defaults.
+const fn list(input: f64, output: f64) -> Price {
+    Price { input_per_mtok: input, output_per_mtok: output, cache_read_per_mtok: None, cache_write_per_mtok: None }
+}
+
 /// Built-in list prices (USD per million tokens, first-party API rates, checked 2026-10).
 pub fn builtin(model: &str) -> Option<Price> {
     let m = model.rsplit('/').next().unwrap_or(model);
+    // A dated id (`claude-haiku-4-5-20251001`) is priced as its family.
+    let m = match m.rsplit_once('-') {
+        Some((family, date)) if date.len() == 8 && date.bytes().all(|b| b.is_ascii_digit()) => family,
+        _ => m,
+    };
     Some(match m {
         "claude-opus-5-5" => p(4.0, 20.0, 0.20),
         "claude-sonnet-5-5" => p(2.0, 10.0, 0.20),
@@ -18,6 +28,11 @@ pub fn builtin(model: &str) -> Option<Price> {
         "claude-fable-5-1" => p(10.0, 50.0, 0.25),
         "claude-opus-5" => p(5.0, 25.0, 0.50),
         "claude-sonnet-5" => p(2.0, 10.0, 0.20),
+        // Earlier models: list prices from the same model table (cached 2026-10-06). Their cache
+        // rates aren't in it, so `cost` uses its defaults for them.
+        "claude-opus-4-8" | "claude-opus-4-7" | "claude-opus-4-6" => list(5.0, 25.0),
+        "claude-sonnet-4-6" => list(3.0, 15.0),
+        "claude-haiku-4-5" => list(1.0, 5.0),
         // OpenRouter's list price (checked 2026-11-03).
         "kimi-k3.1-pro" => p(2.0, 10.0, 0.20),
         _ => return None,
@@ -76,6 +91,11 @@ mod tests {
         assert!((c - (4.0 + 2.0 + 0.2)).abs() < 1e-9, "{c}");
         assert_eq!(cost("anthropic/claude-sonnet-5-5", &Usage { output_tokens: 1_000_000, ..Default::default() }, &BTreeMap::new(), false), Some(10.0));
         assert_eq!(cost("mystery", &u, &BTreeMap::new(), false), None);
+        // #1289: the older models are priced too, and a dated id matches its family.
+        let one_mtok_out = Usage { output_tokens: 1_000_000, ..Default::default() };
+        assert_eq!(cost("claude-haiku-4-5-20251001", &one_mtok_out, &BTreeMap::new(), false), Some(5.0));
+        assert_eq!(cost("claude-sonnet-4-6", &one_mtok_out, &BTreeMap::new(), false), Some(15.0));
+        assert_eq!(cost("claude-opus-4-7", &one_mtok_out, &BTreeMap::new(), false), Some(25.0));
         // Kimi K3.1 Pro through OpenRouter is priced by its model id.
         let k = cost("moonshotai/kimi-k3.1-pro", &Usage { input_tokens: 1_000_000, output_tokens: 1_000_000, ..Default::default() }, &BTreeMap::new(), false)
             .unwrap();

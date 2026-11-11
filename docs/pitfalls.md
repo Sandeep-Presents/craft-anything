@@ -864,11 +864,7 @@ list: scan the folders people keep such things in (`KnownRoot`, by folder name, 
 levels down), and make an install use a copy already found outside our store. Test each layout
 (unzipped, cask, capitalised name) with temp folders, not the machine the test runs on.
 
-**A per-run id that a provider expects to be stable.** OpenCode Go refuses a request without
-`x-opencode-session` (#1225). The header was sent, but only for backends saved with an id, so
-backends from older versions or found from a key got a new id on every run. A fallback id for one
-run is a workaround, not a fix: give each saved provider backend its id once, at startup, before
-any session lock is held (`AiHub::ensure_session_id`), and test a restart keeps the same id.
+
 
 ## Agent tooling
 
