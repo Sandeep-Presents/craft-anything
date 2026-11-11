@@ -1375,6 +1375,8 @@ Gaps found while using the app for real projects.
       — claimed: justinjohn0306, branch bugfix/942-console-input-height
 - [x] A French README (`README.fr.md`) translated from `README.md` and linked from the language
       switcher in every README (#831)
+- [x] A Thai README (`README.th.md`) translated from `README.md` and linked from the language
+      switcher in every README
 - [ ] Vietnamese letters with stacked marks (ạ ả ấ ế ơ ư ữ…) aren't in the bundled DM Sans or egui's
       default fonts: without craft-fonts they show as boxes, and with it each such letter comes from
       Noto Sans CJK while the rest of the word is DM Sans. Bundle a DM Sans build that has the
