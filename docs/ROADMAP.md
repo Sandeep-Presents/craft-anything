@@ -173,8 +173,15 @@ Owner: maintainers · Status: in progress
 - [x] Fix PR #1030's Windows descendant fixture startup and stop the watched launch before
       startup assertions can fail; cover the failure cleanup path
       — claimed: Codex, branch bugfix/r5.2-watched-launch-tests
-- [ ] Run PR #1030's shell-free parent/descendant fixture and startup-timeout cleanup test
-      on Windows; the contributor reproduced startup failure and leaked processes on 07671fe
+- [x] Run PR #1030's shell-free parent/descendant fixture and startup-timeout cleanup test
+      on Windows; the contributor reproduced startup failure and leaked processes on 07671fe.
+      Verified on Windows 11: `cargo test -p craft-anything-platform --lib process::launch_tests`
+      passed five runs (11 passed, 6 ignored, the six being the stand-ins),
+      `stopping_a_watched_program_stops_its_descendant` and
+      `a_descendant_startup_timeout_stops_the_watched_launch` among them; after the runs and a 35 s
+      wait `tasklist` showed no `PING.EXE`, and the only `cmd.exe` and `powershell.exe` were ones
+      already running before the first run
+      — claimed: muraa-p, branch test/r5.2-watched-launch-windows-check
 - [x] Clarify PR #1030's test Rustdoc: post-stop heartbeat sampling, child-fixture guard,
       and the direct-run no-write check
       — claimed: Codex, branch bugfix/r5.2-watched-launch-tests
