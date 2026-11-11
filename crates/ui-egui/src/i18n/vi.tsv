@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	Đang kết nối với {name}… {seconds} 
 Stopped adding {name}.	Đã dừng thêm {name}.
 It isn't there any more, so {program} runs in its place.	Nó không còn ở đó nữa, nên {program} chạy thay thế.
 Use it	Dùng nó
+Found on this computer. Nothing is uploaded unless you choose it.	Được tìm thấy trên máy này. Không có gì được tải lên cho đến khi bạn chọn.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	Tính năng dò tìm chỉ xem máy này: khóa API trong môi trường của bạn, máy chủ mô hình đang chạy ở đây hoặc trên mạng của bạn, và các tác nhân lập trình đã cài đặt. Nó hỏi các máy chủ đó danh sách mô hình. Không có gì được tải lên, và không có gì được thêm vào cho đến khi bạn chọn.
+How detection works	Cách hoạt động của dò tìm

@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	{name} sunucusuna bağlanılıyor… {second
 Stopped adding {name}.	{name} eklenmesi durduruldu.
 It isn't there any more, so {program} runs in its place.	Artık orada değil, bu yüzden yerine {program} çalışıyor.
 Use it	Bunu kullan
+Found on this computer. Nothing is uploaded unless you choose it.	Bu bilgisayarda bulundu. Siz seçmedikçe hiçbir şey yüklenmez.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	Algılama bu bilgisayara bakar: ortamınızdaki API anahtarları, burada veya ağınızda çalışan model sunucuları ve zaten kurulu kodlama ajanları. Bu sunuculardan model listelerini ister. Hiçbir şey yüklenmez ve siz seçmedikçe hiçbir şey eklenmez.
+How detection works	Algılama nasıl çalışır

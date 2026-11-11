@@ -120,6 +120,10 @@ fn brain(app: &mut CraftApp, ui: &mut Ui, width: f32) {
     }
     ui.add_space(10.0);
     let detected: Vec<Detected> = app.detected.clone().unwrap_or_default();
+    if !app.detecting && !detected.is_empty() {
+        ui.label(RichText::new(tr("Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.")).color(t.text_faint).size(theme::CAPTION));
+        ui.add_space(6.0);
+    }
     let tab = crate::detect_tabs::bar(ui, &mut app.state.detect_tab, &detected);
     let list_h = (ui.ctx().content_rect().height() - 330.0).clamp(220.0, 520.0);
     egui::ScrollArea::vertical().max_height(list_h).show(ui, |ui| {

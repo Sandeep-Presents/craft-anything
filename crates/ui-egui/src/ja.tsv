@@ -947,3 +947,6 @@ yesterday	昨日
 … {n} more	… ほか {n} 件
 … {n} older	… 古いもの {n} 件
 Connecting to {name}… {seconds} s	{name} に接続中… {seconds} 秒
+Found on this computer. Nothing is uploaded unless you choose it.	このコンピュータで見つかりました。選ぶまでアップロードも追加もしません。
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	検出はこのコンピュータを見ます: 環境変数の API キー、この PC やネットワーク上で動いているモデルサーバー、インストール済みのコーディングエージェントです。それらのサーバーにはモデル一覧を問い合わせます。アップロードはせず、選ぶまで追加もしません。
+How detection works	検出の仕組み

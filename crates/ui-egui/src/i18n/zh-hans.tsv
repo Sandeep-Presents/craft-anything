@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	正在连接 {name}… {seconds} 秒
 Stopped adding {name}.	已停止添加 {name}。
 It isn't there any more, so {program} runs in its place.	它已不在那里，因此改用 {program}。
 Use it	使用它
+Found on this computer. Nothing is uploaded unless you choose it.	在此计算机上找到。在你选择之前，不会上传或添加任何内容。
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	检测会查看这台计算机：环境变量中的 API 密钥、在本机或网络上运行的模型服务器，以及已安装的编程代理。它会向这些服务器询问模型列表。不会向外部上传任何内容，也不会在你选择之前添加。
+How detection works	检测是如何工作的

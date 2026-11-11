@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	{name}-თან დაკავშირე
 Stopped adding {name}.	{name}-ის დამატება შეჩერდა.
 It isn't there any more, so {program} runs in its place.	ის აღარ არის იქ, ამიტომ მის ნაცვლად {program} ეშვება.
 Use it	გამოყენება
+Found on this computer. Nothing is uploaded unless you choose it.	ნაპოვნია ამ კომპიუტერზე. არაფერი იტვირთება, სანამ თქვენ არ აირჩევთ.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	აღმოჩენა უყურებს ამ კომპიუტერს: API გასაღებები თქვენს გარემოში, აქ ან თქვენს ქსელში მომუშავე მოდელის სერვერები და უკვე დაყენებული კოდირების აგენტები. ის სთხოვს ამ სერვერებს მოდელების სიას. არაფერი იტვირთება და არაფერი ემატება, სანამ თქვენ არ აირჩევთ.
+How detection works	როგორ მუშაობს აღმოჩენა

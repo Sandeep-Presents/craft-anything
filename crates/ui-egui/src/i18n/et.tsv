@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	Ühendamine: {name}… {seconds} s
 Stopped adding {name}.	{name} lisamine peatati.
 It isn't there any more, so {program} runs in its place.	Seda pole enam seal, nii et selle asemel käivitub {program}.
 Use it	Kasuta seda
+Found on this computer. Nothing is uploaded unless you choose it.	Leitud sellest arvutist. Midagi ei laadita üles enne, kui te selle valite.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	Tuvastus vaatab seda arvutit: API-võtmed teie keskkonnas, siin või teie võrgus töötavad mudeliserverid ja juba paigaldatud kodeerimisagendid. See küsib nendelt serveritelt mudelite loendit. Midagi ei laadita üles ja midagi ei lisata enne, kui te selle valite.
+How detection works	Kuidas tuvastus töötab

@@ -1467,3 +1467,6 @@ Connecting to {name}… {seconds} s	Подключение к {name}… {seconds
 Stopped adding {name}.	Добавление {name} остановлено.
 It isn't there any more, so {program} runs in its place.	Его там больше нет, поэтому вместо него запускается {program}.
 Use it	Использовать
+Found on this computer. Nothing is uploaded unless you choose it.	Найдено на этом компьютере. Ничего не отправляется, пока вы не выберете.
+Detection looks at this computer: API keys in your environment, model servers running here or on your network, and coding agents you already installed. It asks those servers for their model list. Nothing is uploaded, and nothing is added unless you choose it.	Поиск смотрит на этот компьютер: ключи API в вашем окружении, серверы моделей здесь или в вашей сети и уже установленные агенты. У этих серверов он запрашивает список моделей. Наружу ничего не отправляется, и ничего не добавляется, пока вы не выберете.
+How detection works	Как работает поиск
