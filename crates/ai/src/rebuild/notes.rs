@@ -4,8 +4,11 @@
 //! `craft-anything-cli builder-notes <dir>`) claims what's there by renaming it to
 //! `<id>.read.json` and gives the text to the model; the run sees the rename and shows the note as
 //! read. The rename is the one moment a note changes hands, so "take back" works until then.
-//! Notes nobody claimed still go in after the turn, as before.
+//! Notes nobody claimed still go in after the turn, as before. A note's file also keeps the
+//! person's own words ([`Left`]), so a note still waiting when the app closes isn't lost: the
+//! next run sends it ([`left`]).
 
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Where a project's notes wait for the builder.
@@ -21,11 +24,39 @@ fn read(dir: &Path, id: u64) -> PathBuf {
     dir.join(format!("{id}.read.json"))
 }
 
-/// Leave a note for the builder's next step.
-pub fn hand_over(dir: &Path, id: u64, text: &str) -> Result<(), craft_anything_evidence::ToolError> {
+/// A note as the person sent it: what a later run sends if this one ends before handing it over.
+/// `text` is without the Just-ask answers the hand-over text may add, so a run in the other mode
+/// adds only the ones it may show.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Left {
+    pub text: String,
+    pub shown: String,
+    #[serde(default)]
+    pub pictures: Vec<PathBuf>,
+}
+
+/// Leave a note for the builder's next step: `text` is what the agent's hook hands over.
+pub fn hand_over(dir: &Path, id: u64, text: &str, left: Option<&Left>) -> Result<(), craft_anything_evidence::ToolError> {
     std::fs::create_dir_all(dir).map_err(|e| craft_anything_evidence::ToolError::io(dir.display(), e))?;
-    let bytes = serde_json::to_vec(&serde_json::json!({"id": id, "text": text})).map_err(|e| craft_anything_evidence::ToolError::internal(e.to_string()))?;
+    let bytes = serde_json::to_vec(&serde_json::json!({"id": id, "text": text, "left": left}))
+        .map_err(|e| craft_anything_evidence::ToolError::internal(e.to_string()))?;
     craft_anything_engine::project::write_atomic(&pending(dir, id), &bytes)
+}
+
+/// The notes an earlier run left waiting (the app closed before the builder took them, #1620),
+/// oldest first. A file without the person's words (from before they were kept) can't be sent
+/// safely and is left out; read notes were handed over already.
+pub fn left(dir: &Path) -> Vec<Left> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut ids: Vec<u64> =
+        entries.flatten().filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".json")).and_then(|n| n.parse::<u64>().ok())).collect();
+    ids.sort_unstable();
+    ids.into_iter()
+        .filter_map(|id| {
+            let file = serde_json::from_slice::<serde_json::Value>(&std::fs::read(pending(dir, id)).ok()?).ok()?;
+            serde_json::from_value::<Left>(file.get("left")?.clone()).ok().filter(|l| !l.text.trim().is_empty())
+        })
+        .collect()
 }
 
 /// Take a note back before the builder read it: true when it was still waiting.
@@ -87,9 +118,9 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let dir = notes_dir(d.path());
         assert!(claim(&dir).is_empty(), "no folder, nothing to claim");
-        hand_over(&dir, 2, "make the header blue").unwrap();
-        hand_over(&dir, 10, "add a contact form").unwrap();
-        hand_over(&dir, 3, "never mind the footer").unwrap();
+        hand_over(&dir, 2, "make the header blue", None).unwrap();
+        hand_over(&dir, 10, "add a contact form", None).unwrap();
+        hand_over(&dir, 3, "never mind the footer", None).unwrap();
         assert!(take_back(&dir, 3), "still waiting: it can be taken back");
         assert_eq!(claim(&dir), ["make the header blue", "add a contact form"], "oldest first, by number");
         assert!(was_read(&dir, 2) && was_read(&dir, 10) && !was_read(&dir, 3));
@@ -99,6 +130,23 @@ mod tests {
         assert!(!was_read(&dir, 2));
         clear(&dir);
         assert!(!dir.exists());
+    }
+
+    #[test]
+    fn notes_nobody_took_are_left_for_the_next_run() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = notes_dir(d.path());
+        assert!(left(&dir).is_empty(), "no folder, nothing left");
+        let note = |text: &str| Left { text: text.into(), shown: format!("{text} (shown)"), pictures: vec![PathBuf::from("pictures/a.png")] };
+        hand_over(&dir, 10, "add a form, with what was asked in Just ask", Some(&note("add a form"))).unwrap();
+        hand_over(&dir, 2, "make it blue", Some(&note("make it blue"))).unwrap();
+        hand_over(&dir, 3, "taken by the hook", Some(&note("taken by the hook"))).unwrap();
+        hand_over(&dir, 4, "from an older version", None).unwrap();
+        hand_over(&dir, 5, " ", Some(&note(" "))).unwrap();
+        std::fs::write(dir.join("6.json"), b"{not json").unwrap();
+        std::fs::rename(dir.join("3.json"), dir.join("3.read.json")).unwrap();
+        assert_eq!(left(&dir), [note("make it blue"), note("add a form")], "oldest first, the person's words without the answers");
+        assert_eq!(claim(&dir)[0], "make it blue", "the hook still reads the hand-over text");
     }
 
     #[test]

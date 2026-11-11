@@ -4,7 +4,7 @@ use craft_anything_engine::workspace::progress::BUILD_PROGRESS_FILE;
 fn consumed_notes(notes: &Mutex<Vec<Note>>, dir: &Path) {
     for (id, text) in [(71, "Keep the header blue"), (72, "Use larger text")] {
         notes.lock().unwrap().push(Note { id, text: text.into(), shown: text.into(), pictures: Vec::new(), questions: Vec::new() });
-        notes::hand_over(dir, id, text).unwrap();
+        notes::hand_over(dir, id, text, None).unwrap();
     }
     assert_eq!(notes::claim(dir).len(), 2);
 }
@@ -167,7 +167,7 @@ fn consumed_note_resets_survive_failed_and_cancelled_turns() {
         fn turn(&mut self, _: &TurnRequest<'_>, _: &mut dyn FnMut(Delta), _: &Stop) -> Result<TurnResult, ToolError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.notes.lock().unwrap().push(Note { id: 73, text: self.text.into(), shown: self.text.into(), pictures: Vec::new(), questions: Vec::new() });
-            notes::hand_over(&self.notes_dir, 73, self.text).unwrap();
+            notes::hand_over(&self.notes_dir, 73, self.text, None).unwrap();
             assert_eq!(notes::claim(&self.notes_dir), [self.text]);
             if !self.record.is_empty() {
                 std::fs::write(&self.progress, self.record).unwrap();

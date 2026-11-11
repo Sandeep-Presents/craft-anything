@@ -266,7 +266,8 @@ pub struct RebuildRun {
 
 impl RebuildRun {
     /// Start a run on a worker thread. Fails fast (before any work) when no coding agent is set up.
-    pub fn start(hub: &AiHub, ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
+    pub fn start(hub: &AiHub, ws: Workspace, mut opts: RunOptions) -> Result<RebuildRun, ToolError> {
+        send_left_notes(&mut opts, &notes::notes_dir(&ws.inbox_dir()));
         let cfg = hub.config();
         let entry = builder_backend(&cfg, opts.backend.as_deref().or_else(|| project_builder(&cfg, &ws)))?;
         // The person's choice of mode is a session setting. A run that waited its turn uses the mode
@@ -393,7 +394,8 @@ impl RebuildRun {
         // Also left for an agent that takes notes at its next step; without it, after the turn.
         // The in-memory note keeps the raw text: if a later run takes it, that run filters the
         // answers by its own mode instead of inheriting this run's.
-        if let Err(e) = notes::hand_over(&notes::notes_dir(self.inbox.dir()), id, &file_text) {
+        let left = notes::Left { text: text.clone(), shown: shown.clone(), pictures: pictures.clone() };
+        if let Err(e) = notes::hand_over(&notes::notes_dir(self.inbox.dir()), id, &file_text, Some(&left)) {
             log::warn!("A note waits for the builder's turn to end: {}", e.message);
         }
         self.notes.lock().unwrap_or_else(PoisonError::into_inner).push(Note { id, text, shown, pictures, questions });
@@ -1405,6 +1407,21 @@ impl Worker {
             }
         }
     }
+}
+
+/// Notes an earlier run never handed over (the app closed while they waited, #1620) are this run's
+/// message when it has none, as a finished run's waiting notes start the next one. Read before
+/// the run clears the folder; a run with its own message leaves them to that clearing, since
+/// whoever started it already sent what was waiting.
+fn send_left_notes(opts: &mut RunOptions, dir: &Path) {
+    let left = notes::left(dir);
+    if opts.message.is_some() || left.is_empty() {
+        return;
+    }
+    let join = |part: fn(&notes::Left) -> &str| left.iter().map(part).collect::<Vec<_>>().join("\n\n");
+    opts.message = Some(join(|n| &n.text));
+    opts.shown = Some(join(|n| &n.shown));
+    opts.shown_pictures = left.iter().flat_map(|n| n.pictures.clone()).collect();
 }
 
 /// What the run says, and the status it leaves on the project, when it ends: paused, failed, or
