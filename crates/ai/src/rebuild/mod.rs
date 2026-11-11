@@ -266,7 +266,7 @@ pub struct RebuildRun {
 
 impl RebuildRun {
     /// Start a run on a worker thread. Fails fast (before any work) when no coding agent is set up.
-    pub fn start(hub: &AiHub, ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
+    pub fn start(hub: &AiHub, mut ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
         let cfg = hub.config();
         let entry = builder_backend(&cfg, opts.backend.as_deref().or_else(|| project_builder(&cfg, &ws)))?;
         // The person's choice of mode is a session setting. A run that waited its turn uses the mode
@@ -316,6 +316,9 @@ impl RebuildRun {
         // Notes an earlier run never handed over (the app closed while they waited, #1620) wait for
         // this run's builder; their old files go before the app can add any to this one.
         let left = notes::take_left(&notes::notes_dir(&ws.inbox_dir()), opts.message.is_none());
+        if !left.is_empty() {
+            left_notes_are_a_request(&mut ws);
+        }
         let root = ws.root.clone();
         // The project's conversation: the run keeps it in the folder as it goes.
         let feed = Arc::new(Mutex::new(feed::FeedLog::open(&ws)));
@@ -1411,6 +1414,26 @@ impl Worker {
                 self.emit(RunEvent::Ask(r));
             }
         }
+    }
+}
+
+/// Notes an earlier run left are a request the person made, as a message is: they start the counts
+/// of unchanged turns and of checks that found no working build again, or a run carrying on from a
+/// build that reached either limit would stop before its builder reads them. Their files are gone
+/// by now, so a count that can't be saved is logged and the run starts anyway.
+fn left_notes_are_a_request(ws: &mut Workspace) {
+    let progress = BuildProgress::load(&ws.root).and_then(|mut p| {
+        p.reset();
+        p.save(&ws.root)
+    });
+    let checks = if ws.manifest.not_working_checks == 0 {
+        Ok(())
+    } else {
+        ws.manifest.not_working_checks = 0;
+        ws.save()
+    };
+    if let Err(e) = progress.and(checks) {
+        log::warn!("Couldn't start the build's counts again for the notes left waiting: {}", e.message);
     }
 }
 
