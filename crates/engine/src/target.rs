@@ -288,6 +288,9 @@ mod tests {
         assert_eq!(sniff(b"\xEF\xBB\xBFhello", "notes.txt"), TargetKind::Text);
         assert_eq!(sniff(b"\xFF\xFEh\0i\0", "notes.txt"), TargetKind::Text);
         assert_eq!(sniff(b"\0\xFF\x02", "notes.md"), TargetKind::Unknown);
+        // The bytes decide, not the name: a gzip stream called `.txt` is not text.
+        assert_eq!(sniff(b"\x1f\x8b\x08\x00\x00\x00", "notes.txt"), TargetKind::Unknown);
+        assert_eq!(sniff(b"", "empty.txt"), TargetKind::Unknown);
         assert_eq!(TargetKind::Text.id(), "text");
         assert!(TargetKind::Text.plain().contains("text file"));
     }
