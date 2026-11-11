@@ -827,6 +827,13 @@ broke, and "Basic Membership" lost a word. It also tested whole tokens, so a sec
 after `ref=` passed. Test a scrubber on what must survive as well as what must go, and on each
 kind of content it can receive.
 
+**Expected values taken from the wrong path of the real program.** Tests for filling an added
+SQLite column's default in old rows were written from what SQLite stores on a later insert
+(`DEFAULT 1e3` stores '1000.0'), but an old row reads the default expression as written ('1e3').
+Two PRs were merged on those expectations before anyone ran ALTER TABLE ADD COLUMN against a row
+stored before it. When a test claims to match another program, produce each expected value from
+that program on the same path (here: insert a row, add the column, read the old row).
+
 **Response metadata that fills a replay limit.** Comparing stored HTTP headers literally kept
 equivalent polls apart: names ignore case, and only values for the same name retain order.
 Compare that way without rewriting the saved headers. Unavailable 304 samples still prove which

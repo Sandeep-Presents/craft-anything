@@ -1749,17 +1749,21 @@ Owner: open · Status: in progress
       constants; a signed numeric string and single digit separators take the column's affinity,
       and a separator-bearing REAL fills a missing TEXT field with its unseparated spelling.
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-sqlite-default-literals
-- [x] Read a TEXT column's REAL default as SQLite does: `DEFAULT 1e3` and `DEFAULT 5.` are
-      '1000.0' and '5.0' in SQLite. A non-integer REAL default now uses SQLite's REAL text form,
-      including `Inf`/`-Inf`; integer literals keep integer text.
+- [x] Read a TEXT column's REAL default as SQLite does. (Corrected below: '1000.0' and '5.0' for
+      `DEFAULT 1e3` and `DEFAULT 5.` are what a later insert stores, not what an old row reads.)
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-sqlite-real-text
 - [x] Preserve decimal literal spelling when filling a missing TEXT field from a SQLite default with digit separators.
       — claimed: Afloat16, branch bugfix/r3.12-sqlite-added-default-spellings
 - [x] Read a signed quoted numeric default with SQLite's coercion before the column's affinity:
-      `DEFAULT -'1e3'` is '-1000.0' on TEXT and -1000 on INTEGER, and `DEFAULT -'1.50'` is '-1.5';
-      integer text keeps integer formatting. The quoted text is coerced to an INTEGER or REAL
-      before affinity, and TEXT's REAL value uses SQLite's REAL text form.
+      `DEFAULT -'1e3'` is -1000 on INTEGER and `DEFAULT -'1.50'` is '-1.5' on TEXT. (Corrected
+      below: an old row reads `-'1e3'` as '-1000' on TEXT and -1000 untyped.)
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-sqlite-signed-quoted
+- [x] Fill an old row's TEXT default as SQLite 3.50 reads it, not as a later insert stores it: an
+      integer that fits in 64 bits is written plainly and any other number keeps its spelling
+      (`1e3` is '1e3', `5.` is '5.', `1e400` is '1e400'), and a signed quoted default is read as a
+      number before it is negated (`-'1e3'` is '-1000' on TEXT, -1000 untyped). Checked against
+      SQLite 3.50.4 with ALTER TABLE ADD COLUMN on a row stored before it
+      — claimed: bflatastic, branch bugfix/r3.12-sqlite-old-row-text-defaults
 - [x] Whole numbers in SQLite REAL columns read as REAL: SQLite stores a REAL with no fractional
       part as an integer and turns it back into a REAL when it reads the column, so a REAL, FLOAT
       or DOUBLE column holding 1.0 shows 1.0 instead of 1.

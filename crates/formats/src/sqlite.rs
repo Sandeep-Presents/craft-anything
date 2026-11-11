@@ -1422,27 +1422,19 @@ fn literal_value(tokens: &[&str], affinity: Affinity, allow_words: bool) -> Opti
     let clean = unseparated_number(&number)?;
     let integer = number_kind(&clean)?;
     match affinity {
-        // Reading an old row supplies the DEFAULT expression, not the stored value of a
-        // later insert. SQLite formats a representable integer magnitude, but otherwise
-        // keeps a separated literal's spelling (without underscores or a leading plus).
-        Affinity::Text if clean != number => {
+        // A row stored before ALTER TABLE ADD COLUMN reads the DEFAULT expression, not what a
+        // later insert stores: an integer whose digits fit in 64 bits is written plainly (`007`
+        // reads '7'), and any other number keeps its spelling without separators or a leading
+        // plus (`1e3` reads '1e3', `5.` reads '5.', `-09223372036854775808` keeps its zero), as
+        // SQLite 3.50 reads them.
+        Affinity::Text => {
             let spelling = clean.strip_prefix('+').unwrap_or(&clean);
-            let magnitude = spelling.strip_prefix('-').unwrap_or(spelling);
-            Some(match magnitude.parse::<i64>() {
-                Ok(n) if integer => integer_default(if spelling.starts_with('-') { -n } else { n }, affinity),
+            let (negative, digits) = spelling.strip_prefix('-').map_or((false, spelling), |digits| (true, digits));
+            Some(match digits.parse::<i64>() {
+                Ok(n) if integer && !digits.starts_with(['+', '-']) => integer_default(if negative { -n } else { n }, affinity),
                 _ => text_value(spelling.as_bytes()),
             })
         }
-        // An integer literal that fits in 64 bits is written plainly (`007` reads '7', and
-        // `-9223372036854775808` keeps its sign); any other number is written in SQLite's REAL
-        // text form, since the schema's text is not the REAL it reads.
-        Affinity::Text => Some(match clean.parse::<i64>() {
-            Ok(n) if integer => integer_default(n, affinity),
-            _ => {
-                let real = clean.parse::<f64>().ok()?;
-                text_value(real_text(real).as_bytes())
-            }
-        }),
         Affinity::Numeric | Affinity::Real => numeric_value(&clean).and_then(finite),
         Affinity::Blob => match clean.parse::<i64>() {
             Ok(n) if integer => Some(CellValue::Int(n)),
@@ -1480,28 +1472,24 @@ fn text_default(text: &str, affinity: Affinity) -> Option<CellValue> {
     Some(text_value(text.as_bytes()))
 }
 
-/// A `-'…'` default: SQLite coerces the quoted text to an INTEGER when it is written as one,
-/// otherwise to a REAL, negates it, and reads it with the column's affinity.
+/// A `-'…'` default: SQLite reads the quoted text as a number (an INTEGER when it's whole and
+/// fits, as `'1e3'` and `'1.0'` are), negates it, and reads that with the column's affinity, so
+/// `-'1e3'` is '-1000' in a TEXT column and -1000 in an untyped one. Text that isn't a number
+/// (which SQLite would read as 0) stays unsupported.
 fn signed_quoted_default(text: &str, affinity: Affinity) -> Option<CellValue> {
-    let text = text.trim_matches([' ', '\t', '\n', '\u{b}', '\u{c}', '\r']);
     // A separator inside quoted text is not the number the separator would join.
     if text.contains('_') {
         return None;
     }
-    if let Ok(n) = text.parse::<i64>()
-        && let Some(neg) = n.checked_neg()
-    {
-        return Some(integer_default(neg, affinity));
-    }
-    let real = text.parse::<f64>().ok().filter(|n| n.is_finite())?;
-    let neg = -real;
-    match affinity {
-        Affinity::Text => Some(text_value(real_text(neg).as_bytes())),
-        Affinity::Numeric | Affinity::Real => {
-            let negated = if let Some(rest) = text.strip_prefix('-') { rest.to_string() } else { format!("-{}", text.strip_prefix('+').unwrap_or(text)) };
-            numeric_value(&negated).and_then(finite)
-        }
-        Affinity::Blob => finite(CellValue::Real(neg)),
+    let negated = match numeric_value(text)? {
+        CellValue::Int(n) => n.checked_neg().map_or(CellValue::Real(-(n as f64)), CellValue::Int),
+        CellValue::Real(r) => CellValue::Real(-r),
+        _ => return None,
+    };
+    match (affinity, negated) {
+        (Affinity::Text, CellValue::Int(n)) => Some(text_value(n.to_string().as_bytes())),
+        (Affinity::Text, CellValue::Real(r)) => Some(text_value(real_text(r).as_bytes())),
+        (_, negated) => finite(negated),
     }
 }
 
@@ -2481,25 +2469,32 @@ mod tests {
     #[test]
     fn added_column_defaults_take_the_column_affinity() {
         for (declaration, value) in [
-            // TEXT: an integer written plainly, otherwise SQLite's own REAL text.
+            // TEXT, for a row stored before the column: an integer that fits in 64 bits written
+            // plainly, any other number as spelt (what a later insert stores, '1000.0' for
+            // `1e3`, is not what an old row reads).
             ("x TEXT DEFAULT 5", text("5")),
             ("x VARCHAR(10) DEFAULT -5.0", text("-5.0")),
             ("x TEXT DEFAULT 007", text("7")),
             ("x TEXT DEFAULT - 007", text("-7")),
-            ("x CLOB DEFAULT +1e3", text("1000.0")),
-            ("x TEXT DEFAULT 5.", text("5.0")),
-            ("x TEXT DEFAULT 0.10", text("0.1")),
-            ("x TEXT DEFAULT 1.50", text("1.5")),
-            ("x TEXT DEFAULT 0001.5", text("1.5")),
-            ("x TEXT DEFAULT 1e-7", text("1.0e-07")),
-            ("x TEXT DEFAULT 1e16", text("1.0e+16")),
-            ("x TEXT DEFAULT -0.0", text("0.0")),
-            ("x TEXT DEFAULT 99999999999999999999", text("1.0e+20")),
+            ("x TEXT DEFAULT 0099999999999", text("99999999999")),
+            ("x TEXT DEFAULT -0099999999999", text("-99999999999")),
+            ("x TEXT DEFAULT -09223372036854775808", text("-09223372036854775808")),
+            ("x TEXT DEFAULT +09223372036854775807", text("9223372036854775807")),
+            ("x TEXT DEFAULT -00", text("0")),
+            ("x CLOB DEFAULT +1e3", text("1e3")),
+            ("x TEXT DEFAULT 5.", text("5.")),
+            ("x TEXT DEFAULT 0.10", text("0.10")),
+            ("x TEXT DEFAULT 1.50", text("1.50")),
+            ("x TEXT DEFAULT 0001.5", text("0001.5")),
+            ("x TEXT DEFAULT 1e-7", text("1e-7")),
+            ("x TEXT DEFAULT 1e16", text("1e16")),
+            ("x TEXT DEFAULT -0.0", text("-0.0")),
+            ("x TEXT DEFAULT 99999999999999999999", text("99999999999999999999")),
             ("x TEXT DEFAULT -9223372036854775808", text("-9223372036854775808")),
-            ("x TEXT DEFAULT 9223372036854775808", text("9.22337203685478e+18")),
-            ("x TEXT DEFAULT -9223372036854775809", text("-9.22337203685478e+18")),
-            ("x TEXT DEFAULT 1e400", text("Inf")),
-            ("x TEXT DEFAULT -1e400", text("-Inf")),
+            ("x TEXT DEFAULT 9223372036854775808", text("9223372036854775808")),
+            ("x TEXT DEFAULT -9223372036854775809", text("-9223372036854775809")),
+            ("x TEXT DEFAULT 1e400", text("1e400")),
+            ("x TEXT DEFAULT -1e400", text("-1e400")),
             ("x TEXT DEFAULT TRUE", text("1")),
             // INTEGER and NUMERIC: text that is a number becomes one; a whole REAL an INTEGER.
             ("x INTEGER DEFAULT '7'", CellValue::Int(7)),
@@ -2552,16 +2547,19 @@ mod tests {
             ("x REAL DEFAULT -'5'", CellValue::Real(-5.0)),
             ("x BLOB DEFAULT -'5'", CellValue::Int(-5)),
             ("x TEXT DEFAULT -'5'", text("-5")),
-            ("x TEXT DEFAULT -'1e3'", text("-1000.0")),
+            ("x TEXT DEFAULT -'1e3'", text("-1000")),
             ("x TEXT DEFAULT -'1.50'", text("-1.5")),
-            ("x TEXT DEFAULT -'1.0'", text("-1.0")),
+            ("x TEXT DEFAULT -'1.0'", text("-1")),
             ("x TEXT DEFAULT -'1000'", text("-1000")),
-            ("x TEXT DEFAULT -' 1e3 '", text("-1000.0")),
+            ("x TEXT DEFAULT -' 1e3 '", text("-1000")),
             ("x TEXT DEFAULT -' -5 '", text("5")),
+            ("x TEXT DEFAULT -'9223372036854775808'", text("-9.22337203685478e+18")),
             ("x INTEGER DEFAULT -'1e3'", CellValue::Int(-1000)),
             ("x INTEGER DEFAULT -'1.50'", CellValue::Real(-1.5)),
             ("x REAL DEFAULT -'1e3'", CellValue::Real(-1000.0)),
-            ("x BLOB DEFAULT -'1e3'", CellValue::Real(-1000.0)),
+            ("x BLOB DEFAULT -'1e3'", CellValue::Int(-1000)),
+            ("x DEFAULT -'1.0'", CellValue::Int(-1)),
+            ("x DEFAULT -'9223372036854775808'", CellValue::Real(-9.223_372_036_854_776e18)),
             ("x TEXT DEFAULT 1_000", text("1000")),
             ("x TEXT DEFAULT 1_000.5", text("1000.5")),
             ("x TEXT DEFAULT 1_000.", text("1000.")),
@@ -2609,9 +2607,11 @@ mod tests {
             ("x TEXT DEFAULT 0x10", text("16")),
             ("x TEXT DEFAULT -0xFFFFFFFFFFFFFFFF", text("1")),
             ("x TEXT DEFAULT (5.0)", text("5.0")),
-            ("x TEXT DEFAULT (1e3)", text("1000.0")),
-            ("x TEXT DEFAULT (5.)", text("5.0")),
-            ("x TEXT DEFAULT (1e400)", text("Inf")),
+            ("x TEXT DEFAULT (1e3)", text("1e3")),
+            ("x TEXT DEFAULT (+1e3)", text("1e3")),
+            ("x TEXT DEFAULT (5.)", text("5.")),
+            ("x TEXT DEFAULT (1e400)", text("1e400")),
+            ("x TEXT DEFAULT (-'1e3')", text("-1000")),
             ("x TEXT DEFAULT (- 007)", text("-7")),
             ("x TEXT DEFAULT (TRUE)", text("1")),
             ("x INTEGER DEFAULT ('7')", CellValue::Int(7)),
