@@ -507,7 +507,7 @@ pub fn oid_text(d: &[u8]) -> String {
     let mut parts: Vec<u64> = Vec::new();
     let mut v = 0u64;
     for (i, &b) in d.iter().enumerate() {
-        v = v.checked_shl(7).map(|x| x | u64::from(b & 0x7f)).unwrap_or(u64::MAX);
+        v = v.checked_mul(128).and_then(|x| x.checked_add(u64::from(b & 0x7f))).unwrap_or(u64::MAX);
         if b & 0x80 == 0 {
             if parts.is_empty() && i < 8 {
                 let first = if v < 80 { v / 40 } else { 2 };
@@ -529,6 +529,12 @@ pub fn oid_text(d: &[u8]) -> String {
 mod tests {
     use super::*;
     use craft_anything_testkit::apple as fx;
+
+    #[test]
+    fn oid_text_saturates_oversized_arc() {
+        let d = [0x2a, 0x82, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01];
+        assert_eq!(oid_text(&d), "1.2.18446744073709551615");
+    }
 
     #[test]
     fn sha1_vectors() {
