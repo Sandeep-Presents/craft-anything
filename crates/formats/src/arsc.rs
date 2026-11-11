@@ -317,6 +317,14 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
     }
     let id = r.u32_le(pos + 8).unwrap_or(0);
     let name = utf16_fixed(&r, pos + 12, 128);
+    // Older 284-byte packages predate this field. Type names still use the
+    // unshifted chunk ID, while public resource identities include the offset.
+    let type_id_offset = if hsize >= 288 { r.u32_le(pos + 284).unwrap_or(0) } else { 0 };
+    let Ok(type_id_offset) = u8::try_from(type_id_offset) else {
+        table.truncated = true;
+        table.warnings.push(format!("package {name}: type ID offset is outside the one-byte type field"));
+        return;
+    };
     let type_strings = r.u32_le(pos + 268).unwrap_or(0) as usize;
     let key_strings = r.u32_le(pos + 276).unwrap_or(0) as usize;
     let end = data.len();
@@ -359,16 +367,16 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
             break;
         };
         let r = Reader::new(child);
-        match ct {
-            RES_TYPE_SPEC if ch >= 16 => {
-                let tid = r.u8(c + 8).unwrap_or(0);
+        let local_tid = r.u8(c + 8).unwrap_or(0);
+        let type_id = local_tid.checked_add(type_id_offset).filter(|_| local_tid != 0);
+        match (ct, type_id) {
+            (RES_TYPE_SPEC, Some(tid)) if ch >= 16 => {
                 let count = r.u32_le(c + 12).unwrap_or(0);
                 if !package.types.iter().any(|t| t.id == tid) && package.types.len() < 256 {
-                    package.types.push(TypeInfo { id: tid, name: type_name(&p, tid), entry_count: count, configs: Vec::new() });
+                    package.types.push(TypeInfo { id: tid, name: type_name(&p, local_tid), entry_count: count, configs: Vec::new() });
                 }
             }
-            RES_TYPE if ch >= 24 => {
-                let tid = r.u8(c + 8).unwrap_or(0);
+            (RES_TYPE, Some(tid)) if ch >= 24 => {
                 let (cfg, _) = config_qualifiers(&r, c + 20);
                 match package.types.iter_mut().find(|t| t.id == tid) {
                     Some(t) => {
@@ -378,13 +386,22 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
                     }
                     None => {
                         if package.types.len() < 256 {
-                            package.types.push(TypeInfo { id: tid, name: type_name(&p, tid), entry_count: r.u32_le(c + 12).unwrap_or(0), configs: vec![cfg] })
+                            package.types.push(TypeInfo {
+                                id: tid,
+                                name: type_name(&p, local_tid),
+                                entry_count: r.u32_le(c + 12).unwrap_or(0),
+                                configs: vec![cfg],
+                            })
                         }
                     }
                 }
-                parse_type(&r, c, ch, sz, &p, global, table, limits);
+                parse_type(&r, c, ch, sz, &p, tid, global, table, limits);
             }
-            RES_LIBRARY if ch >= 12 => {
+            (RES_TYPE_SPEC | RES_TYPE, None) if ch >= 16 => {
+                table.truncated = true;
+                table.warnings.push(format!("package {name}: type ID {local_tid} with offset {type_id_offset} is outside the one-byte type field"));
+            }
+            (RES_LIBRARY, _) if ch >= 12 => {
                 let n = r.u32_le(c + 8).unwrap_or(0) as usize;
                 let available = (sz - ch) / 260;
                 if n > available {
@@ -397,7 +414,7 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
                     }
                 }
             }
-            RES_TYPE_SPEC | RES_TYPE | RES_LIBRARY => {
+            (RES_TYPE_SPEC | RES_TYPE | RES_LIBRARY, _) => {
                 table.warnings.push(format!("package {name}: incomplete chunk header at offset {c}"));
             }
             _ => {}
@@ -411,7 +428,7 @@ fn parse_package(data: &[u8], pos: usize, cs: usize, global: &StringPool, table:
 }
 
 #[allow(clippy::too_many_arguments)]
-fn parse_type(r: &Reader<'_>, c: usize, ch: usize, sz: usize, p: &Pkg<'_>, global: &StringPool, table: &mut Table, limits: Limits) {
+fn parse_type(r: &Reader<'_>, c: usize, ch: usize, sz: usize, p: &Pkg<'_>, type_id: u8, global: &StringPool, table: &mut Table, limits: Limits) {
     let tid = r.u8(c + 8).unwrap_or(0);
     let flags = r.u8(c + 9).unwrap_or(0);
     let count = r.u32_le(c + 12).unwrap_or(0) as usize;
@@ -456,7 +473,7 @@ fn parse_type(r: &Reader<'_>, c: usize, ch: usize, sz: usize, p: &Pkg<'_>, globa
         }
         let esize = usize::from(r.u16_le(e).unwrap_or(0));
         let eflags = r.u16_le(e + 2).unwrap_or(0);
-        let id = (p.id << 24) | (u32::from(tid) << 16) | (idx & 0xffff);
+        let id = (p.id << 24) | (u32::from(type_id) << 16) | (idx & 0xffff);
         let mut entry = Entry {
             id: format!("{id:#010x}"),
             package: p.name.to_string(),

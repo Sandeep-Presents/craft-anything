@@ -976,7 +976,10 @@ fn android_method_show(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, T
                 .map(|i| InsnRow { offset: format!("{:04x}", i.offset), text: d.format_insn(i), opcode: format!("{:#04x}", i.opcode), units: i.units })
                 .collect();
             if !complete {
-                lims.push(Limitation::new("listing_incomplete", "Decoding stopped at an instruction that runs past the end of the code."));
+                lims.push(Limitation::new(
+                    "listing_incomplete",
+                    "The bytecode is truncated or exceeds an instruction or payload limit; some instructions or payload details may be omitted.",
+                ));
             }
             (rows, code.tries.clone(), Some((code.registers, code.ins, code.outs)), complete)
         }

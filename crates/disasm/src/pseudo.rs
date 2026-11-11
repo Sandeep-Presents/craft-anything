@@ -251,6 +251,26 @@ impl Lifter<'_> {
         // Win64 outgoing stack arguments stored in this block: rsp offset → (statement, value).
         let mut stack_args: BTreeMap<i64, (usize, String)> = BTreeMap::new();
         for (k, i) in insns.iter().enumerate() {
+            let exclusive_memory = self.mode == Mode::A64
+                && matches!(
+                    i.mnemonic.as_str(),
+                    "ldxr"
+                        | "ldxrb"
+                        | "ldxrh"
+                        | "ldaxr"
+                        | "ldaxrb"
+                        | "ldaxrh"
+                        | "ldxp"
+                        | "ldaxp"
+                        | "stxr"
+                        | "stxrb"
+                        | "stxrh"
+                        | "stlxr"
+                        | "stlxrb"
+                        | "stlxrh"
+                        | "stxp"
+                        | "stlxp"
+                );
             // A register read by a later instruction keeps its assignment.
             if !matches!(i.flow, Flow::Call { .. } | Flow::IndirectCall { .. }) {
                 for r in &i.reads {
@@ -258,7 +278,7 @@ impl Lifter<'_> {
                 }
             }
             // AArch64 page loads and import-slot loads are shown through what uses them.
-            if i.kind == Kind::Adrp || (i.kind == Kind::Load && i.refs.first().is_some_and(|r| self.prog.import_slots.contains_key(r))) {
+            if i.kind == Kind::Adrp || (!exclusive_memory && i.kind == Kind::Load && i.refs.first().is_some_and(|r| self.prog.import_slots.contains_key(r))) {
                 continue;
             }
             let d = i.ops.first().map(|o| self.op(o));
@@ -271,6 +291,11 @@ impl Lifter<'_> {
             };
             let frame_reg = |r: &str| matches!(canonical_reg(r).as_str(), "rsp" | "rbp" | "sp" | "x29" | "x30");
             match (i.kind, &i.flow) {
+                // Plain assignments would lose the exclusive monitor and conditional-store semantics.
+                _ if exclusive_memory => {
+                    self.asm_fallbacks += 1;
+                    stmt = Some(format!("__asm(\"{}\");", escape(&i.text())));
+                }
                 (_, Flow::Call { .. } | Flow::IndirectCall { .. }) => {
                     let name = self.call_name(i);
                     if self.calls.len() < 512 {

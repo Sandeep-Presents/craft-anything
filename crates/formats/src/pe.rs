@@ -16,6 +16,35 @@ const MAX_UNWIND: usize = 500_000;
 const MAX_IMPORT_ROWS: usize = 200_000;
 /// Most exported entries kept from one file.
 const MAX_EXPORTS: usize = 200_000;
+/// Most decoded name bytes retained by an import or export table by default.
+pub const DEFAULT_MAX_TABLE_TEXT_BYTES: usize = 64 << 20;
+
+struct TableTextBudget {
+    remaining: usize,
+    exhausted: bool,
+}
+
+impl TableTextBudget {
+    fn new(bytes: usize) -> Self {
+        Self { remaining: bytes, exhausted: false }
+    }
+
+    fn take(&mut self, bytes: usize) -> bool {
+        if self.exhausted || bytes > self.remaining {
+            self.exhausted = true;
+            return false;
+        }
+        self.remaining -= bytes;
+        true
+    }
+
+    fn finish(&self, truncated: &mut bool, warnings: &mut Vec<String>) {
+        if self.exhausted {
+            *truncated = true;
+            warnings.push("the table's retained name-byte budget was reached; later names were omitted".into());
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PeSection {
@@ -188,7 +217,7 @@ pub struct PeImport {
 /// Walk the import directory, retaining functions with representable IAT slot addresses.
 pub fn imports(data: &[u8], h: &PeHeaders) -> Vec<PeImport> {
     let mut table = ImportTable::default();
-    normal_imports(data, h, &mut table);
+    normal_imports(data, h, &mut table, &mut TableTextBudget::new(DEFAULT_MAX_TABLE_TEXT_BYTES));
     table.rows.into_iter().filter_map(|row| Some(PeImport { slot_va: row.slot_va?, library: row.library, name: row.name, ordinal: row.ordinal })).collect()
 }
 
@@ -264,7 +293,10 @@ fn thunk_target(r: &Reader<'_>, h: &PeHeaders, v: u64, name_rva: impl Fn(u64) ->
     (name, hint, None)
 }
 
-fn normal_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
+fn normal_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable, budget: &mut TableTextBudget) {
+    if budget.exhausted {
+        return;
+    }
     let r = Reader::new(data);
     let Some((rva, _)) = h.dir(1) else { return };
     let Some(start) = h.rva_to_offset(rva) else {
@@ -302,6 +334,9 @@ fn normal_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
                 break;
             }
             let (name, hint, ordinal) = thunk_target(&r, h, v, |v| u32::try_from(v & 0x7fff_ffff).ok());
+            if !budget.take(library.len().saturating_add(name.as_ref().map_or(0, String::len))) {
+                return;
+            }
             let slot_va = u64::from(ft).checked_add((i * thunk_size) as u64).and_then(|rva| h.image_va(rva));
             out.rows.push(ImportRow { library: library.clone(), kind: ImportKind::Normal, name, ordinal, hint, slot_va, bound });
         }
@@ -313,7 +348,10 @@ fn delay_rva(field: u32, rva_based: bool, image_base: u64) -> Option<u32> {
     if rva_based { Some(field) } else { u64::from(field).checked_sub(image_base).and_then(|v| u32::try_from(v).ok()) }
 }
 
-fn delay_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
+fn delay_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable, budget: &mut TableTextBudget) {
+    if budget.exhausted {
+        return;
+    }
     let r = Reader::new(data);
     let Some((rva, _)) = h.dir(13) else { return };
     let Some(start) = h.rva_to_offset(rva) else {
@@ -353,12 +391,18 @@ fn delay_imports(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
                 if rva_based { u32::try_from(v & 0x7fff_ffff).ok() } else { v.checked_sub(h.image_base).and_then(|x| u32::try_from(x).ok()) }
             });
             let slot_va = iat.and_then(|a| u64::from(a).checked_add((i * thunk_size) as u64)).and_then(|rva| h.image_va(rva));
+            if !budget.take(library.len().saturating_add(name.as_ref().map_or(0, String::len))) {
+                return;
+            }
             out.rows.push(ImportRow { library: library.clone(), kind: ImportKind::Delay, name, ordinal, hint, slot_va, bound: false });
         }
     }
 }
 
-fn bound_modules(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
+fn bound_modules(data: &[u8], h: &PeHeaders, out: &mut ImportTable, budget: &mut TableTextBudget) {
+    if budget.exhausted {
+        return;
+    }
     let r = Reader::new(data);
     let Some((rva, size)) = h.dir(11) else { return };
     let Some(start) = h.rva_to_offset(rva) else {
@@ -374,23 +418,42 @@ fn bound_modules(data: &[u8], h: &PeHeaders, out: &mut ImportTable) {
             break;
         }
         let name_of = |o: u16| start.checked_add(usize::from(o)).and_then(|p| r.cstr(p, 256)).unwrap_or_default();
+        let name = name_of(name_off);
+        if !budget.take(name.len()) {
+            return;
+        }
         let mut forwarders = Vec::new();
         for i in 0..usize::from(refs) {
             let Some(f) = (i + 1).checked_mul(8).and_then(|o| at.checked_add(o)) else { break };
             let Some(o) = r.u16_le(f.saturating_add(4)) else { break };
-            forwarders.push(name_of(o));
+            let forwarder = name_of(o);
+            if !budget.take(forwarder.len()) {
+                break;
+            }
+            forwarders.push(forwarder);
         }
-        out.bound_modules.push(BoundModule { name: name_of(name_off), timestamp: stamp, forwarders });
+        out.bound_modules.push(BoundModule { name, timestamp: stamp, forwarders });
+        if budget.exhausted {
+            return;
+        }
         pos = pos.saturating_add((usize::from(refs) + 1) * 8);
     }
 }
 
 /// Read the import, delay-load and bound import directories.
 pub fn import_table(data: &[u8], h: &PeHeaders) -> ImportTable {
+    import_table_with_text_limit(data, h, DEFAULT_MAX_TABLE_TEXT_BYTES)
+}
+
+/// Read imports with one retained-string byte budget shared by normal, delay and bound imports.
+/// The budget counts decoded UTF-8 bytes, including repeated library names and forwarders.
+pub fn import_table_with_text_limit(data: &[u8], h: &PeHeaders, max_text_bytes: usize) -> ImportTable {
     let mut out = ImportTable::default();
-    normal_imports(data, h, &mut out);
-    delay_imports(data, h, &mut out);
-    bound_modules(data, h, &mut out);
+    let mut budget = TableTextBudget::new(max_text_bytes);
+    normal_imports(data, h, &mut out, &mut budget);
+    delay_imports(data, h, &mut out, &mut budget);
+    bound_modules(data, h, &mut out, &mut budget);
+    budget.finish(&mut out.truncated, &mut out.warnings);
     out
 }
 
@@ -422,9 +485,15 @@ pub struct ExportTable {
 
 /// Read the export directory; `None` when the file has none.
 pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
+    export_table_with_text_limit(data, h, DEFAULT_MAX_TABLE_TEXT_BYTES)
+}
+
+/// Read exports within a decoded-name byte budget, counting the DLL name and every alias copy.
+pub fn export_table_with_text_limit(data: &[u8], h: &PeHeaders, max_text_bytes: usize) -> Option<ExportTable> {
     let (dir_rva, dir_size) = h.dir(0)?;
     let r = Reader::new(data);
     let mut out = ExportTable::default();
+    let mut budget = TableTextBudget::new(max_text_bytes);
     let Some(d) = h.rva_to_offset(dir_rva) else {
         out.warnings.push(format!("the export directory at RVA {dir_rva:#x} is outside the file"));
         out.truncated = true;
@@ -443,9 +512,14 @@ pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
     out.declared_functions = nfuncs;
     out.declared_names = nnames;
     out.dll_name = h.rva_to_offset(name_rva).and_then(|o| r.cstr(o, 512));
+    if !budget.take(out.dll_name.as_ref().map_or(0, String::len)) {
+        out.dll_name = None;
+        budget.finish(&mut out.truncated, &mut out.warnings);
+        return Some(out);
+    }
 
-    // Names first: each points at a slot of the function table.
-    let mut named: BTreeMap<u32, Vec<String>> = BTreeMap::new();
+    // Keep offsets, not decoded copies: aliases can all refer to the same long string.
+    let mut named: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
     if let (Some(nt), Some(ot)) = (h.rva_to_offset(names), h.rva_to_offset(ords)) {
         let mut bad_ordinal = 0u32;
         for i in 0..(nnames as usize).min(MAX_EXPORTS) {
@@ -458,8 +532,8 @@ pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
                 bad_ordinal = bad_ordinal.saturating_add(1);
                 continue;
             }
-            let Some(text) = h.rva_to_offset(n).and_then(|p| r.cstr(p, 1024)) else { continue };
-            named.entry(u32::from(o)).or_default().push(text);
+            let Some(offset) = h.rva_to_offset(n).filter(|&p| p <= data.len()) else { continue };
+            named.entry(u32::from(o)).or_default().push(offset);
         }
         if bad_ordinal > 0 {
             out.warnings.push(format!("{bad_ordinal} name(s) point past the function table"));
@@ -506,11 +580,22 @@ pub fn export_table(data: &[u8], h: &PeHeaders) -> Option<ExportTable> {
                 if list.len() > room {
                     out.truncated = true;
                 }
-                for name in list.into_iter().take(room) {
+                for offset in list.into_iter().take(room) {
+                    let Some(name) = r.cstr(offset, 1024) else { continue };
+                    if !budget.take(name.len().saturating_add(forwarder.as_ref().map_or(0, String::len))) {
+                        budget.finish(&mut out.truncated, &mut out.warnings);
+                        return Some(out);
+                    }
                     out.entries.push(PeExport { ordinal, name: Some(name), rva, forwarder: forwarder.clone() });
                 }
             }
-            None => out.entries.push(PeExport { ordinal, name: None, rva, forwarder }),
+            None => {
+                if !budget.take(forwarder.as_ref().map_or(0, String::len)) {
+                    budget.finish(&mut out.truncated, &mut out.warnings);
+                    return Some(out);
+                }
+                out.entries.push(PeExport { ordinal, name: None, rva, forwarder });
+            }
         }
     }
     Some(out)
@@ -565,7 +650,8 @@ pub fn enrich(data: &[u8], b: &mut Binary) {
     let r = Reader::new(data);
     // Imports (ours carry IAT slots and ordinals).
     let mut imps = ImportTable::default();
-    normal_imports(data, &h, &mut imps);
+    let mut import_budget = TableTextBudget::new(DEFAULT_MAX_TABLE_TEXT_BYTES);
+    normal_imports(data, &h, &mut imps, &mut import_budget);
     if !imps.rows.is_empty() {
         b.imports.clear();
         let mut libs = BTreeSet::new();
@@ -582,7 +668,7 @@ pub fn enrich(data: &[u8], b: &mut Binary) {
     b.warnings.extend(imps.warnings);
     // Delay-loaded imports: calls go through their own slots, so they get names too.
     let mut delayed = ImportTable::default();
-    delay_imports(data, &h, &mut delayed);
+    delay_imports(data, &h, &mut delayed, &mut import_budget);
     for i in delayed.rows {
         let name = i.name.clone().unwrap_or_else(|| format!("{}#{}", i.library.trim_end_matches(".dll").trim_end_matches(".DLL"), i.ordinal.unwrap_or(0)));
         if !b.libraries.contains(&i.library) {
@@ -593,6 +679,8 @@ pub fn enrich(data: &[u8], b: &mut Binary) {
         }
         b.imports.push(Import { name, library: Some(i.library), ordinal: i.ordinal, slot: i.slot_va });
     }
+    import_budget.finish(&mut delayed.truncated, &mut delayed.warnings);
+    b.warnings.extend(delayed.warnings);
     // Mitigations.
     let dc = h.dll_characteristics;
     b.mitigations.pie = Some(dc & 0x40 != 0);
@@ -945,13 +1033,19 @@ fn walk_version(r: &Reader<'_>, start: usize, end: usize, depth: u8, info: &mut 
         let value_bytes = if is_text { value_len * 2 } else { value_len };
         match key.as_str() {
             "VS_VERSION_INFO" => {
-                if r.u32_le(value_off) == Some(0xfeef_04bd) {
+                // The fixed record is 13 DWORDs. Adjacent children or bytes after this node
+                // cannot supply fields missing from its declared binary value.
+                let fixed = r
+                    .slice(value_off, value_len)
+                    .filter(|_| r.u16_le(pos + 4) == Some(0) && value_len >= 52 && value_off.checked_add(value_len).is_some_and(|end| end <= node_end))
+                    .map(Reader::new);
+                if let Some(fixed) = fixed.filter(|fixed| fixed.u32_le(0) == Some(0xfeef_04bd)) {
                     let v = |ms: Option<u32>, ls: Option<u32>| -> Option<String> {
                         let (ms, ls) = (ms?, ls?);
                         Some(format!("{}.{}.{}.{}", ms >> 16, ms & 0xffff, ls >> 16, ls & 0xffff))
                     };
-                    info.file_version = v(r.u32_le(value_off + 8), r.u32_le(value_off + 12));
-                    info.product_version = v(r.u32_le(value_off + 16), r.u32_le(value_off + 20));
+                    info.file_version = v(fixed.u32_le(8), fixed.u32_le(12));
+                    info.product_version = v(fixed.u32_le(16), fixed.u32_le(20));
                 }
                 walk_version(r, align4(value_off + value_bytes), node_end, depth + 1, info);
             }

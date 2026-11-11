@@ -82,6 +82,11 @@ pub fn release_for_magic(magic: u16) -> Option<&'static Release> {
     RELEASES.iter().find(|r| (r.first..=r.last).contains(&magic))
 }
 
+/// Header length for a known magic number; unknown releases keep the modern 16-byte form.
+pub(crate) fn header_size(magic: u16) -> usize {
+    release_for_magic(magic).map_or(16, |release| release.header)
+}
+
 /// The release line called this ("3.12").
 pub fn release_named(version: &str) -> Option<&'static Release> {
     RELEASES.iter().find(|r| r.version == version)
@@ -132,7 +137,7 @@ pub fn parse_header(data: &[u8]) -> Result<PycHeader, FormatError> {
     let magic = u16::from_le_bytes([b0, b1]);
     let release = release_for_magic(magic);
     // An unknown number is newer than our table, and every recent release uses the 16-byte form.
-    let size = release.map_or(16, |r| r.header);
+    let size = header_size(magic);
     if data.len() < size {
         return Err(short());
     }
@@ -531,12 +536,15 @@ impl Walk {
     fn string(&mut self, s: &str) -> Option<String> {
         let keep = (0..=MAX_STRING.min(s.len())).rev().find(|i| s.is_char_boundary(*i)).unwrap_or(0);
         let piece = s.get(..keep).unwrap_or("");
-        if self.text.saturating_add(piece.len()) > MAX_TEXT {
+        let shortened = keep < s.len();
+        self.cut |= shortened;
+        let bytes = piece.len() + if shortened { '…'.len_utf8() } else { 0 };
+        if self.text.saturating_add(bytes) > MAX_TEXT {
             self.cut = true;
             return None;
         }
-        self.text += piece.len();
-        Some(if keep < s.len() { format!("{piece}…") } else { piece.to_string() })
+        self.text += bytes;
+        Some(if shortened { format!("{piece}…") } else { piece.to_string() })
     }
 
     fn strings_in(&mut self, o: &Object, out: &mut Vec<String>, children: &mut Vec<CodeObject>) {
@@ -644,10 +652,11 @@ pub fn read_pyc(data: &[u8]) -> Result<PycFile, FormatError> {
 
 /// A `.pyc` around bare marshalled code: the magic number and a timestamp-style header of zeros.
 pub fn wrap_marshal(magic: u16, marshal: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(marshal.len().saturating_add(16));
+    let header = header_size(magic);
+    let mut out = Vec::with_capacity(marshal.len().saturating_add(header));
     out.extend(magic.to_le_bytes());
     out.extend([0x0d, 0x0a]);
-    out.extend([0u8; 12]);
+    out.resize(header, 0);
     out.extend(marshal);
     out
 }
@@ -944,6 +953,44 @@ mod tests {
         assert!(read_value(&[0x7e], None).is_err());
     }
 
+    #[test]
+    fn shortened_constants_report_a_partial_code_inventory() {
+        for text in ["x".repeat(MAX_STRING + 1), "界".repeat(MAX_STRING / 3 + 1)] {
+            let body = code_311("module", "module", "app.py", 1, &[], &[&text], &[]);
+            let read = read_code(&body, CodeLayout::Py311).unwrap();
+            assert!(read.cut_short);
+            let kept = &read.root.strings[0];
+            assert!(kept.ends_with('…'));
+            assert!(!kept.contains('\u{fffd}'));
+        }
+    }
+
+    #[test]
+    fn shortened_name_fields_report_a_partial_code_inventory() {
+        let long = "n".repeat(MAX_STRING + 1);
+        for (name, file, qualname) in [(&long[..], "app.py", "module"), ("module", &long[..], "module"), ("module", "app.py", &long[..])] {
+            let body = code_311(name, qualname, file, 1, &[], &[], &[]);
+            assert!(read_code(&body, CodeLayout::Py311).unwrap().cut_short);
+        }
+        let short = read_code(&sample_311(), CodeLayout::Py311).unwrap();
+        assert!(!short.cut_short);
+    }
+
+    #[test]
+    fn retained_text_budget_includes_the_truncation_marker() {
+        let long = "x".repeat(MAX_STRING + 1);
+        let mut too_small = Walk { steps: MAX_WALK, text: MAX_TEXT - MAX_STRING, cut: false };
+        assert!(too_small.string(&long).is_none());
+        assert!(too_small.cut);
+        let mut exact = Walk { steps: MAX_WALK, text: MAX_TEXT - MAX_STRING - '…'.len_utf8(), cut: false };
+        assert!(exact.string(&long).unwrap().ends_with('…'));
+        assert_eq!(exact.text, MAX_TEXT);
+        assert!(exact.cut);
+        let mut whole = Walk { steps: MAX_WALK, text: MAX_TEXT - 2, cut: false };
+        assert_eq!(whole.string("ok").as_deref(), Some("ok"));
+        assert_eq!(whole.text, MAX_TEXT);
+        assert!(!whole.cut);
+    }
     #[test]
     fn long_constants_are_cut_on_a_character_boundary() {
         let long = "é".repeat(MAX_STRING);

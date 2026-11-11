@@ -94,7 +94,8 @@ impl KeyedArchive {
         self.class_name(idx).map(str::to_owned)
     }
 
-    fn class_name(&self, idx: u64) -> Option<&str> {
+    /// The class name borrowed from its shared class object, without copying the text.
+    pub fn class_name(&self, idx: u64) -> Option<&str> {
         let o = self.object(idx)?;
         let c = o.get("$class").and_then(uid_of)?;
         self.object(c)?.get("$classname").and_then(Value::as_str)
@@ -102,9 +103,16 @@ impl KeyedArchive {
 
     /// The table of objects.
     pub fn rows(&self) -> Vec<ObjectRow> {
+        self.rows_page(0, usize::MAX)
+    }
+
+    /// Object rows in the requested range. Unrequested rows do not copy names or collect edges.
+    pub fn rows_page(&self, offset: usize, limit: usize) -> Vec<ObjectRow> {
         self.objects
             .iter()
             .enumerate()
+            .skip(offset)
+            .take(limit)
             .map(|(i, o)| {
                 let mut references = Vec::new();
                 collect_uids(o, &mut references, 0);

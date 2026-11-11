@@ -264,27 +264,25 @@ impl<'m, 'a> Names<'m, 'a> {
         }
     }
 
-    fn tdor_encoded(&self, c: &mut Cur<'_>, g: &GenCtx<'_>, depth: u32) -> Option<String> {
+    fn tdor_encoded(&self, c: &mut Cur<'_>, g: &GenCtx<'_>, depth: u32, allow_type_spec: bool) -> Option<String> {
         let v = c.cu32()?;
         let table = match v & 3 {
             0 => t::TYPE_DEF,
             1 => t::TYPE_REF,
-            2 => t::TYPE_SPEC,
+            2 if allow_type_spec => t::TYPE_SPEC,
             _ => return None,
         };
         Some(self.type_name(table, v >> 2, g, depth))
     }
 
-    fn skip_mods(&self, c: &mut Cur<'_>, g: &GenCtx<'_>, depth: u32) -> Option<Vec<String>> {
-        let mut mods = Vec::new();
+    fn skip_mods(&self, c: &mut Cur<'_>, g: &GenCtx<'_>, depth: u32) -> Option<bool> {
+        let mut is_volatile = false;
         while matches!(c.peek(), Some(0x1f | 0x20)) {
             let req = c.u8()? == 0x1f;
-            let m = self.tdor_encoded(c, g, depth)?;
-            if mods.len() < 8 {
-                mods.push(format!("{}({m})", if req { "modreq" } else { "modopt" }));
-            }
+            let m = self.tdor_encoded(c, g, depth, true)?;
+            is_volatile |= req && m == "System.Runtime.CompilerServices.IsVolatile";
         }
-        Some(mods)
+        Some(is_volatile)
     }
 
     /// One type from a signature.
@@ -292,7 +290,7 @@ impl<'m, 'a> Names<'m, 'a> {
         if depth > MAX_DEPTH {
             return None;
         }
-        let mods = self.skip_mods(c, g, depth)?;
+        let is_volatile = self.skip_mods(c, g, depth)?;
         let b = c.u8()?;
         let s = match b {
             0x01 => "void".into(),
@@ -311,7 +309,8 @@ impl<'m, 'a> Names<'m, 'a> {
             0x0e => "string".into(),
             0x0f => format!("{}*", self.ty(c, g, depth + 1)?),
             0x10 => format!("ref {}", self.ty(c, g, depth + 1)?),
-            0x11 | 0x12 => self.tdor_encoded(c, g, depth + 1)?,
+            // CLI CLASS and VALUETYPE name definitions or references, never another signature.
+            0x11 | 0x12 => self.tdor_encoded(c, g, depth + 1, false)?,
             0x13 => {
                 let n = c.cu32()?;
                 g.type_params.get(n as usize).cloned().unwrap_or_else(|| format!("!{n}"))
@@ -347,7 +346,7 @@ impl<'m, 'a> Names<'m, 'a> {
                 if kind != 0x11 && kind != 0x12 {
                     return None;
                 }
-                let base = self.tdor_encoded(c, g, depth + 1)?;
+                let base = self.tdor_encoded(c, g, depth + 1, false)?;
                 let n = c.cu32()?;
                 if n == 0 || n > 64 {
                     return None;
@@ -381,7 +380,7 @@ impl<'m, 'a> Names<'m, 'a> {
             0x45 => format!("pinned {}", self.ty(c, g, depth + 1)?),
             _ => return None,
         };
-        Some(if mods.iter().any(|m| m.contains("IsVolatile")) { format!("volatile {s}") } else { s })
+        Some(if is_volatile { format!("volatile {s}") } else { s })
     }
 
     fn method_sig_inner(&self, c: &mut Cur<'_>, g: &GenCtx<'_>, depth: u32) -> Option<MethodSig> {

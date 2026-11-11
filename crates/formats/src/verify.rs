@@ -53,8 +53,122 @@ impl Digest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum SigScheme {
     RsaPkcs1v15(Digest),
+    /// Matching message/MGF1 digests and a digest-sized salt (the APK PSS schemes).
     RsaPss(Digest),
     Ecdsa(Digest),
+}
+
+/// Parameters needed to verify an RSASSA-PSS signature, including non-default salt lengths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PssParameters {
+    digest: Digest,
+    mask_digest: Digest,
+    salt_len: usize,
+}
+
+impl PssParameters {
+    fn for_digest(digest: Digest) -> Self {
+        let salt_len = match digest {
+            Digest::Sha1 => 20,
+            Digest::Sha256 => 32,
+            Digest::Sha384 => 48,
+            Digest::Sha512 => 64,
+        };
+        Self { digest, mask_digest: digest, salt_len }
+    }
+
+    pub(crate) fn fixed_scheme(self, digest: Digest) -> Option<SigScheme> {
+        (self == Self::for_digest(digest)).then_some(SigScheme::RsaPss(digest))
+    }
+}
+
+// AlgorithmIdentifier has one OID and at most one complete parameter value.
+fn algorithm_parts(data: &[u8]) -> Option<(String, Option<&[u8]>)> {
+    let root = der::read(data, 0)?;
+    if root.tag != 0x30 || root.end() != data.len() {
+        return None;
+    }
+    let oid = der::read(data, root.content)?;
+    if oid.tag != 0x06 {
+        return None;
+    }
+    let params = if oid.end() == root.end() {
+        None
+    } else {
+        let params = der::read(data, oid.end())?;
+        if params.end() != root.end() {
+            return None;
+        }
+        Some(params.whole(data)?)
+    };
+    Some((der::oid(oid.bytes(data)?), params))
+}
+
+fn pss_digest(data: &[u8]) -> Result<Digest, &'static str> {
+    let (oid, params) = algorithm_parts(data).ok_or("malformed RSASSA-PSS digest algorithm")?;
+    if params.is_some_and(|p| p != [0x05, 0x00]) {
+        return Err("RSASSA-PSS digest parameters are neither absent nor NULL");
+    }
+    pkcs7::digest_from_oid(&oid).ok_or("RSASSA-PSS digest algorithm is not checked")
+}
+
+fn pss_integer(data: &[u8]) -> Option<usize> {
+    let integer = der::read(data, 0)?;
+    if integer.tag != 0x02 || integer.end() != data.len() {
+        return None;
+    }
+    let bytes = integer.bytes(data)?;
+    let first = *bytes.first()?;
+    if first & 0x80 != 0 || (bytes.len() > 1 && first == 0 && bytes.get(1).is_some_and(|b| b & 0x80 == 0)) {
+        return None;
+    }
+    bytes.iter().try_fold(0usize, |n, b| n.checked_mul(256)?.checked_add(usize::from(*b)))
+}
+
+fn pss_parameter_sequence(data: &[u8]) -> Result<PssParameters, &'static str> {
+    let root = der::read(data, 0).ok_or("malformed RSASSA-PSS parameters")?;
+    if root.tag != 0x30 || root.end() != data.len() {
+        return Err("RSASSA-PSS parameters are not a complete sequence");
+    }
+    let mut params = PssParameters::for_digest(Digest::Sha1);
+    let mut pos = root.content;
+    let mut previous_tag = 0x9f;
+    while pos < root.end() {
+        let field = der::read(data, pos).ok_or("truncated RSASSA-PSS parameter")?;
+        if !(0xa0..=0xa3).contains(&field.tag) || field.tag <= previous_tag {
+            return Err("unknown, repeated or out-of-order RSASSA-PSS parameter");
+        }
+        let value = field.bytes(data).ok_or("truncated RSASSA-PSS parameter")?;
+        match field.tag {
+            0xa0 => params.digest = pss_digest(value)?,
+            0xa1 => {
+                let (oid, mask) = algorithm_parts(value).ok_or("malformed RSASSA-PSS mask algorithm")?;
+                if oid != "1.2.840.113549.1.1.8" {
+                    return Err("RSASSA-PSS mask algorithm is not MGF1");
+                }
+                params.mask_digest = pss_digest(mask.ok_or("RSASSA-PSS MGF1 has no digest parameters")?)?;
+            }
+            0xa2 => params.salt_len = pss_integer(value).ok_or("invalid RSASSA-PSS salt length")?,
+            0xa3 => {
+                if pss_integer(value) != Some(1) {
+                    return Err("RSASSA-PSS trailer field is not 1");
+                }
+            }
+            _ => return Err("unknown RSASSA-PSS parameter"),
+        }
+        previous_tag = field.tag;
+        pos = field.end();
+    }
+    Ok(params)
+}
+
+/// Signature identifiers require a parameter sequence; defaults apply inside that sequence.
+pub(crate) fn pss_parameters(algorithm: &[u8]) -> Result<PssParameters, &'static str> {
+    let (oid, params) = algorithm_parts(algorithm).ok_or("malformed RSASSA-PSS signature algorithm")?;
+    if oid != RSA_PSS {
+        return Err("signature algorithm is not RSASSA-PSS");
+    }
+    pss_parameter_sequence(params.ok_or("RSASSA-PSS signature parameters are missing")?)
 }
 
 /// Hash several byte ranges as one message, without copying them together.
@@ -81,8 +195,6 @@ pub fn scheme_from_oid(oid: &str) -> Option<SigScheme> {
         "1.2.840.113549.1.1.11" => SigScheme::RsaPkcs1v15(Digest::Sha256),
         "1.2.840.113549.1.1.12" => SigScheme::RsaPkcs1v15(Digest::Sha384),
         "1.2.840.113549.1.1.13" => SigScheme::RsaPkcs1v15(Digest::Sha512),
-        // RSASSA-PSS: the hash lives in the parameters; code-signing uses SHA-256 overwhelmingly.
-        "1.2.840.113549.1.1.10" => SigScheme::RsaPss(Digest::Sha256),
         "1.2.840.10045.4.3.2" => SigScheme::Ecdsa(Digest::Sha256),
         "1.2.840.10045.4.3.3" => SigScheme::Ecdsa(Digest::Sha384),
         "1.2.840.10045.4.3.4" => SigScheme::Ecdsa(Digest::Sha512),
@@ -132,12 +244,7 @@ pub fn verify_signature(spki: &[u8], scheme: SigScheme, msg: &[u8], sig: &[u8]) 
             }
             rsa_pkcs1v15(key, d, msg, sig)
         }
-        SigScheme::RsaPss(d) => {
-            if alg_oid != RSA_ENCRYPTION && alg_oid != RSA_PSS {
-                return Verified::unsupported(format!("RSASSA-PSS signature but key is {alg_oid}"));
-            }
-            rsa_pss(key, d, msg, sig)
-        }
+        SigScheme::RsaPss(d) => verify_pss_signature(spki, PssParameters::for_digest(d), msg, sig),
         SigScheme::Ecdsa(d) => {
             if alg_oid != EC_PUBLIC_KEY {
                 return Verified::unsupported(format!("ECDSA signature but key is {alg_oid}"));
@@ -180,13 +287,46 @@ fn rsa_pkcs1v15(pkcs1_der: &[u8], d: Digest, msg: &[u8], sig: &[u8]) -> Verified
     if ok { Verified::Valid } else { Verified::Invalid }
 }
 
-fn rsa_pss(pkcs1_der: &[u8], d: Digest, msg: &[u8], sig: &[u8]) -> Verified {
+fn verify_pss_signature(spki: &[u8], params: PssParameters, msg: &[u8], sig: &[u8]) -> Verified {
+    let Some((oid, key)) = der::spki_parts(spki) else {
+        return Verified::unsupported("public key could not be parsed");
+    };
+    if oid != RSA_ENCRYPTION && oid != RSA_PSS {
+        return Verified::unsupported(format!("RSASSA-PSS signature but key is {oid}"));
+    }
+    if oid == RSA_PSS {
+        let algorithm =
+            der::read(spki, 0).and_then(|root| der::read(spki.get(..root.end())?, root.content)).and_then(|alg| alg.whole(spki)).and_then(algorithm_parts);
+        let Some((_, restriction)) = algorithm else {
+            return Verified::unsupported("malformed RSASSA-PSS public-key algorithm");
+        };
+        if let Some(restriction) = restriction {
+            let key_params = match pss_parameter_sequence(restriction) {
+                Ok(p) => p,
+                Err(reason) => return Verified::unsupported(reason),
+            };
+            if key_params.digest != params.digest || key_params.mask_digest != params.mask_digest || params.salt_len < key_params.salt_len {
+                return Verified::Invalid;
+            }
+        }
+    }
+    if params.digest != params.mask_digest {
+        return Verified::unsupported("RSASSA-PSS with different message and MGF1 digests is not checked");
+    }
+    rsa_pss(key, params, msg, sig)
+}
+
+fn rsa_pss(pkcs1_der: &[u8], params: PssParameters, msg: &[u8], sig: &[u8]) -> Verified {
     let Some(key) = rsa_key(pkcs1_der) else { return Verified::Invalid };
+    // Bound attacker-controlled salt lengths before the verifier's padding-size arithmetic.
+    if params.salt_len > rsa::traits::PublicKeyParts::size(&key) {
+        return Verified::Invalid;
+    }
     let Ok(signature) = rsa::pss::Signature::try_from(sig) else { return Verified::Invalid };
-    let ok = match d {
-        Digest::Sha256 => rsa::pss::VerifyingKey::<sha2::Sha256>::new(key).verify(msg, &signature).is_ok(),
-        Digest::Sha384 => rsa::pss::VerifyingKey::<sha2::Sha384>::new(key).verify(msg, &signature).is_ok(),
-        Digest::Sha512 => rsa::pss::VerifyingKey::<sha2::Sha512>::new(key).verify(msg, &signature).is_ok(),
+    let ok = match params.digest {
+        Digest::Sha256 => rsa::pss::VerifyingKey::<sha2::Sha256>::new_with_salt_len(key, params.salt_len).verify(msg, &signature).is_ok(),
+        Digest::Sha384 => rsa::pss::VerifyingKey::<sha2::Sha384>::new_with_salt_len(key, params.salt_len).verify(msg, &signature).is_ok(),
+        Digest::Sha512 => rsa::pss::VerifyingKey::<sha2::Sha512>::new_with_salt_len(key, params.salt_len).verify(msg, &signature).is_ok(),
         Digest::Sha1 => return Verified::unsupported("RSASSA-PSS with SHA-1 is not checked"),
     };
     if ok { Verified::Valid } else { Verified::Invalid }
@@ -262,6 +402,16 @@ fn verify_cert_by(child: &[u8], issuer: &[u8]) -> Verified {
     let (Some(c), Some(i)) = (der::certificate_parts(child), der::certificate_parts(issuer)) else {
         return Verified::unsupported("certificate could not be parsed");
     };
+    if c.signature_algorithm == RSA_PSS {
+        let (outer, signed) = match (pss_parameters(c.signature_algorithm_der), pss_parameters(c.signed_signature_algorithm_der)) {
+            (Ok(outer), Ok(signed)) => (outer, signed),
+            (Err(reason), _) | (_, Err(reason)) => return Verified::unsupported(reason),
+        };
+        if outer != signed {
+            return Verified::Invalid;
+        }
+        return verify_pss_signature(i.spki, outer, c.tbs, c.signature);
+    }
     match scheme_from_oid(&c.signature_algorithm) {
         Some(scheme) => verify_signature(i.spki, scheme, c.tbs, c.signature),
         None => Verified::unsupported(format!("signature algorithm {} is not checked", c.signature_algorithm)),
@@ -378,33 +528,55 @@ pub struct MachoCms {
     pub notes: Vec<String>,
 }
 
+fn verify_cms_signature(sd: &pkcs7::SignedData, spki: &[u8], message: &[u8]) -> Verified {
+    if sd.signature_algorithm == RSA_PSS {
+        let params = match sd.pss_parameters {
+            Some(Ok(params)) => params,
+            Some(Err(reason)) => return Verified::unsupported(reason),
+            None => return Verified::unsupported("RSASSA-PSS signature parameters are missing"),
+        };
+        if sd.digest != Some(params.digest) {
+            return Verified::Invalid;
+        }
+        return verify_pss_signature(spki, params, message, &sd.signature);
+    }
+    match sd.scheme() {
+        Some(scheme) => verify_signature(spki, scheme, message, &sd.signature),
+        None => Verified::unsupported(format!("signature algorithm {} is not checked", sd.signature_algorithm)),
+    }
+}
+
 /// Verify a detached CMS `SignedData` (the Mach-O CMS blob) against the primary CodeDirectory.
 pub fn verify_macho_cms(cms_der: &[u8], code_directory: &[u8]) -> Option<MachoCms> {
     let sd = pkcs7::parse_signed_data(cms_der)?;
     let mut notes = sd.signer_identity_notes.clone();
+    if let Some(reason) = sd.signed_attrs_error {
+        notes.push(reason.into());
+    }
     let signer = sd.signer_cert().map(<[u8]>::to_vec);
     let info = signer.as_deref().and_then(der::certificate);
     // Does the signed messageDigest attribute cover this CodeDirectory?
     let binds_code_directory = match (&sd.message_digest, sd.digest) {
         (Some(md), Some(d)) => hexs(&d.hash(code_directory)).eq_ignore_ascii_case(md),
         _ => {
-            notes.push("no messageDigest signed attribute; cannot tie the signature to this CodeDirectory".into());
+            if sd.signed_attrs_error.is_none() {
+                notes.push("no messageDigest signed attribute; cannot tie the signature to this CodeDirectory".into());
+            }
             false
         }
     };
     // Verify the signer's signature over the (re-encoded) signed attributes.
-    let signature_valid = match (sd.scheme(), sd.signed_attrs_reencoded.as_deref(), signer.as_deref()) {
-        (Some(scheme), Some(attrs), Some(cert)) => match der::certificate_spki(cert) {
-            Some(spki) => verify_signature(spki, scheme, attrs, &sd.signature),
+    let signature_valid = match (sd.signed_attrs_reencoded.as_deref(), signer.as_deref()) {
+        (Some(attrs), Some(cert)) => match der::certificate_spki(cert) {
+            Some(spki) => verify_cms_signature(&sd, spki, attrs),
             None => Verified::unsupported("signer public key could not be read"),
         },
-        (None, _, _) => Verified::unsupported(format!("signature algorithm {} is not checked", sd.signature_algorithm)),
-        (_, None, _) => Verified::unsupported("CMS carries no signed attributes; this detached form is not checked"),
-        (_, _, None) => Verified::unsupported("no signer certificate"),
+        (None, _) => Verified::unsupported("CMS carries no signed attributes; this detached form is not checked"),
+        (_, None) => Verified::unsupported("no signer certificate"),
     };
     let certs: Vec<&[u8]> = ordered_certs(&sd);
     let chain = verify_chain(&certs);
-    let authenticated = signature_valid.is_valid() && binds_code_directory;
+    let authenticated = sd.signed_attrs_error.is_none() && signature_valid.is_valid() && binds_code_directory;
     Some(MachoCms {
         signature_valid,
         binds_code_directory,
@@ -613,11 +785,15 @@ pub struct Pkcs7Signature {
 pub fn verify_pkcs7_detached(content: &[u8], pkcs7_der: &[u8]) -> Option<Pkcs7Signature> {
     let sd = pkcs7::parse_signed_data(pkcs7_der)?;
     let mut notes = sd.signer_identity_notes.clone();
+    if let Some(reason) = sd.signed_attrs_error {
+        notes.push(reason.into());
+    }
     let signer = sd.signer_cert().map(<[u8]>::to_vec);
     let cert_sha = signer.as_deref().map(sha256_hex);
     let subject = signer.as_deref().and_then(der::certificate).map(|c| c.subject);
-    let signature_valid = match (sd.scheme(), signer.as_deref()) {
-        (Some(scheme), Some(cert)) => {
+    let signature_valid = match (sd.signed_attrs_error, signer.as_deref()) {
+        (Some(_), _) => Verified::Invalid,
+        (None, Some(cert)) => {
             let Some(spki) = der::certificate_spki(cert) else {
                 return Some(Pkcs7Signature {
                     signature_valid: Verified::unsupported("signer key unreadable"),
@@ -637,7 +813,7 @@ pub fn verify_pkcs7_detached(content: &[u8], pkcs7_der: &[u8]) -> Option<Pkcs7Si
                     if !binds {
                         notes.push("the signed messageDigest does not match the signature file".into());
                     }
-                    let v = verify_signature(spki, scheme, attrs, &sd.signature);
+                    let v = verify_cms_signature(&sd, spki, attrs);
                     if v.is_valid() && binds {
                         Verified::Valid
                     } else if v.is_valid() {
@@ -647,11 +823,10 @@ pub fn verify_pkcs7_detached(content: &[u8], pkcs7_der: &[u8]) -> Option<Pkcs7Si
                     }
                 }
                 // Classic JAR signing: the signature is over the raw .SF content.
-                None => verify_signature(spki, scheme, content, &sd.signature),
+                None => verify_cms_signature(&sd, spki, content),
             }
         }
-        (None, _) => Verified::unsupported(format!("signature algorithm {} is not checked", sd.signature_algorithm)),
-        (_, None) => Verified::unsupported("no signer certificate"),
+        (None, None) => Verified::unsupported("no signer certificate"),
     };
     Some(Pkcs7Signature { signature_valid, signer_subject: subject, certificate_sha256: cert_sha, chain: verify_chain(&ordered_certs(&sd)), notes })
 }
@@ -729,10 +904,12 @@ pub fn base64(data: &[u8]) -> String {
     out
 }
 
-/// The digest (and its algorithm) a JAR section records, trying SHA-256 then SHA-1.
+const JAR_DIGESTS: [(Digest, &str); 3] = [(Digest::Sha256, "SHA-256-Digest"), (Digest::Sha512, "SHA-512-Digest"), (Digest::Sha1, "SHA1-Digest")];
+
+/// The digest (and its algorithm) a JAR section records, in supported preference order.
 fn section_digest(section: &JarSection, suffix: &str) -> Option<(Digest, String)> {
-    for (d, prefix) in [(Digest::Sha256, "SHA-256"), (Digest::Sha512, "SHA-512"), (Digest::Sha1, "SHA1")] {
-        if let Some(v) = attr(section, &format!("{prefix}-Digest{suffix}")) {
+    for (d, key) in JAR_DIGESTS {
+        if let Some(v) = attr(section, &format!("{key}{suffix}")) {
             return Some((d, v.to_string()));
         }
     }
@@ -762,15 +939,26 @@ pub fn verify_jar_integrity(manifest_mf: &[u8], sf: &[u8], mut read_entry: impl 
         notes.push("the signature file records no whole-manifest digest; per-file digests are still checked".into());
     }
     let sections = parse_jar_sections(manifest_mf);
+    // Repeated sections describe one entry. Only attributes present in a later section replace
+    // earlier values; preserve the other algorithms before selecting a preferred digest.
+    let mut entries: std::collections::BTreeMap<&str, [Option<&str>; 3]> = std::collections::BTreeMap::new();
+    for section in &sections {
+        let Some(name) = section.name.as_deref() else { continue };
+        let digests = entries.entry(name).or_insert([None; 3]);
+        for (slot, (_, key)) in digests.iter_mut().zip(JAR_DIGESTS) {
+            if let Some(value) = attr(section, key) {
+                *slot = Some(value);
+            }
+        }
+    }
     let mut files_listed = 0;
     let mut files_matched = 0;
     let mut files_mismatched = 0;
     let mut files_unchecked = 0;
     let mut mismatched_names = Vec::new();
-    for s in sections.iter().filter(|s| s.name.is_some()) {
-        let Some(name) = &s.name else { continue };
+    for (name, digests) in entries {
         files_listed += 1;
-        let Some((d, want)) = section_digest(s, "") else {
+        let Some((d, want)) = digests.into_iter().zip(JAR_DIGESTS).find_map(|(want, (digest, _))| want.map(|want| (digest, want))) else {
             files_unchecked += 1;
             continue;
         };
@@ -781,7 +969,7 @@ pub fn verify_jar_integrity(manifest_mf: &[u8], sf: &[u8], mut read_entry: impl 
                 } else {
                     files_mismatched += 1;
                     if mismatched_names.len() < 32 {
-                        mismatched_names.push(name.clone());
+                        mismatched_names.push(name.to_string());
                     }
                 }
             }

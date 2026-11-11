@@ -315,6 +315,9 @@ pub struct CertParts<'a> {
     pub tbs: &'a [u8],
     /// The `signatureAlgorithm` OID (dotted).
     pub signature_algorithm: String,
+    /// The outer and signed AlgorithmIdentifier values, including their parameters.
+    pub signature_algorithm_der: &'a [u8],
+    pub signed_signature_algorithm_der: &'a [u8],
     /// The `signatureValue` BIT STRING contents (leading unused-bits byte stripped).
     pub signature: &'a [u8],
     /// The `subjectPublicKeyInfo` SEQUENCE (header included).
@@ -359,7 +362,9 @@ pub fn certificate_parts(data: &[u8]) -> Option<CertParts<'_>> {
     let issuer = f.get(i + 2).filter(|t| t.tag == 0x30).and_then(|t| t.whole(data))?;
     let subject = f.get(i + 4).filter(|t| t.tag == 0x30).and_then(|t| t.whole(data))?;
     let spki = f.get(i + 5).filter(|t| t.tag == 0x30).and_then(|t| t.whole(data))?;
-    Some(CertParts { tbs, signature_algorithm, signature, spki, issuer, subject, serial })
+    let signature_algorithm_der = sig_alg_seq.whole(data)?;
+    let signed_signature_algorithm_der = f.get(i + 1)?.whole(data)?;
+    Some(CertParts { tbs, signature_algorithm, signature_algorithm_der, signed_signature_algorithm_der, signature, spki, issuer, subject, serial })
 }
 
 /// The `subjectPublicKeyInfo` SEQUENCE of a certificate (header included).

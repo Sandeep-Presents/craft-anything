@@ -255,6 +255,7 @@ fn vlq(bytes: &[u8], pos: &mut usize) -> Option<i64> {
     })
 }
 
+/// Decode mapping deltas, rejecting fields that cannot name a declared source or symbol.
 fn decode_mappings(m: &str, map: &mut SourceMap, budget: &mut usize, line_budget: &mut usize, line_limit: usize) -> Result<(), SourceMapError> {
     let bytes = m.as_bytes();
     let (mut src, mut ol, mut oc, mut name) = (0i64, 0i64, 0i64, 0i64);
@@ -299,7 +300,11 @@ fn decode_mappings(m: &str, map: &mut SourceMap, budget: &mut usize, line_budget
                 name += vlq(bytes, &mut pos).ok_or(SourceMapError::BadMappings(count))?;
                 n = Some(to_u32(name, count)?);
             }
-            seg.original = Some((to_u32(src, count)?, to_u32(ol, count)?, to_u32(oc, count)?, n));
+            let source = to_u32(src, count)?;
+            if source as usize >= map.sources.len() || n.is_some_and(|index| index as usize >= map.names.len()) {
+                return Err(SourceMapError::BadMappings(count));
+            }
+            seg.original = Some((source, to_u32(ol, count)?, to_u32(oc, count)?, n));
         }
         if !matches!(bytes.get(pos), None | Some(b',') | Some(b';')) {
             return Err(SourceMapError::BadMappings(count));
@@ -373,6 +378,17 @@ mod tests {
             assert_eq!(find_source_mapping_url(&format!("{prefix}https://example.test/maps/*/")), Some("https://example.test/maps/*/".into()));
         }
         assert_eq!(find_source_mapping_url("/*# sourceMappingURL=map.json */"), Some("map.json".into()));
+    }
+
+    /// Mappings reject undeclared indices while retaining null source slots.
+    #[test]
+    fn mapping_indices_must_refer_to_declared_entries() {
+        for mappings in ["ACAA", "AAAAC"] {
+            let json = serde_json::json!({"version":3,"sources":["source.js"],"names":["name"],"mappings":mappings});
+            assert!(matches!(parse(json.to_string().as_bytes(), Limits::default()), Err(SourceMapError::BadMappings(1))));
+        }
+        let valid = br#"{"version":3,"sources":[null],"names":["name"],"mappings":"AAAAA"}"#;
+        assert!(parse(valid, Limits::default()).is_ok());
     }
 
     #[test]
