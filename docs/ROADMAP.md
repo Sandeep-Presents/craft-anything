@@ -336,8 +336,18 @@ Every round spends the person's money or quota. One that can't do anything shoul
 - [x] A builder step on an API backend stops after 25 failed build commands in a row (none
       succeeding between), says so and keeps the project (`MAX_FAILED_BUILDS` in `agent.rs`, #399:
       9.4M tokens in 19 minutes of the first stage, never compiled). Try again carries on
+- [ ] An unreadable `usage.json` reads as all zeros (`ProjectUsage::load` in `workspace.rs`), so
+      the cost shown can be $0 for a build that spent money. Say the count is unknown instead, as
+      R2.2's ACP line asks for agents' turns
+- [ ] Show what the last run used next to Try again. `usage.json` keeps project totals only
+      (time, tokens, `cost_usd`, `api_billed_usd`); the activity log has each turn's tokens but
+      no cost, since a resumed agent's figure can't be tied to one turn (`activity.rs`). Show
+      the run's tokens, and a cost only where it can be attributed
 - [ ] **decision** Whether a build gets a token or cost limit of its own, beyond rounds and that
-      stop (#399): a model that changes code without ever running a build isn't caught by it
+      stop (#399): a model that changes code without ever running a build isn't caught by it.
+      One shape: price each builder turn before it runs, as asset calls already are
+      (`AssetProvider::estimate` against the project's asset budget, $5 by default), and stop at
+      a limit the person sets. #503's spending controls wait on R5.2's wide-PR decision too
 - [ ] Check live that the stop fires on a real API-backend build and the message reads well. It
       fired on a local Ollama build (the same built-in loop) after two turns that changed nothing
       in `app/` ("The build stopped after two builder turns changed no files in app/…"); an
