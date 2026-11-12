@@ -609,7 +609,7 @@ fn a64_canon(n: u16, sp: bool) -> Option<String> {
 }
 
 fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
-    use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
+    use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand, ShiftStyle};
     let word = bytes.get(..4)?;
     let mut reader = U8Reader::new(word);
     let inst = InstDecoder::default().decode(&mut reader).ok()?;
@@ -881,6 +881,22 @@ fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
         Kind::Mov
     } else {
         kind
+    };
+    // `mov` between registers, and `mov` of a bitmask immediate, are ORR from the zero register: the
+    // value moved is the last operand. Read from the operands, so it holds whether or not `fmt` named it.
+    let orr_move = inst.opcode == Opcode::ORR
+        && matches!(inst.operands.get(1), Some(Operand::Register(_, 31)))
+        && matches!(
+            inst.operands.get(2),
+            Some(Operand::Register(..) | Operand::Immediate(_) | Operand::Imm64(_) | Operand::RegShift(ShiftStyle::LSL, 0, _, _))
+        );
+    let moved = match ops.as_slice() {
+        [dst, _zero, src] if orr_move => Some(vec![dst.clone(), src.clone()]),
+        _ => None,
+    };
+    let (kind, ops) = match moved {
+        Some(ops) => (Kind::Mov, ops),
+        None => (kind, ops),
     };
     Some(Insn { addr, len: 4, mnemonic, operands, kind, flow, cond, refs, ops, reads, writes, sets_flags })
 }
@@ -1260,6 +1276,37 @@ mod tests {
         c.apply(&mut b);
         assert_eq!(b.refs, vec![0x2010]);
         assert_eq!(c.value("x0"), Some(0x2010));
+    }
+
+    /// `mov` is ORR from the zero register; the zero register was taken for the value moved.
+    #[test]
+    fn a64_register_and_bitmask_moves_take_their_last_operand() {
+        let reg = |r: &str| Op::Reg(r.into());
+        // Words and aliases from clang, disassembled by otool.
+        let cases: &[(u32, &str, Vec<Op>)] = &[
+            (0xaa00_03f3, "mov x19, x0", vec![reg("x19"), reg("x0")]),
+            (0x2a01_03e0, "mov w0, w1", vec![reg("w0"), reg("w1")]),
+            (0x3208_9fe0, "mov w0, #0xff00ff00", vec![reg("w0"), Op::Imm(0xff00_ff00)]),
+            (0xb200_f3e0, "mov x0, #0x5555555555555555", vec![reg("x0"), Op::Imm(0x5555_5555_5555_5555)]),
+        ];
+        for (word, name, ops) in cases {
+            for fmt in [false, true] {
+                let i = decode(Mode::A64, &word.to_le_bytes(), 0x1000, fmt).unwrap();
+                assert_eq!((i.kind, &i.ops), (Kind::Mov, ops), "{name} fmt={fmt}");
+            }
+        }
+        // A shifted source, or a real first source, is still an ORR.
+        for word in [0xaa01_0fe0u32, 0xaa02_0020] {
+            let i = decode(Mode::A64, &word.to_le_bytes(), 0x1000, true).unwrap();
+            assert_eq!((i.kind, i.ops.len()), (Kind::Or, 3), "{}", i.text());
+        }
+        // The moved register's known value moves with it.
+        let mut c = ArmConsts::default();
+        for (word, at) in [(0xb000_0000u32, 0x1000u64), (0xaa00_03f3, 0x1004)] {
+            let mut i = decode(Mode::A64, &word.to_le_bytes(), at, true).unwrap();
+            c.apply(&mut i);
+        }
+        assert_eq!(c.value("x19"), Some(0x2000));
     }
 
     #[test]

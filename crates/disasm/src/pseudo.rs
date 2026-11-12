@@ -1302,6 +1302,24 @@ mod tests {
         assert!(helper.text.contains("w0 == 0") || helper.text.contains("w0 != 0"), "{}", helper.text);
     }
 
+    fn lift_a64(words: &[u32]) -> Pseudo {
+        let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
+        let image = Image::raw(Arc::from(bytes), craft_anything_formats::Arch::Aarch64, 0x1000);
+        let program = Program::analyze(&image, &Limits::default(), &NoControl).unwrap();
+        let f = program.functions.get(&0x1000).unwrap();
+        lift(&image, &program, f, &|_| None)
+    }
+
+    /// `mov x19, x0` came out as `x19 = xzr;`: the zero register of its ORR form was taken as the value.
+    #[test]
+    fn aarch64_moves_copy_the_source_not_the_zero_register() {
+        // mov x19, x0; mov w1, w2; mov w0, #0xff00ff00; ret
+        let p = lift_a64(&[0xaa00_03f3, 0x2a02_03e1, 0x3208_9fe0, 0xd65f_03c0]);
+        assert!(p.text.contains("x19 = x0;") && p.text.contains("w1 = w2;"), "{}", p.text);
+        assert!(p.text.contains("w0 = 0xff00ff00;"), "{}", p.text);
+        assert!(!p.text.contains("zr"), "{}", p.text);
+    }
+
     #[test]
     fn every_function_of_damaged_inputs_lifts_without_panicking() {
         let (elf, _) = tk::elf64(tk::ElfArch::X86_64, false);

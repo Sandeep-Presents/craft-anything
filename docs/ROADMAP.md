@@ -1641,7 +1641,7 @@ Owner: open · Status: in progress
       target's kind stays `unknown`, so `core_targets_list` and triage's `description` say so, and
       Codex tried `core_overview_show` on a `.md` before triage. Give text its own target kind (or
       description) so the list and the app call it text — claimed: Martin-Aziz, branch bugfix/r3.11-text-target-kind
-- [ ] AArch64 register and bitmask-immediate moves read their zero register: `mov x19, x0` (ORR from
+- [x] AArch64 register and bitmask-immediate moves read their zero register: `mov x19, x0` (ORR from
       `xzr`) lifts to `x19 = xzr;` and `mov w0, #0xff00ff00` to `w0 = wzr;`. Move the last operand
       — claimed: htcom-code, branch bugfix/r3.11-a64-mov-alias-source
 
