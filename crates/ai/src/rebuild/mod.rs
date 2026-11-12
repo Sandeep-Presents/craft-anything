@@ -1329,19 +1329,19 @@ impl Worker {
         let mut reply = String::new();
         let mut failed = None;
         let mut said = HashMap::new();
+        // An API builder's next tool (a decompile waiting on Ghidra, #1714) may already hold the
+        // session when its last one finishes: the refresh waits for a free moment, so the loop
+        // keeps reading what that tool says meanwhile.
+        let mut refresh = false;
         loop {
             if self.stop.is_cancelled() {
                 agent.stop();
             }
             for e in agent.poll() {
-                if matches!(e, AgentEvent::ToolFinished { .. } | AgentEvent::TurnDone { .. }) {
-                    let mut session = self.engine.session();
-                    let project = session.project.clone().filter(|project| project.root == ws.investigation_dir());
-                    if let Some(project) = project
-                        && let Err(error) = session.open_project(project)
-                    {
-                        log::warn!("Couldn't refresh the investigation: {}", error.message);
-                    }
+                refresh |= matches!(e, AgentEvent::ToolFinished { .. });
+                if matches!(e, AgentEvent::TurnDone { .. }) {
+                    refresh_investigation(&mut self.engine.session(), ws);
+                    refresh = false;
                 }
                 match &e {
                     AgentEvent::TextDelta { text } => reply.push_str(text),
@@ -1379,6 +1379,10 @@ impl Worker {
                     }
                     return Ok(reply);
                 }
+            }
+            if refresh && let Some(mut session) = self.engine.try_session() {
+                refresh_investigation(&mut session, ws);
+                refresh = false;
             }
             self.relay_inbox();
             self.relay_read_notes(ws);
@@ -1447,6 +1451,17 @@ fn left_notes_are_a_request(ws: &mut Workspace) {
     });
     if let Err(e) = progress.and(checks) {
         log::warn!("Couldn't start the build's counts again for the notes left waiting: {}", e.message);
+    }
+}
+
+/// Read the investigation again after the builder's tools changed it; a view refresh, so a failure
+/// is only logged.
+fn refresh_investigation(session: &mut craft_anything_engine::Session, ws: &Workspace) {
+    let project = session.project.clone().filter(|project| project.root == ws.investigation_dir());
+    if let Some(project) = project
+        && let Err(error) = session.open_project(project)
+    {
+        log::warn!("Couldn't refresh the investigation: {}", error.message);
     }
 }
 
