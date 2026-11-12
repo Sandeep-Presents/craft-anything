@@ -263,15 +263,18 @@ mod launch_tests {
     fn godot_does_not_open_a_different_project_after_lossy_conversion() {
         use std::os::unix::ffi::OsStrExt;
 
-        let dir = tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let app = dir.path().join(std::ffi::OsStr::from_bytes(b"game-\xff"));
         let other = dir.path().join("game-\u{fffd}");
-        for folder in [&app, &other] {
-            std::fs::create_dir(folder).unwrap();
-            std::fs::write(folder.join("project.godot"), "").unwrap();
-        }
+        std::fs::create_dir(&other).unwrap();
+        std::fs::write(other.join("project.godot"), "").unwrap();
         let godot = Path::new("godot");
         assert_eq!(launch(&other, Some(godot)), Some((godot.into(), vec!["--path".into(), other.to_str().unwrap().into()])));
+        // macOS file systems refuse names that aren't UTF-8, so there is no such folder to confuse.
+        if std::fs::create_dir(&app).is_err() {
+            return;
+        }
+        std::fs::write(app.join("project.godot"), "").unwrap();
         assert_eq!(launch(&app, Some(godot)), None);
     }
 

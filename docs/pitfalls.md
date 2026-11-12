@@ -155,6 +155,11 @@ and releasing a shared ephemeral port.
 same temp directory, and game detection walked up and found the game. Give each case its own
 `tempfile::tempdir()`.
 
+**A Unix test that only Linux can run.** A test made a folder whose name isn't UTF-8; Linux allows
+it, so CI passed, but macOS file systems refuse such names and the test failed on a contributor's
+Mac before checking anything. When a test needs what only some file systems allow, skip that part
+where creating it fails, and keep the rest of the test running everywhere.
+
 **Tests that share a process-wide value.** The start guard keeps its mark's lock in a `static`;
 one test's `opened()` emptied it while another test was between `begin` and its check, so
 `main` failed now and then although the PR's own run had passed. Tests that touch the same
