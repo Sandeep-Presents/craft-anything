@@ -723,8 +723,11 @@ Owner: open · Status: in progress
       a per-user Flatpak browser in `~/.local/share/flatpak/exports/bin` is found, but its start
       script needs `flatpak`, which the sandbox doesn't have. `flatpak-spawn --host` would need
       `--talk-name=org.freedesktop.Flatpak`, which lets the app run anything outside its sandbox (#841)
-- [ ] Say in the feed while a decompile waits on Ghidra, and for how long, as the one-time analysis
-      does (#1714) — claimed: justinjohn0306, branch `feature/r1.5-decompile-wait-in-feed`
+- [x] Say in the feed while a decompile waits on Ghidra, and for how long, as the one-time analysis
+      does (#1714): once a minute, "Ghidra is decompiling this function (N min so far; it gives up
+      at 15 min)", or that it waits for another decompile to finish. The builder's tool server
+      writes the line to `inbox/activity/`, which the run reads into the feed. Unit-tested; not run
+      with Ghidra — claimed: justinjohn0306, branch `feature/r1.5-decompile-wait-in-feed`
 - [ ] More pins once their hashes are checked against the publisher: Chromium (no published
       checksums found yet), Rizin for Linux (the tar.xz unpacks to ~800 MB, so it needs streaming
       extraction) and macOS (a .pkg)

@@ -285,3 +285,19 @@ fn notes_left_waiting_start_the_limits_again() {
     assert_eq!(saved.not_working_checks, 0);
     assert_eq!(saved.agent_session.as_deref(), Some("session-ahead"), "an older copy doesn't undo the newer session");
 }
+
+/// #1714: a decompile's waiting line joins the feed once per change, from every wait.
+#[test]
+fn what_a_tool_waits_on_joins_the_feed_once_per_change() {
+    let d = tempfile::tempdir().unwrap();
+    let mut said = HashMap::new();
+    assert!(newly_said(d.path(), &mut said).is_empty());
+    let decompile = craft_anything_engine::inbox::Activity::start(d.path());
+    decompile.say("Ghidra is decompiling this function (1 min so far; it gives up at 15 min)");
+    assert_eq!(newly_said(d.path(), &mut said), ["Ghidra is decompiling this function (1 min so far; it gives up at 15 min)"]);
+    assert!(newly_said(d.path(), &mut said).is_empty(), "said once");
+    decompile.say("Ghidra is decompiling this function (2 min so far; it gives up at 15 min)");
+    let queued = craft_anything_engine::inbox::Activity::start(d.path());
+    queued.say("Waiting for Ghidra to finish decompiling another function (1 min so far)");
+    assert_eq!(newly_said(d.path(), &mut said).len(), 2, "each wait's new line");
+}

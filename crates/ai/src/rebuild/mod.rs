@@ -31,7 +31,7 @@ pub use craft_anything_platform::serve::StaticServer;
 use craft_anything_platform::serve::serve_dir;
 use craft_anything_platform::sync::Mutex;
 use serde_json::{Value, json};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
@@ -320,6 +320,7 @@ impl RebuildRun {
         // Notes an earlier run never handed over (the app closed while they waited, #1620) wait for
         // this run's builder; their old files go before the app can add any to this one.
         let left = notes::take_left(&notes::notes_dir(&ws.inbox_dir()), opts.message.is_none());
+        craft_anything_engine::inbox::clear_activity(&ws.inbox_dir());
         if !left.is_empty() {
             left_notes_are_a_request(&mut ws);
         }
@@ -1327,6 +1328,7 @@ impl Worker {
         }
         let mut reply = String::new();
         let mut failed = None;
+        let mut said = HashMap::new();
         loop {
             if self.stop.is_cancelled() {
                 agent.stop();
@@ -1380,6 +1382,9 @@ impl Worker {
             }
             self.relay_inbox();
             self.relay_read_notes(ws);
+            for line in newly_said(&ws.inbox_dir(), &mut said) {
+                self.emit(RunEvent::Step { step: Step::Build, text: line });
+            }
             self.answer_self_checks(ws)?;
             if self.usage.as_ref().is_some_and(|c| c.since.elapsed() >= USAGE_FLUSH) {
                 self.record_usage(None);
@@ -1443,6 +1448,19 @@ fn left_notes_are_a_request(ws: &mut Workspace) {
     if let Err(e) = progress.and(checks) {
         log::warn!("Couldn't start the build's counts again for the notes left waiting: {}", e.message);
     }
+}
+
+/// What the tools working for the builder say that the feed hasn't shown yet (a decompile waiting
+/// on Ghidra, #1714): each wait's line once per change, as the one-time analysis is shown.
+fn newly_said(inbox: &Path, said: &mut HashMap<String, String>) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (wait, line) in craft_anything_engine::inbox::activity(inbox) {
+        if said.get(&wait) != Some(&line) {
+            said.insert(wait, line.clone());
+            lines.push(line);
+        }
+    }
+    lines
 }
 
 /// What the run says, and the status it leaves on the project, when it ends: paused, failed, or

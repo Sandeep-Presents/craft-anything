@@ -624,16 +624,16 @@ fn live_ghidra_makes_and_decompiles_code_reached_only_through_a_pointer_table() 
 
     let known: Vec<u64> = session.list_functions().unwrap().iter().map(|f| f.entry).collect();
     assert!(!known.contains(&triple) && !known.contains(&negate), "the analysis already made these, so this tests nothing: {known:x?}");
-    let made = session.decompile(triple).unwrap().expect("an answer");
+    let made = session.decompile(triple, &|_| {}).unwrap().expect("an answer");
     assert!(made.created && made.pseudocode.as_deref().unwrap_or_default().contains("* 3"), "{made:?}");
-    let again = session.decompile(negate).unwrap().expect("an answer");
+    let again = session.decompile(negate, &|_| {}).unwrap().expect("an answer");
     assert!(again.created && again.pseudocode.as_deref().unwrap_or_default().contains("-param_1"), "{again:?}");
-    match session.decompile(table).unwrap_err() {
+    match session.decompile(table, &|_| {}).unwrap_err() {
         GhidraError::Bridge { code, message } => assert!(code == "not_found" && message.contains("executable memory"), "{code}: {message}"),
         other => panic!("expected not_found, got {other:?}"),
     }
     // Made once, then found again, still marked as made on demand.
-    assert!(session.decompile(triple).unwrap().expect("an answer").created);
+    assert!(session.decompile(triple, &|_| {}).unwrap().expect("an answer").created);
 }
 
 #[test]
@@ -673,7 +673,7 @@ fn live_ghidra_reports_where_it_loaded_a_position_independent_elf() {
     let base = session.image_base().expect("the handshake says where the program is");
     assert_ne!(base, 0, "Ghidra moves a program whose lowest segment is at 0");
     let rebase = Rebase::new(0, Some(base));
-    let made = session.decompile(rebase.to_engine(triple)).unwrap().expect("an answer");
+    let made = session.decompile(rebase.to_engine(triple), &|_| {}).unwrap().expect("an answer");
     assert_eq!(rebase.from_engine(made.entry), triple);
     assert!(made.pseudocode.as_deref().unwrap_or_default().contains("* 3"), "{made:?}");
 }
