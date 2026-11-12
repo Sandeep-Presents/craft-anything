@@ -313,6 +313,12 @@ Cursor address	Адрес курсора
 Cursor function	Функция курсора
 Custom	Пользовательский
 Cutter command	Команда Cutter
+Kuna function inventory	Инвентарь функций Kuna
+Kuna decompile	Декомпиляция Kuna
+Kuna cross-references	Перекрёстные ссылки Kuna
+Kuna strings	Строки Kuna
+Kuna project export	Экспорт проекта Kuna
+Kuna decompiler	Декомпилятор Kuna
 DOS load image	Образ загрузки DOS
 Databases	Базы данных
 Decide yourself	Решайте сами

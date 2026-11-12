@@ -358,6 +358,12 @@ Cursor address	კურსორის მისამართი
 Cursor function	კურსორის ფუნქცია
 Custom	მორგებული
 Cutter command	Cutter-ის ბრძანება
+Kuna function inventory	Kuna-ფუნქციების სია
+Kuna decompile	Kuna-დეკომპილაცია
+Kuna cross-references	Kuna-ის ჯვარედინი ბმულები
+Kuna strings	Kuna-ს სტრიქონები
+Kuna project export	Kuna-პროექტის გატანა
+Kuna decompiler	დეკომპილატორი Kuna
 DOS load image	DOS-ის ჩატვირთვის ანაბეჭდი
 Databases	მონაცემთა ბაზები
 Decide yourself	თავად გადაწყვიტეთ

@@ -325,6 +325,12 @@ Cursor address	光标地址
 Cursor function	光标所在函数
 Custom	自定义
 Cutter command	Cutter 命令
+Kuna function inventory	Kuna 函数清单
+Kuna decompile	Kuna 反编译
+Kuna cross-references	Kuna 交叉引用
+Kuna strings	Kuna 字符串
+Kuna project export	Kuna 项目导出
+Kuna decompiler	Kuna 反编译器
 DOS load image	DOS 加载映像
 Databases	数据库
 Decide yourself	自行决定

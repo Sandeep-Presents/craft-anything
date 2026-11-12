@@ -325,6 +325,12 @@ Cursor address	Adresa kurzoru
 Cursor function	Funkce pod kurzorem
 Custom	Vlastní
 Cutter command	Příkaz Cutter
+Kuna function inventory	Inventář funkcí Kuna
+Kuna decompile	Dekompilace Kuna
+Kuna cross-references	Křížové odkazy Kuna
+Kuna strings	Řetězce Kuna
+Kuna project export	Export projektu Kuna
+Kuna decompiler	Dekompilátor Kuna
 DOS load image	Zaváděcí obraz programu DOS
 Databases	Databáze
 Decide yourself	Rozhodovat samostatně

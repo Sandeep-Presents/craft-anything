@@ -500,6 +500,7 @@ pub const ENGINES: &[ExternalEngine] = &[
         path_setting: true,
         install: Install::Pinned(RIZIN_PINS),
     },
+    manual("kuna", "Kuna", "Native decompiling (a second opinion)", &["kuna"], &["kuna.exe"]),
     manual("rtl433", "rtl_433", "Decoding radio recordings", &["rtl_433"], &["rtl_433.exe"]),
     ExternalEngine {
         id: "vineflower",

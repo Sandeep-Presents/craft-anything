@@ -107,6 +107,8 @@ pub mod python_tools;
 pub mod text_tools;
 // Thin read-only wrappers over optional objdump and rizin.
 pub mod external_disasm_tools;
+// The external Kuna decompiler: functions, decompile, xrefs, strings, project export.
+pub mod kuna_tools;
 // GDB sessions over the machine interface (optional GDB).
 pub mod cutter_tools;
 pub mod gdb_tools;
@@ -167,6 +169,7 @@ pub fn all() -> Vec<crate::ToolSpec> {
     v.extend(wasm_compare_tools::specs());
     v.extend(packet_tools::specs());
     v.extend(external_disasm_tools::specs());
+    v.extend(kuna_tools::specs());
     v.extend(gdb_tools::specs());
     v.extend(rizin_session_tools::specs());
     v.extend(radio_tools::specs());

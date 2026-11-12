@@ -7,7 +7,7 @@ form is the CLI command.
 
 `<area>_<object>_<action>`, all lower case, words joined by `_`:
 
-- **area**: `core`, `native`, `managed`, `java`, `android`, `apple`, `harmony`, `js`, `web`, `app`,
+- **area**: `core`, `native`, `kuna`, `managed`, `java`, `android`, `apple`, `harmony`, `js`, `web`, `app`,
   `firmware`, `formats`, `radio`, `packets`, `db`, `assets`, `game`, `project`, `rebuild`, `build`,
   `runtime`, `adb`, `frida`, `engines`, `settings`, `plugins`, `setup` (the list is
   `registry::AREAS`).
