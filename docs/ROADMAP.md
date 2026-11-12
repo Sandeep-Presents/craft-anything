@@ -1479,8 +1479,9 @@ Gaps found while using the app for real projects.
 Owner: maintainers · Status: in progress
 Keep a build that works at hand: pin it, and open it from the sidebar whatever the builder does
 to the project next.
-- [ ] Say when a light pin ended up copying what it meant to share (a drive without hard links)
-      — in PR #220
+- [x] Say when a light pin ended up copying what it meant to share (a drive without hard links):
+      `copied_shared_bytes` on `Pin`, shown as a toast once the pin is made
+      — claimed: muraa-p, branch bugfix/r2.10-light-pin-copied-shared
 - [ ] Pins of one project sharing with each other, so a third frozen copy of the same assets
       takes no more space
 - [ ] Pin a website (a frozen copy of the built site, each served on its own port)

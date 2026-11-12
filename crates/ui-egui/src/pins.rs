@@ -101,6 +101,17 @@ impl CraftApp {
             ("project_pin_create", Ok(v)) => {
                 let name = v["pin"]["name"].as_str().unwrap_or_default();
                 self.toast(trf("Pinned: {name}. Open it from the sidebar any time.", &[("name", name)]), false);
+                if let Some(copied) = v["pin"]["copied_shared_bytes"].as_u64()
+                    && copied > 0
+                {
+                    self.toast(
+                        trf(
+                            "Some shared files had to be copied ({copied}) because the drive doesn't support hard links.",
+                            &[("copied", &crate::human_bytes(copied as usize))],
+                        ),
+                        false,
+                    );
+                }
                 self.state.pins_collapsed = false;
                 self.refresh_pins();
             }
