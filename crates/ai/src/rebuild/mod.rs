@@ -47,6 +47,7 @@ pub mod kinds;
 mod locate;
 pub mod notes;
 mod output;
+mod pictures;
 pub mod project;
 pub mod question;
 pub mod runs;
@@ -864,9 +865,11 @@ impl Worker {
         // A coding agent resumes its own session; our loop resumes its kept transcript.
         let resumable = api.as_ref().is_none_or(crate::agent::ApiConversation::resumed);
         let api_loop = api.is_some();
-        // Agent apps open pictures with their Read tool; the API loop sends text only, so its
-        // builder is told what to use instead (R5.4: models that can see get pictures later).
-        let sees_pictures = !api_loop;
+        // Agent apps open pictures with their Read tool. In the API loop the model is shown them
+        // attached to its messages when it sees (its vision setting, or what its server says);
+        // one that doesn't is told what to use instead.
+        let sees_pictures = api.as_ref().is_none_or(crate::agent::ApiConversation::sees_pictures);
+        let attaches = api_loop && sees_pictures;
         // A session another coding agent saved can't be continued by this one (#469).
         if !api_loop && ws.manifest.agent_session_by.as_deref() != Some(entry.config.model.as_str()) {
             ws.manifest.agent_session = ws.manifest.agent_session_for(&entry.config.model).map(str::to_string);
@@ -911,7 +914,7 @@ impl Worker {
             None if carrying_on && !first && has_history => continue_prompt(kind, api_loop) + &now(),
             _ => {
                 let b = brief(kind, &cx, opts.message.as_deref());
-                if api_loop { format!("{API_BUILDER}{}\n\n{b}", if sees_pictures { "" } else { BLIND_BUILDER }) } else { b }
+                if api_loop { format!("{API_BUILDER}{}\n\n{b}", if sees_pictures { SIGHTED_API_BUILDER } else { BLIND_BUILDER }) } else { b }
             }
         };
         // The extraction step left the original's files in app/Original/: the builder starts from them.
@@ -941,10 +944,16 @@ impl Worker {
         } else if ws.manifest.not_working_checks >= NOT_WORKING_CHECK_LIMIT {
             return Err(not_working(ws));
         }
-        let mut refinements = 0;
-        let mut reminded = false;
         // The builder finished and only the check didn't: the build is there to check.
         let mut only_check = carrying_on && !first && opts.message.is_none() && ws.manifest.awaiting_check;
+        // Each run's conversation starts without the pictures' bytes (a kept transcript has only
+        // their names), so the original's go with its first message. A run that only checks sends
+        // its first message after the check, with the check's pictures, the original's among them.
+        if attaches && !only_check {
+            self.show_pictures(agent.as_mut(), ws, pictures::for_first_message(ws, crate::agent::MAX_PICTURES));
+        }
+        let mut refinements = 0;
+        let mut reminded = false;
         loop {
             if !std::mem::take(&mut only_check) {
                 progress = BuildProgress::load(&ws.root)?;
@@ -1079,6 +1088,10 @@ impl Worker {
             // It is asked to write the project and to show its build output (#736).
             let refined = if app_is_empty(ws) { NO_PROJECT_PROMPT.to_string() } else { kind.refine(check, sees_pictures) };
             prompt = refined + &pictures_reminder(ws, sees_pictures);
+            if attaches {
+                let root = ws.root.clone();
+                self.show_pictures(agent.as_mut(), ws, pictures::for_check(&checks, opts.good_enough, crate::agent::MAX_PICTURES, |p| root.join(p).is_file()));
+            }
             if !api_loop {
                 prompt.push_str(CHECK_BEFORE_REPLYING);
             }
@@ -1107,6 +1120,24 @@ impl Worker {
         ws.set_status(Status::Ready, summary.clone())?;
         self.emit(RunEvent::Step { step: Step::Done, text: summary.clone() });
         Ok(summary)
+    }
+
+    /// Attach pictures (project-relative, picked within [`crate::agent::MAX_PICTURES`], with
+    /// `left_out` more that didn't fit) to the builder's next message; saying in the feed which
+    /// couldn't be shown and why.
+    fn show_pictures(&self, agent: &mut dyn Conversation, ws: &Workspace, (paths, mut left_out): (Vec<PathBuf>, usize)) {
+        let max = crate::agent::MAX_PICTURES;
+        left_out += paths.len().saturating_sub(max);
+        let (shown, mut skipped) = pictures::load(&ws.root, paths.get(..max).unwrap_or(&paths));
+        if left_out > 0 {
+            skipped.push(format!("{left_out} more (at most {max} go with one message)"));
+        }
+        if !skipped.is_empty() {
+            self.emit(RunEvent::Agent(AgentEvent::Status { text: format!("Not shown to the builder: {}.", skipped.join(", ")) }));
+        }
+        if !shown.is_empty() {
+            agent.attach(shown);
+        }
     }
 
     /// Read progress after the turn has ended. A consumed request resets the allowance on
@@ -1535,6 +1566,9 @@ fn kept_session(ws: &Workspace) -> Option<String> {
 
 /// What an API-backend builder is told first: its tools differ from an agent app's.
 const API_BUILDER: &str = "Your tools: build_files_list, build_file_read, build_file_write and build_file_edit for the project's files (paths relative to the project folder, e.g. app/src/main.rs), and build_command_run for commands, which run in app/ (never start dev servers or watchers). Where the steps below mention Read, Write, Edit or Bash, use these. For the checklist step use build_checklist (the same shape as TodoWrite: todos with content, activeForm and status) and call it again as you go. Ask the person with core_person_ask only when a choice really changes the result. Other Craft Anything tools are available too; enable a toolset with enable_toolset when you need it. rebuild_check isn't available in this loop: Craft Anything checks your build after each turn instead.";
+
+/// Added to the API loop's note for a builder whose model sees pictures: they come attached.
+const SIGHTED_API_BUILDER: &str = " You can't open a picture with build_file_read, but you're shown the ones that matter, each after a line naming it: the person's pictures in reference/ and the original's screenshots in capture/ with this message, and after each check its pictures of your build beside the original's. Where the steps below say to open a picture with Read, look at the one shown under that name; you can't take or open new screenshots yourself.";
 
 /// Added to the API loop's note for a builder that can't look at pictures.
 const BLIND_BUILDER: &str = " You can't look at pictures: use capture/README.md, capture/capture.json and the evidence instead.";

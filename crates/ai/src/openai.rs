@@ -75,8 +75,14 @@ pub struct OpenAi {
     /// The AI's own limit on one streamed answer (a slow local model can need hours); none uses
     /// the defaults.
     pub stream_limit: Option<std::time::Duration>,
+    /// Asked for its context window (see [`crate::window`]): OpenRouter and OpenAI-compatible
+    /// services are; OpenAI's and Gemini's own model lists don't say one, so they aren't.
+    pub asks_window: bool,
     /// The longest answer to ask for, once OpenRouter has said the key can't afford more (#1213).
     pub answer_cap: Option<u64>,
+    /// A server on this computer or its network, asked for its window in its own ways too; any
+    /// other is asked only through its model list.
+    pub on_this_network: bool,
 }
 
 /// An answer cap smaller than this would cut a builder's file writes short: such a refusal stays one.
@@ -91,6 +97,7 @@ impl OpenAi {
         let mut o = Self::compatible("OpenRouter", base.unwrap_or(OPENROUTER_BASE), Some(key), if model.is_empty() { OPENROUTER_DEFAULT_MODEL } else { model });
         o.extra_headers = vec![("HTTP-Referer", APP_REFERER.to_string()), ("X-Title", APP_TITLE.to_string())];
         o.openrouter = true;
+        o.asks_window = true;
         o
     }
 
@@ -111,6 +118,8 @@ impl OpenAi {
             openrouter: false,
             stream_limit: None,
             answer_cap: None,
+            asks_window: false,
+            on_this_network: false,
         }
     }
 
@@ -307,6 +316,22 @@ impl ChatModel for OpenAi {
     fn model(&self) -> String {
         self.model.clone()
     }
+
+    fn context_window(&self) -> Option<crate::window::Window> {
+        if !self.asks_window {
+            return None;
+        }
+        let server = crate::window::Server { base: &self.base_url, model: &self.model };
+        crate::window::read_from_server(&server, &self.headers(), self.on_this_network)
+    }
+
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        if !self.asks_window {
+            return None;
+        }
+        let server = crate::window::Server { base: &self.base_url, model: &self.model };
+        crate::sight::read_from_server(&server, &self.headers(), self.on_this_network)
+    }
 }
 
 impl OpenAi {
@@ -324,6 +349,9 @@ pub fn messages_json(m: &Msg, react: bool) -> Vec<Value> {
         Speaker::User => {
             let mut out = Vec::new();
             let mut text = String::new();
+            // With a picture the message's content becomes a list of parts, in order; without
+            // one it stays a plain string, as every server takes.
+            let mut parts: Vec<Value> = Vec::new();
             for b in &m.blocks {
                 match b {
                     Block::Text { text: t } => text.push_str(t),
@@ -335,11 +363,25 @@ pub fn messages_json(m: &Msg, react: bool) -> Vec<Value> {
                             out.push(json!({"role": "tool", "tool_call_id": tool_use_id, "content": content}));
                         }
                     }
+                    Block::Image { data, name, .. } if data.is_empty() => text.push_str(&Block::image_note(name)),
+                    Block::Image { media_type, data, .. } => {
+                        if !text.is_empty() {
+                            parts.push(json!({"type": "text", "text": std::mem::take(&mut text)}));
+                        }
+                        parts.push(json!({"type": "image_url", "image_url": {"url": format!("data:{media_type};base64,{data}")}}));
+                    }
                     _ => {}
                 }
             }
-            if !text.is_empty() {
-                out.push(json!({"role": "user", "content": text}));
+            if parts.is_empty() {
+                if !text.is_empty() {
+                    out.push(json!({"role": "user", "content": text}));
+                }
+            } else {
+                if !text.is_empty() {
+                    parts.push(json!({"type": "text", "text": text}));
+                }
+                out.push(json!({"role": "user", "content": parts}));
             }
             out
         }

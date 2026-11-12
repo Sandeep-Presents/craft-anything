@@ -1488,3 +1488,32 @@ Updated to {version}.	Aktualizováno na {version}.
 Use Releases or your package manager to update this installation.	Aktualizujte tuto instalaci přes vydání nebo správce balíčků.
 You're up to date.	Máte nejnovější verzi.
 {version} is available.	Je dostupná verze {version}.
+Context budget (tokens)	Rozpočet kontextu (tokeny)
+Auto	Automaticky
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Kolik konverzace se posílá, než se starší části zkrátí. Automaticky: kolik podle serveru modelu pojme, nebo bezpečná výchozí hodnota, když to neřekne.
+Set an AI's context budget	Nastavit rozpočet kontextu AI
+Custom…	Vlastní…
+Asking the server…	Ptám se serveru…
+Auto: {budget} tokens of the server's {window}	Automaticky: {budget} tokenů z {window} serveru
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automaticky: {budget} tokenů, obvyklé množství (server neuvádí, kolik pojme)
+{budget} will be used: the server holds {window}	Použije se {budget}: server pojme {window}
+The server holds {window}	Server pojme {window}
+Ask an AI's server how much it holds	Zeptat se serveru AI, kolik pojme
+Tools for building	Nástroje pro sestavení
+Lean	Úsporné
+Full	Všechny
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Které nástroje dostane sestavovací agent na této AI. Úsporné: jen nástroje pro sestavení, pro malé místní modely. Všechny: každý nástroj. Automaticky: všechny nástroje, když má konverzace místo pro 64k tokenů nebo víc.
+(every tool)	(všechny nástroje)
+(the lean list)	(úsporný seznam)
+(the lean list until its server says it holds more)	(úsporný seznam, dokud jeho server neřekne, že pojme víc)
+Set which tools an AI is offered	Nastavit, jaké nástroje AI dostane
+Sees pictures	Vidí obrázky
+Yes	Ano
+No	Ne
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	Zda sestavovací agent na této AI dostává obrázky: snímky originálu, tvoje obrázky originálu a obrázky sestavení z kontroly. Automaticky: podle toho, co řekne jeho server; model, o kterém server nic neřekne, žádné nedostane.
+(its server says it sees)	(server říká, že vidí)
+(its server says it doesn't)	(server říká, že ne)
+(its server doesn't say: not shown pictures)	(server nic neříká: bez obrázků)
+(asked when a build starts: it's reached over SSH)	(zeptá se, až začne sestavení: je připojen přes SSH)
+Auto (asked when a build starts: it's reached over SSH)	Automaticky (zeptá se, až začne sestavení: je připojen přes SSH)
+Set whether an AI sees pictures	Nastavit, zda AI vidí obrázky
