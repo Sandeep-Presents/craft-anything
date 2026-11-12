@@ -195,6 +195,11 @@ fn general(app: &mut CraftApp, ui: &mut Ui) {
             app.settings_changed();
         }
     });
+    row(ui, "About", "The version of Craft Anything you're running.", |ui| {
+        if widgets::secondary(ui, Some("info"), "Open").clicked() {
+            app.state.modal = Some(crate::state::Modal::About);
+        }
+    });
 }
 
 fn language(app: &mut CraftApp, ui: &mut Ui) {
