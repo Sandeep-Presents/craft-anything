@@ -556,6 +556,12 @@ Owner: open · Status: todo
       — claimed: Afloat16, branch bugfix/r5.5-bounded-sse-events-20261103
 - [x] Show the provider's own reason: #369 bought $10 of credit and got only "OpenRouter answered
       400: Provider returned error". Find the reason in the response body and show it — PR #542
+- [x] A Claude build failed with 400 "Invalid `signature` in `thinking` block" once the conversation
+      was summarised, and every retry failed the same way (#1585): summarising, trimming or a
+      resumed build's new system prompt changes what Claude's signed thinking blocks were written
+      after. Requests now send `thinking.block_binding.prefix_mismatch_behavior: "drop_block"`
+      (beta `thinking-binding-controls-2026-08-01`), so those blocks are dropped instead
+- [ ] Check #1585 live: a long Claude build that summarises, then a resumed one, carry on
 - [x] OpenRouter picks an upstream provider per request, and one without tool calling answered
       "400: Provider returned error" (#369): a request with tools now sets
       `provider.require_parameters`, and a 404 "no provider for these parameters" falls back to the

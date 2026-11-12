@@ -31,6 +31,9 @@ pub fn effort_for(model: &str, effort: Effort) -> Effort {
 }
 pub const API_VERSION: &str = "2023-06-01";
 pub const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
+/// Lets a request say what happens to a thinking block whose conversation changed since it was
+/// written (`thinking.block_binding`).
+pub const THINKING_BINDING_BETA: &str = "thinking-binding-controls-2026-08-01";
 pub const MAX_TOKENS: u32 = 64_000;
 
 /// Most content blocks we track in one response.
@@ -64,11 +67,8 @@ impl Anthropic {
     }
 
     pub fn headers(&self) -> Vec<(&'static str, String)> {
-        let mut h = vec![("x-api-key", self.api_key.clone()), ("anthropic-version", API_VERSION.to_string())];
-        if self.fallbacks {
-            h.push(("anthropic-beta", FALLBACK_BETA.to_string()));
-        }
-        h
+        let betas = if self.fallbacks { format!("{THINKING_BINDING_BETA},{FALLBACK_BETA}") } else { THINKING_BINDING_BETA.to_string() };
+        vec![("x-api-key", self.api_key.clone()), ("anthropic-version", API_VERSION.to_string()), ("anthropic-beta", betas)]
     }
 
     /// The request body for one streamed turn.
@@ -79,7 +79,10 @@ impl Anthropic {
             "stream": true,
             "system": [{"type": "text", "text": req.system, "cache_control": {"type": "ephemeral"}}],
             "messages": req.messages.iter().map(message_json).collect::<Vec<_>>(),
-            "thinking": {"type": "adaptive", "display": "summarized"},
+            // Summarising or trimming earlier turns, or a resumed build's new system prompt, changes
+            // what an earlier thinking block was written after; the API then drops that block
+            // and the ones after it instead of refusing the whole request (#1585).
+            "thinking": {"type": "adaptive", "display": "summarized", "block_binding": {"prefix_mismatch_behavior": "drop_block"}},
             "output_config": {"effort": effort_for(&self.model, req.effort).as_str()},
         });
         if !req.tools.is_empty() {
@@ -383,11 +386,16 @@ mod tests {
         assert!(b["tools"][0].get("cache_control").is_none());
         assert_eq!(b["tools"][1]["cache_control"]["type"], "ephemeral");
         assert_eq!(b["system"][0]["cache_control"]["type"], "ephemeral");
-        assert!(a.headers().iter().any(|(k, v)| *k == "anthropic-beta" && v == FALLBACK_BETA));
+        // #1585: a thinking block from before a summary is dropped, not a reason to refuse the turn.
+        assert_eq!(b["thinking"]["block_binding"]["prefix_mismatch_behavior"], "drop_block");
+        let betas = |a: &Anthropic| a.headers().into_iter().find(|(k, _)| *k == "anthropic-beta").map(|(_, v)| v).unwrap_or_default();
+        assert_eq!(betas(&a).split(',').collect::<Vec<_>>(), [THINKING_BINDING_BETA, FALLBACK_BETA]);
         let mut off = a.clone();
         off.fallbacks = false;
-        assert!(off.body(&TurnRequest { system: "s", messages: &msgs, tools: &[], effort: Effort::Low, max_tokens: 10 }).get("fallbacks").is_none());
-        assert!(off.headers().iter().all(|(k, _)| *k != "anthropic-beta"));
+        let without = off.body(&TurnRequest { system: "s", messages: &msgs, tools: &[], effort: Effort::Low, max_tokens: 10 });
+        assert!(without.get("fallbacks").is_none());
+        assert_eq!(without["thinking"]["block_binding"]["prefix_mismatch_behavior"], "drop_block");
+        assert_eq!(betas(&off), THINKING_BINDING_BETA, "block_binding is refused without its beta header");
     }
 
     /// Every level goes to a model that has it; one that lacks it gets the nearest level below.

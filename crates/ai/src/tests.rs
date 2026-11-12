@@ -1065,7 +1065,7 @@ fn anthropic_streaming_tool_loop_through_the_engine() {
     assert_eq!(r1.path, "/v1/messages");
     assert_eq!(r1.header("x-api-key"), Some("sk-test-123"));
     assert_eq!(r1.header("anthropic-version"), Some("2023-06-01"));
-    assert_eq!(r1.header("anthropic-beta"), Some("server-side-fallback-2026-07-01"));
+    assert_eq!(r1.header("anthropic-beta"), Some("thinking-binding-controls-2026-08-01,server-side-fallback-2026-07-01"));
     assert_eq!(r1.header("user-agent"), Some("CraftAnything-dev"));
     let b = &r1.body;
     assert_eq!(b["model"], "claude-opus-5-5");
