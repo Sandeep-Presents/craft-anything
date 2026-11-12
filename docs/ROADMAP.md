@@ -728,6 +728,14 @@ Owner: open · Status: in progress
       at 15 min)", or that it waits for another decompile to finish. The builder's tool server
       writes the line to `inbox/activity/`, which the run reads into the feed. Unit-tested; not run
       with Ghidra — claimed: justinjohn0306, branch `feature/r1.5-decompile-wait-in-feed`
+- [x] Ghidra's decompile of one function stops after 120 s: it had no time limit, so a function
+      Ghidra can't bound (an unguarded jump table in a Rust async state machine, #1715) ran for over
+      an hour and every request behind it waited the full 15-minute request time (#1711). The
+      request then falls back to the built-in decompiler. Not run live (no Ghidra here)
+      — claimed: bflatastic, branch bugfix/r1.5-ghidra-decompile-time-limit
+- [ ] Bound unguarded jump tables when Ghidra decompiles a function (#1715): with no bounds check it
+      reads up to 256 entries, follows targets inside other functions and the decompile grows
+      without end. The time limit above stops it; bounding the table would let it finish
 - [ ] More pins once their hashes are checked against the publisher: Chromium (no published
       checksums found yet), Rizin for Linux (the tar.xz unpacks to ~800 MB, so it needs streaming
       extraction) and macOS (a .pkg)

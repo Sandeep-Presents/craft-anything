@@ -49,6 +49,14 @@ public class CraftAnythingBridge extends GhidraScript {
     /** How long making a function on demand may take before the bridge gives up. */
     private static final long CREATE_SECONDS = 60;
 
+    /**
+     * How long one function's decompile may take. Without a limit a function Ghidra can't bound
+     * (an unguarded jump table) decompiled for over an hour, and every request queued behind it
+     * waited the whole request time (#1711). On a timeout no result comes back, the request
+     * fails, and the built-in decompiler answers instead.
+     */
+    private static final int DECOMPILE_SECONDS = 120;
+
     private String token = "";
     /** Entry points of the functions this run made on demand. */
     private final Set<Address> made = new HashSet<>();
@@ -161,7 +169,7 @@ public class CraftAnythingBridge extends GhidraScript {
                 f = createFunctionAt(a);
                 made.add(f.getEntryPoint());
             }
-            DecompileResults results = decompiler.decompileFunction(f, 0, monitor);
+            DecompileResults results = decompiler.decompileFunction(f, DECOMPILE_SECONDS, monitor);
             String c = results != null && results.getDecompiledFunction() != null
                 ? results.getDecompiledFunction().getC() : null;
             if (c == null) {
