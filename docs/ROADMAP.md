@@ -1560,6 +1560,8 @@ Owner: open · Status: in progress
       to `w9 -= w9;` and `add w9, w10, w9, lsr #31` to `w9 = w10 + w9;`. Keep the shift or extension
       on the operand and show it in pseudo-C
       — claimed: htcom-code, branch bugfix/r3.11-a64-shifted-operands
+- [ ] AArch64 memory operands with an extended index (`ldr w0, [x1, w2, sxtw #2]`) drop the extension:
+      the index reads as the plain register, so a sign-extended index looks unsigned in pseudo-C
 - [x] Preserve AArch64 exclusive-memory status results and paired load definitions without presenting them as unconditional stores.
       — claimed: Afloat16, branch bugfix/r3.11-a64-exclusive-value-flow-20261110
 - [x] Keep the first 100000 byte-search matches in file-offset order across hex, UTF-8 and UTF-16LE queries, including capped pages.
