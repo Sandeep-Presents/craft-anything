@@ -266,7 +266,11 @@ pub struct RebuildRun {
 
 impl RebuildRun {
     /// Start a run on a worker thread. Fails fast (before any work) when no coding agent is set up.
-    pub fn start(hub: &AiHub, mut ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
+    pub fn start(hub: &AiHub, ws: Workspace, opts: RunOptions) -> Result<RebuildRun, ToolError> {
+        // The project as it is now. A run that waited in the queue, or one started as the project's
+        // last run was ending, holds a copy from before that run's last saves (its session), and
+        // everything below, the worker's saves included, works from this copy.
+        let mut ws = Workspace::open(&ws.root).unwrap_or(ws);
         let cfg = hub.config();
         let entry = builder_backend(&cfg, opts.backend.as_deref().or_else(|| project_builder(&cfg, &ws)))?;
         // The person's choice of mode is a session setting. A run that waited its turn uses the mode
