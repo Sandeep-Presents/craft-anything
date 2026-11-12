@@ -1362,6 +1362,11 @@ Gaps found while using the app for real projects.
       — claimed: Nghiathan13, branch bugfix/r2.9-linux-gpu-choice
 - [ ] Linux GPU choice on a desktop with monitors on two GPUs, and on an Intel + NVIDIA laptop:
       covered by unit tests on fake `/sys/class/drm` folders, not run on such a machine yet (#571)
+- [x] A display wider than 8192 px no longer aborts the app at startup: egui-wgpu asked every GPU
+      for 8192 px textures at most, so the window's surface couldn't be configured on a 5120-point
+      display at 2x (#1639). The app now asks the GPU for its own limit, never less than before
+      — claimed: bflatastic, branch bugfix/r2.9-gpu-texture-limit
+- [ ] Check #1639 live on a Mac with a display wider than 8192 px (built and checked by CI only)
 - [x] "Work on my project" on New project, beside "Make my own version" and "Just look inside":
       pick the folder of a project you already have, say what to change, and its files are edited
       in place, with nothing asked; the project takes the folder's name, an empty folder is
