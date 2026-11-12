@@ -457,7 +457,36 @@ been run live.
       — commit `0c3ae5cca569`
 - [ ] Find how each local server is told its context size and set it, or stop with a plain message
       when the prompt won't fit. We assume 24k and send no `num_ctx`, which an OpenAI-style endpoint
-      may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73)
+      may ignore anyway; LM Studio refused a 12.6k prompt on its 8k default (#73). Ollama 0.40.15
+      loads a model with 4096 tokens unless told otherwise: its window is now read (`/api/ps`), so
+      the budget is 3072, but a builder's prompt alone is larger
+- [x] Read the context window from the server before the first request, so a large local model
+      isn't trimmed at 24k: llama.cpp's `/props`, llama-swap's `/upstream/<model>/…` (its model
+      list has a window only when its config gives one), Ollama's `/api/ps`, LM Studio's model
+      list, and `context_length` in an OpenAI-style model list (OpenRouter). Only the window a
+      server has loaded counts (not Ollama's `/api/show`, which says what the model was trained
+      with), so Ollama and LM Studio say it once the model is loaded: asked again after the first
+      turn. Keep 24k when the server says nothing, and a budget the person set stays the most.
+      `context_tokens` is in Settings → AI and `ai context`
+      — claimed: youkaicountry, branch feature/r5.4-server-context-window — PR #1155
+- [ ] Settings → AI and `ai context` don't ask a server reached over ssh (`ssh_host`) for its
+      window, so they show Auto as "its server doesn't say" while a build, which opens the
+      tunnel, may read a large window and use more. Ask through the tunnel, or say the window is
+      read when a build starts
+- [x] Each AI's tool list is Auto, Lean or Full in Settings → AI. Auto offers every tool when the
+      window is 64k or more and the lean builder list (#417) below that; the memory steps in the
+      system prompt follow the same choice. Today every local builder is lean, whatever its window.
+      `tools` in `[[ai.backends]]`, `ai tools <name>`; Auto decides on the conversation's budget
+      (`FULL_TOOLS_BUDGET`, a 64k window less its quarter) after the server is asked, and decides
+      again when a later answer changes it (Ollama says only once loaded); paid services keep every
+      tool. Only builders are trimmed: a chat keeps every tool whatever the setting
+      — claimed: youkaicountry, branch feature/r5.4-tool-list-per-ai (stacked on #1155)
+- [x] Run a build live with the full list on a large local model (a 262k or 512k window), and note
+      in STATUS which models used the extra Core tools well.
+      A Qwen model with a 512k window: 2 of 3 full-list builds of "a scientific calculator" were
+      Ready, using the brief, handoff and finding tools; the third stopped when the model wrote a
+      call to a tool that doesn't exist as text
+- [ ] Run a build live with the lean list on a small local model, and note the result in STATUS
 - [x] A builder that can't see pictures (the API loop) is told it can't, then sent to open
       screenshots with Read: the website capture lines and the `--screenshot` and reference-picture
       lines in `brief.rs`, the website check's "Open each pair", the reminder after each round, the
@@ -470,6 +499,11 @@ been run live.
       to check its work with rebuild_check, which the loop refuses while it builds; only its first
       message says so. Say "Craft Anything checks it after your turn" there instead
       — claimed: Afloat16, branch bugfix/r5.4-api-follow-up-check
+- [ ] Models that can see get pictures: an image block in the conversation, sent as `image_url`
+      parts (OpenAI-style) and `image` blocks (Anthropic), for the check's screenshots beside the
+      original's, the pictures in `reference/` and a PNG the builder reads. Each AI's Pictures
+      setting is Auto, On or Off; Auto follows what the server reports (Ollama's capabilities,
+      LM Studio's model type, `input_modalities` in a model list)
 - [x] When a server refuses a request for its context window and says the size (Ollama, llama.cpp,
       OpenAI-style), fit the conversation to that window and ask once more, else say how to raise it (#962)
 - [x] Ollama fits a long prompt to its context by dropping the oldest messages, and a Qwen 3.8 model
@@ -700,6 +734,9 @@ yet, and the quick start is how every new person begins.
       — claimed: hasnain607, branch docs/r5.7-vineflower-live-run
 - [ ] Verify the 23 unverified adb tools; record results in tool-status.md
 - [ ] Android locales: try `only_locales` on a real APK (only the test fixture so far)
+- [ ] Ask LM Studio and a plain llama.cpp server for their context window (R5.4,
+      `crate::window`): llama-swap (its list and its `/upstream/` route) and Ollama 0.40.15 were
+      asked live; these two probes rest on their documented answers
 - [ ] `app_graphs_compare` on the two real Electron releases again, to count how many of the
       162 "removed" now pair (and pair the `index-<hash>` chunks by structure if many stay)
 - [ ] A real IL2CPP `global-metadata.dat` (needs a Unity build or a shipped game); synthetic so far.

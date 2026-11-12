@@ -1488,3 +1488,22 @@ Updated to {version}.	Đã cập nhật lên {version}.
 Use Releases or your package manager to update this installation.	Dùng Bản phát hành hoặc trình quản lý gói để cập nhật bản cài đặt này.
 You're up to date.	Bạn đang dùng phiên bản mới nhất.
 {version} is available.	Đã có phiên bản {version}.
+Context budget (tokens)	Ngân sách ngữ cảnh (token)
+Auto	Tự động
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Gửi bao nhiêu phần cuộc trò chuyện trước khi cắt bớt phần cũ. Tự động: bằng chỗ mà máy chủ của mô hình nói là có, hoặc một mặc định an toàn khi nó không nói.
+Set an AI's context budget	Đặt ngân sách ngữ cảnh của AI
+Custom…	Tùy chỉnh…
+Asking the server…	Đang hỏi máy chủ…
+Auto: {budget} tokens of the server's {window}	Tự động: {budget} token trong {window} của máy chủ
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Tự động: {budget} token, mức thông thường (máy chủ không cho biết chứa được bao nhiêu)
+{budget} will be used: the server holds {window}	Sẽ dùng {budget}: máy chủ chứa được {window}
+The server holds {window}	Máy chủ chứa được {window}
+Ask an AI's server how much it holds	Hỏi máy chủ của AI xem chứa được bao nhiêu
+Tools for building	Công cụ để xây dựng
+Lean	Gọn
+Full	Đầy đủ
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Những công cụ mà trình xây dựng trên AI này nhận được. Gọn: chỉ các công cụ để xây dựng, cho mô hình cục bộ nhỏ. Đầy đủ: mọi công cụ. Tự động: mọi công cụ khi cuộc trò chuyện có chỗ cho 64k token trở lên.
+(every tool)	(mọi công cụ)
+(the lean list)	(danh sách gọn)
+(the lean list until its server says it holds more)	(danh sách gọn cho đến khi máy chủ của nó cho biết chứa được nhiều hơn)
+Set which tools an AI is offered	Đặt công cụ mà AI nhận được

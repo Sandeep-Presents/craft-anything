@@ -27,9 +27,45 @@ pub mod prompt;
 pub mod providers;
 pub mod rebuild;
 pub mod ssh;
+pub mod window;
 
+/// The context budgets offered in Settings → AI besides Auto and a number of your own.
+pub const CONTEXT_PRESETS: &[u64] = &[8_192, 16_384, 32_768, 65_536, 131_072, 262_144, 524_288, 1_048_576];
+
+/// What a backend's server said about its context window ([`AiHub::server_window`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ServerWindow {
+    /// The window, when the server named one.
+    pub window: Option<window::Window>,
+    /// A server on this computer or its network (its budget may rise to fill a large window).
+    pub local: bool,
+}
+
+impl ServerWindow {
+    /// Whether a builder on this backend gets the lean tool list with these settings (`tools`, and
+    /// the context budget: `None` is Auto), decided exactly as the agent loop decides once it knows
+    /// the window.
+    pub fn lean_tools(&self, tools: ToolList, configured: Option<u64>) -> bool {
+        agent::offers_lean(tools, self.local, self.budget(configured))
+    }
+
+    /// Whether the lean list is only for now: it is lean, the server hasn't named a window, and
+    /// one naming a large window would lift it. A budget set below the full list's stays lean.
+    pub fn lean_until_told(&self, tools: ToolList, configured: Option<u64>) -> bool {
+        let told = ServerWindow { window: Some(window::Window { tokens: u64::MAX / 2, source: "" }), ..*self };
+        self.window.is_none() && self.lean_tools(tools, configured) && !told.lean_tools(tools, configured)
+    }
+
+    /// The budget a conversation gets with this setting (`None`: Auto), worked out exactly as the
+    /// agent loop does before its first request.
+    pub fn budget(&self, configured: Option<u64>) -> u64 {
+        agent::context_budget_from(configured.unwrap_or(0), None, self.window.map(|w| w.tokens), self.local)
+    }
+}
+
+pub use agent::FULL_TOOLS_BUDGET;
 pub use cli_agents::models::{AgentModel, ModelContext};
-pub use config::{AiConfig, BackendEntry, BackendOptions, Price};
+pub use config::{AiConfig, BackendEntry, BackendOptions, Price, ToolList};
 pub use failure::{FailureKind, TurnFailure};
 pub use keys::KeyStore;
 pub use model::Effort;
@@ -405,6 +441,10 @@ impl ChatModel for Tunneled {
     fn model(&self) -> String {
         self.inner.model()
     }
+
+    fn context_window(&self) -> Option<window::Window> {
+        self.inner.context_window()
+    }
 }
 
 /// The tools this layer adds to the engine's (rebuild control), for
@@ -754,6 +794,51 @@ impl AiHub {
         Ok(true)
     }
 
+    /// Set how many input tokens an API backend's conversation may grow to before it's trimmed
+    /// (`None`: the window its server says, else the local/cloud default). Agent apps keep their own.
+    pub fn set_context_tokens(&self, name: &str, budget: Option<u64>) -> Result<bool, ToolError> {
+        let mut cfg = self.config_to_change()?;
+        let Some(b) = cfg.backends.iter_mut().find(|b| b.config.name == name) else { return Ok(false) };
+        if b.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which keeps its own conversation."))
+                .with_remediation("A context budget is for API backends."));
+        }
+        b.options.context_tokens = budget.filter(|n| *n > 0);
+        self.save_config(&cfg)?;
+        Ok(true)
+    }
+
+    /// Set which tools a builder on an API backend is offered (`None`: Auto). Returns whether the
+    /// backend exists.
+    pub fn set_tools(&self, name: &str, tools: Option<ToolList>) -> Result<bool, ToolError> {
+        let mut cfg = self.config_to_change()?;
+        let Some(b) = cfg.backends.iter_mut().find(|b| b.config.name == name) else { return Ok(false) };
+        if b.config.kind == BackendKind::AgentCli {
+            return Err(
+                ToolError::invalid(format!("{name} is an agent app, which brings its own tools.")).with_remediation("The tool list is for API backends.")
+            );
+        }
+        b.options.tools = tools.filter(|t| *t != ToolList::Auto);
+        self.save_config(&cfg)?;
+        Ok(true)
+    }
+
+    /// What a backend's server says about its context window, for showing what its budget works
+    /// out to (Settings → AI, `ai context`). A backend reached over ssh isn't asked here (a tunnel
+    /// would be opened just for this), nor one that can't be built (no key): the window is then
+    /// unknown, as it is when the server doesn't say. Blocking (bounded); run it off the UI thread.
+    pub fn server_window(&self, name: &str) -> Result<ServerWindow, ToolError> {
+        let e = self.entry(name)?;
+        if e.config.kind == BackendKind::AgentCli {
+            return Err(ToolError::invalid(format!("{name} is an agent app, which keeps its own conversation."))
+                .with_remediation("A context budget is for API backends."));
+        }
+        let over_ssh = e.config.ssh_host.as_deref().is_some_and(|h| !h.trim().is_empty());
+        let slot = if over_ssh { None } else { self.build_model(&e).ok() };
+        let local = slot.as_ref().map_or(e.config.kind == BackendKind::OpenaiCompatible, |s| s.local);
+        Ok(ServerWindow { window: slot.and_then(|s| s.model.context_window()), local })
+    }
+
     /// The models a backend can be set to: the API's or registered agent's list.
     /// Empty for an agent app that picks its own. Blocking (bounded); run it off the UI thread.
     pub fn model_choices(&self, name: &str) -> Result<Vec<String>, ToolError> {
@@ -1008,6 +1093,8 @@ impl AiHub {
                 let key = self.keys.get(&c.name).or_else(|| go_env_key(base).or_else(|| providers::env_key(base)));
                 let mut o = compatible_client(&c.name, base, key, &c.model, &self.session_id());
                 o.react = e.options.react_fallback.unwrap_or(false);
+                o.asks_window = true;
+                o.on_this_network = local;
                 with_limit(o)
             }
             BackendKind::AgentCli => return Err(ToolError::invalid(format!("{} is an agent app, not an API backend.", c.name))),
@@ -1027,6 +1114,7 @@ impl AiHub {
             effort: e.options.effort,
             max_turns: e.options.max_turns.unwrap_or(agent::DEFAULT_MAX_TURNS),
             context_tokens: e.options.context_tokens.unwrap_or(0),
+            tools: e.options.tools.unwrap_or_default(),
         })
     }
 

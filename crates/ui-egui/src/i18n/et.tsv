@@ -1488,3 +1488,22 @@ Updated to {version}.	Uuendatud versioonile {version}.
 Use Releases or your package manager to update this installation.	Selle paigalduse uuendamiseks kasuta Väljalaskeid või paketihaldurit.
 You're up to date.	Sul on uusim versioon.
 {version} is available.	Saadaval on {version}.
+Ask an AI's server how much it holds	Küsi AI serverilt, kui palju see mahutab
+Asking the server…	Serveri küsimine…
+Auto	Automaatne
+Auto: {budget} tokens of the server's {window}	Automaatne: {budget} tokenit, server mahutab {window}
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automaatne: {budget} tokenit, tavaline kogus (server ei ütle, kui palju see mahutab)
+Context budget (tokens)	Konteksti eelarve (tokenid)
+Custom…	Kohandatud…
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Kui suur osa vestlusest saadetakse, enne kui vanemaid osi kärbitakse. Automaatne: nii palju, kui mudeli server ütleb end mahutavat, või turvaline vaikeväärtus, kui ta seda ei ütle.
+Set an AI's context budget	Määra AI konteksti eelarve
+The server holds {window}	Server mahutab {window}
+{budget} will be used: the server holds {window}	Kasutatakse {budget}: server mahutab {window}
+Tools for building	Tööriistad ehitamiseks
+Lean	Lühike
+Full	Täielik
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Milliseid tööriistu selle AI ehitajale pakutakse. Lühike: ainult ehitamise tööriistad, väikestele kohalikele mudelitele. Täielik: kõik tööriistad. Automaatne: kõik tööriistad, kui vestlusesse mahub 64k tokenit või rohkem.
+(every tool)	(kõik tööriistad)
+(the lean list)	(lühike loend)
+(the lean list until its server says it holds more)	(lühike loend, kuni selle server ütleb, et mahutab rohkem)
+Set which tools an AI is offered	Määra, milliseid tööriistu AI-le pakutakse

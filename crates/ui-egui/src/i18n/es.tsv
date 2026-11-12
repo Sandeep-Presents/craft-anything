@@ -1488,3 +1488,22 @@ Updated to {version}.	Actualizado a {version}.
 Use Releases or your package manager to update this installation.	Usa Versiones o tu gestor de paquetes para actualizar esta instalación.
 You're up to date.	Tienes la última versión.
 {version} is available.	{version} está disponible.
+Context budget (tokens)	Presupuesto de contexto (tokens)
+Auto	Automático
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Cuánto de la conversación se envía antes de recortar las partes antiguas. Automático: el espacio que dice tener el servidor del modelo, o un valor seguro si no lo dice.
+Set an AI's context budget	Fijar el presupuesto de contexto de una IA
+Custom…	Personalizado…
+Asking the server…	Preguntando al servidor…
+Auto: {budget} tokens of the server's {window}	Automático: {budget} tokens de los {window} del servidor
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automático: {budget} tokens, la cantidad habitual (su servidor no dice cuánto admite)
+{budget} will be used: the server holds {window}	Se usarán {budget}: el servidor admite {window}
+The server holds {window}	El servidor admite {window}
+Ask an AI's server how much it holds	Preguntar al servidor de una IA cuánto admite
+Tools for building	Herramientas para construir
+Lean	Ligera
+Full	Completa
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Qué herramientas recibe quien construye con esta IA. Ligera: solo las herramientas para construir, para modelos locales pequeños. Completa: todas las herramientas. Automático: todas cuando la conversación tiene espacio para 64k tokens o más.
+(every tool)	(todas las herramientas)
+(the lean list)	(la lista ligera)
+(the lean list until its server says it holds more)	(la lista ligera hasta que su servidor diga que admite más)
+Set which tools an AI is offered	Elegir qué herramientas recibe una IA
