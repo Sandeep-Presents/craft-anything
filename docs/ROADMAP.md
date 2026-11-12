@@ -235,6 +235,11 @@ only when it's green and a maintainer has fully reviewed it, code as well as wor
       with the fixture's canonical path, so macOS's `/var` → `/private/var` alias does not fail
       the test. Remote expansion and special-character quoting checks are retained — PR #949
       — claimed: Codex, branch test/r5.2-macos-remote-query-path
+- [x] `claude_codes_account_folder_is_set_in_settings` (ui-egui smoke) failed about one CI run in
+      ten: every job that changes an AI hands back a snapshot of the backends, and one read before
+      a save could be shown after it, putting the old folder back (in the app too, until the next
+      refresh). Snapshots are numbered as they're read and an older one is dropped
+      — claimed: bflatastic, branch bugfix/r5.2-stale-backend-snapshots
 - [x] `which::tests::usual_windows_dirs_come_after_path` (platform) failed on Windows with 10
       found, 9 expected ("nothing twice"): #748's second Antigravity folder, counted since #770
 - [x] `capture::console_tests` (platform) timed out now and then with the whole platform suite

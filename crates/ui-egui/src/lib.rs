@@ -159,8 +159,9 @@ pub enum Done {
     Detected(Vec<Detected>, Vec<craft_anything_ai::detect::DetectHint>),
     AgentConnection(String, Result<String, String>),
     /// The configured backends, the ones chosen to build with and to extract with, and each one's
-    /// options.
+    /// options. The first field is when the snapshot was read (see [`backends`]).
     Backends(
+        u64,
         Vec<BackendConfig>,
         Option<String>,
         Option<String>,
@@ -546,6 +547,9 @@ pub struct CraftApp {
     /// a save or a newer check.
     pub backend_keys: Option<std::collections::BTreeMap<String, bool>>,
     backend_keys_request: u64,
+    /// The newest backends snapshot shown (`Done::Backends`): one read before it, from a job that
+    /// finished later, is dropped, so a slow refresh can't put back what a save just changed.
+    backends_read: u64,
     /// What has been typed in each API backend's key field, kept across frames and after a failed
     /// save.
     pub backend_key_inputs: std::collections::BTreeMap<String, String>,
@@ -660,6 +664,7 @@ impl CraftApp {
             asset_keys: None,
             backend_keys: None,
             backend_keys_request: 0,
+            backends_read: 0,
             backend_key_inputs: Default::default(),
             backend_key_pending: Default::default(),
             facts: Default::default(),
@@ -1600,7 +1605,11 @@ impl CraftApp {
             Done::AgentConnection(name, result) => {
                 self.agent_connections.insert(name, Some(result));
             }
-            Done::Backends(b, builder, extractor, options, replaced) => {
+            Done::Backends(read, b, builder, extractor, options, replaced) => {
+                if read < self.backends_read {
+                    return;
+                }
+                self.backends_read = read;
                 if self.state.backend.as_ref().is_some_and(|n| !b.iter().any(|c| &c.name == n)) {
                     self.state.backend = None;
                 }
@@ -2116,7 +2125,10 @@ pub fn app_icon(size: f32) -> egui::Image<'static> {
 /// Run an action; a panic is logged and swallowed so one bad action never takes the app down.
 /// The configured backends and the ones chosen to build and to extract (read off the UI thread).
 pub(crate) fn backends(hub: &AiHub) -> Done {
+    // Numbered before reading: a snapshot read after a save always outnumbers one read before it.
+    static READS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     Done::Backends(
+        READS.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         hub.backends(),
         hub.chosen(craft_anything_ai::Role::Builder),
         hub.chosen(craft_anything_ai::Role::Extractor),
@@ -2261,5 +2273,33 @@ pub mod updates;
 impl Drop for CraftApp {
     fn drop(&mut self) {
         self.updates.finish();
+    }
+}
+
+#[cfg(test)]
+mod backend_snapshot_tests {
+    use super::*;
+
+    /// A backends snapshot read before the one already shown (a slow refresh finishing after a
+    /// save's) is dropped, so it can't put back what the save changed.
+    #[test]
+    fn an_older_backends_snapshot_does_not_replace_a_newer_one() {
+        let mut app = demo::app(demo::engine(Mode::Experienced, true));
+        let snapshot = |read: u64, name: &str| {
+            let backend = BackendConfig {
+                name: name.into(),
+                kind: craft_anything_ai::BackendKind::AgentCli,
+                model: "claude-code".into(),
+                base_url: None,
+                ssh_host: None,
+                enabled: true,
+            };
+            Done::Backends(read, vec![backend], None, None, Default::default(), Default::default())
+        };
+        app.handle_done(jobs::Finished { job: 1, result: Ok(snapshot(10, "New")) });
+        app.handle_done(jobs::Finished { job: 2, result: Ok(snapshot(5, "Old")) });
+        assert_eq!(app.backends.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["New"]);
+        app.handle_done(jobs::Finished { job: 3, result: Ok(snapshot(11, "Newer")) });
+        assert_eq!(app.backends.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["Newer"]);
     }
 }
