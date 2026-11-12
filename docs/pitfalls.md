@@ -199,6 +199,17 @@ off the UI thread; a UI test that added pictures, ran three frames and then look
 fast machines and failed in CI on unrelated PRs. When work moves to a worker, grep the tests that
 call it and make them `wait` for the result, not `run_steps(n)`.
 
+**A click on a button below the window's edge.** A field added to each AI card pushed Settings →
+AI's Add button just past the bottom of the Settings window; its rectangle was still on the screen,
+so kittest clicked there, the click landed outside the window and closed it, and the test timed out
+waiting for the AI to be added. A test that clicks something below content that can grow calls
+`scroll_to_me()` on it first.
+
+**A stand-in server that answers every request in order.** The AI tests' `mock` answered each
+request with the next scripted reply, so when the agent began asking the server for its context
+window before the first chat, that question took the chat's reply. A stand-in says which requests
+it was scripted for and answers anything else as a real server that doesn't know would.
+
 ## Building and running
 
 **A documentation edit rebuilt dependencies in a separate cache.** A sequential review follow-up
@@ -758,6 +769,19 @@ and run `cargo xtask secrets` before every commit (the `.githooks/pre-commit` ho
 run, while the round numbers carried over, so "Try again" bought six more checks each press and a build that never
 worked reached check 40 and 49 (#736). A limit that must hold across runs is a count saved with the project, and
 it's reset only by a new request. Test it with several runs in a row, not one.
+
+**A cap meant for a default, applied to what the person set.** The 150k limit that keeps a paid
+service's Auto budget cheap was applied to the window read from the server before the person's
+own budget was compared with it, so a 390k budget on a service with a 1M window became 150k, in
+the loop, the Settings note and `ai context` alike (found in review of #1155). Apply a default's
+limit only on the path where no value was set, and test a set value above that limit.
+
+**A question that started what it asked about.** The window probe skipped llama-swap's upstream
+route for an unloaded model, but went on to llama.cpp's `/props?model=…` on the same server, and
+llama-swap starts a model for that too: asking about a model with no window in the list unloaded
+the one in use and loaded the other (seen live; the test had only checked that the upstream route
+wasn't asked). Once a server is known to start models on request, ask it nothing but its list
+about one that isn't loaded, and test the whole list of URLs asked, not one of them.
 
 **One field, two meanings.** `TurnDone`'s `input_tokens` included cached tokens from every coding agent but not
 from the built-in loop, which keeps them apart as Anthropic reports them. Once Ollama 0.40 reported its cache, a

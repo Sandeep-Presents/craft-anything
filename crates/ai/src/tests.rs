@@ -101,12 +101,24 @@ fn mock(responses: Vec<(u16, &'static str, String)>) -> (String, Arc<Mutex<Vec<S
     let seen = Arc::new(Mutex::new(Vec::new()));
     let s2 = seen.clone();
     std::thread::spawn(move || {
-        for (status, ctype, reply) in responses {
+        let mut responses = responses.into_iter().peekable();
+        while let Some((next_status, next_type, _)) = responses.peek() {
+            let lists_next = *next_status == 200 && *next_type == "application/json";
             let Ok((stream, _)) = l.accept() else { return };
             let mut r = BufReader::new(stream.try_clone().unwrap());
             let mut line = String::new();
             r.read_line(&mut line).unwrap();
             let path = line.split_whitespace().nth(1).unwrap_or_default().to_string();
+            // Scripted questions are model lists answered with a list. Any other question is a
+            // window probe (crate::window) the test didn't script: say nothing, as a server that
+            // doesn't report its window does, and keep the scripted answer for the request after.
+            if line.starts_with("GET ") && !(lists_next && path.ends_with("/models")) {
+                let mut w = stream;
+                write!(w, "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n").unwrap();
+                w.flush().unwrap();
+                continue;
+            }
+            let Some((status, ctype, reply)) = responses.next() else { return };
             let mut headers = Vec::new();
             let mut len = 0usize;
             loop {
@@ -644,6 +656,42 @@ fn an_ais_model_is_changed() {
     assert_eq!(h.backends().into_iter().find(|b| b.name == "Claude Code").unwrap().model, "claude-code");
     assert!(!h.set_model("Nobody", "m").unwrap());
     assert!(h.set_model("Box", " ").is_err());
+}
+
+/// An API backend's context budget is set and cleared; an agent app keeps its own conversation.
+#[test]
+fn an_ais_context_budget_is_set_and_cleared() {
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Box", BackendKind::OpenaiCompatible, "qwen"), None).unwrap();
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    let budget = |h: &AiHub| h.options().get("Box").and_then(|o| o.context_tokens);
+    assert!(h.set_context_tokens("Box", Some(390_000)).unwrap());
+    assert_eq!(budget(&h), Some(390_000));
+    assert!(h.set_context_tokens("Box", None).unwrap());
+    assert_eq!(budget(&h), None, "Auto again");
+    assert!(h.set_context_tokens("Box", Some(0)).unwrap());
+    assert_eq!(budget(&h), None, "zero is Auto, not a budget of nothing");
+    assert!(h.set_context_tokens("Codex", Some(1000)).is_err());
+    assert!(!h.set_context_tokens("Nobody", Some(1000)).unwrap());
+}
+
+/// What a budget works out to: Auto fills three quarters of a local window, a setting is held to
+/// it, and with no window the defaults apply.
+#[test]
+fn a_budget_is_worked_out_from_the_servers_window() {
+    let w = |tokens: Option<u64>, local| crate::ServerWindow { window: tokens.map(|tokens| crate::window::Window { tokens, source: "model list" }), local };
+    assert_eq!(w(Some(524_288), true).budget(None), 393_216);
+    assert_eq!(w(Some(524_288), true).budget(Some(131_072)), 131_072);
+    assert_eq!(w(Some(262_144), true).budget(Some(1_048_576)), 196_608, "held to what the server holds");
+    assert_eq!(w(None, true).budget(None), crate::context::LOCAL_CONTEXT_TOKENS);
+    assert_eq!(w(None, false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS);
+    assert_eq!(w(Some(1_000_000), false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS, "a paid service isn't raised");
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    assert!(h.server_window("Codex").is_err());
+    assert!(h.server_window("Nobody").is_err());
 }
 
 /// Every Claude effort level can be chosen for the Claude API and Claude Code, and only for them.

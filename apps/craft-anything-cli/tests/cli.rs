@@ -33,6 +33,27 @@ fn opencode_cli_lists_supported_depths_and_rejects_unsupported_choices() {
     assert_eq!(cli(&["ai", "model", "OpenCode", "test/model", "--default"], cfg.path()).code, Some(2));
 }
 
+/// `ai context` shows, sets and clears an API backend's context budget, and refuses what isn't one.
+#[test]
+fn an_ais_context_budget_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "context", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // Nothing answers at that address, so no window is known: Auto is the local default.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["auto"].clone(), auto["window"].clone(), auto["budget"].clone()), (json!(true), Value::Null, json!(24_000)));
+    assert!(cli(&["ai", "context", "Box", "390,000"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["context_tokens"], 390_000);
+    assert_eq!(shown(cfg.path())["budget"], 390_000);
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("context_tokens = 390000"));
+    assert!(!cli(&["ai", "context", "Box", "lots"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["context_tokens"], 390_000, "a refused value changes nothing");
+    assert!(cli(&["ai", "context", "Box", "auto"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["auto"], true);
+    assert!(!cli(&["ai", "context", "Nobody"], cfg.path()).success);
+}
+
 #[test]
 fn commands_and_exit_codes() {
     let cfg = tempfile::tempdir().unwrap();

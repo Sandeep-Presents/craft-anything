@@ -94,6 +94,10 @@ pub enum AiCommand {
     /// Set how hard a Claude backend thinks (the Claude API or Claude Code): low, medium, high,
     /// xhigh or max, or `default` for the usual level; leave it out to see the level and choices.
     Effort { name: String, level: Option<String> },
+    /// Set how many input tokens an API backend's conversation may grow to before older parts are
+    /// trimmed, or `auto` for what its server says it has room for (else the default); leave it
+    /// out to see the setting.
+    Context { name: String, tokens: Option<String> },
     /// Send a tiny request and report latency.
     Test { name: String },
     /// Choose the backend that builds (leave the name out to go back to automatic).
@@ -400,6 +404,40 @@ pub fn ai(cli: &Cli, c: &AiCommand, f: Format) -> u8 {
             match hub.set_effort(name, effort) {
                 Ok(found) => {
                     emit(&json!({"name": name, "effort": effort.map(Effort::as_str), "found": found}), f);
+                    if found { 0 } else { 1 }
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Context { name, tokens: None } => {
+            let tokens = hub.options().get(name).and_then(|o| o.context_tokens).filter(|n| *n > 0);
+            match hub.server_window(name) {
+                Ok(server) => {
+                    let (window, source) = (server.window.map(|w| w.tokens), server.window.map(|w| w.source));
+                    let budget = server.budget(tokens);
+                    emit(
+                        &json!({"name": name, "context_tokens": tokens, "auto": tokens.is_none(), "window": window, "window_source": source, "budget": budget}),
+                        f,
+                    );
+                    0
+                }
+                Err(e) => fail(&e, f),
+            }
+        }
+        AiCommand::Context { name, tokens: Some(tokens) } => {
+            let budget = match tokens.trim() {
+                "auto" => None,
+                t => match t.replace(['_', ','], "").parse::<u64>().ok().filter(|n| *n > 0) {
+                    Some(n) => Some(n),
+                    None => {
+                        let e = ToolError::invalid(format!("{t:?} isn't a number of tokens.")).with_remediation("Use a whole number such as 390000, or auto.");
+                        return fail(&e, f);
+                    }
+                },
+            };
+            match hub.set_context_tokens(name, budget) {
+                Ok(found) => {
+                    emit(&json!({"name": name, "context_tokens": budget, "found": found}), f);
                     if found { 0 } else { 1 }
                 }
                 Err(e) => fail(&e, f),

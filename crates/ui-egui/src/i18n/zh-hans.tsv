@@ -1488,3 +1488,14 @@ Updated to {version}.	已更新至 {version}。
 Use Releases or your package manager to update this installation.	请通过“发行版本”或软件包管理器更新此安装。
 You're up to date.	已是最新版本。
 {version} is available.	{version} 已可用。
+Context budget (tokens)	上下文预算（令牌）
+Auto	自动
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	在截短较早内容之前发送多少对话。自动：模型服务器所说的容量，若它不说则用安全的默认值。
+Set an AI's context budget	设置 AI 的上下文预算
+Custom…	自定义…
+Asking the server…	正在询问服务器…
+Auto: {budget} tokens of the server's {window}	自动：服务器 {window} 中的 {budget} 个令牌
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	自动：{budget} 个令牌，常规用量（服务器未说明能容纳多少）
+{budget} will be used: the server holds {window}	将使用 {budget}：服务器可容纳 {window}
+The server holds {window}	服务器可容纳 {window}
+Ask an AI's server how much it holds	询问 AI 的服务器能容纳多少

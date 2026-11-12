@@ -297,6 +297,26 @@ impl CraftApp {
         });
     }
 
+    /// Set how much of the conversation an AI is sent (`None`: what its server says, or the default).
+    pub fn set_context_tokens(&mut self, name: &str, budget: Option<u64>) {
+        let (hub, name) = (self.hub.clone(), name.to_string());
+        self.jobs.spawn(tr("Set an AI's context budget"), false, move |_| {
+            hub.set_context_tokens(&name, budget).map_err(|e| e.message)?;
+            Ok(crate::backends(&hub))
+        });
+    }
+
+    /// Ask an AI's server how large its context window is, so Settings → AI can say what Auto
+    /// works out to. Asked again when the AI's model changes.
+    pub fn ask_server_window(&mut self, name: &str, model: &str) {
+        let (hub, name, model) = (self.hub.clone(), name.to_string(), model.to_string());
+        self.server_windows.insert(name.clone(), (model.clone(), None));
+        self.jobs.spawn(tr("Ask an AI's server how much it holds"), false, move |_| {
+            let result = hub.server_window(&name);
+            Ok(crate::Done::ServerWindow { name, model, result })
+        });
+    }
+
     /// Connect the server in Settings → AI's address form. Its key goes to the keychain; the form
     /// keeps what was typed until it's added, so a mistake can be fixed.
     pub fn add_server(&mut self) {
@@ -479,4 +499,88 @@ pub fn need_builder_modal(app: &mut CraftApp, ui: &mut Ui, start: bool, close: &
             }
         });
     });
+}
+
+/// What the context budget field holds: `Some(None)` when it's empty (Auto), `Some(Some(n))` for a
+/// whole number of tokens (spaces, commas and underscores between digits allowed), `None` for text
+/// that isn't one, which leaves the setting as it was.
+pub fn context_budget(text: &str) -> Option<Option<u64>> {
+    let digits: String = text.chars().filter(|c| !matches!(c, ' ' | ',' | '_')).collect();
+    if digits.is_empty() {
+        return Some(None);
+    }
+    digits.parse::<u64>().ok().filter(|n| *n > 0).map(Some)
+}
+
+/// A number of tokens, grouped in threes: `393,216`.
+pub fn token_count(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A preset budget's short name: `8k`, `128k`, `1M`.
+pub fn budget_label(n: u64) -> String {
+    const MI: u64 = 1_048_576;
+    if n >= MI && n.is_multiple_of(MI) {
+        format!("{}M", n / MI)
+    } else if n.is_multiple_of(1024) {
+        format!("{}k", n / 1024)
+    } else {
+        token_count(n)
+    }
+}
+
+/// Forget each server answer that named no window, so Settings asks again: Ollama and LM Studio
+/// say it only once the model is loaded, which may have happened since. Asks still going stay.
+pub fn forget_windowless(windows: &mut std::collections::BTreeMap<String, (String, Option<Option<craft_anything_ai::ServerWindow>>)>) {
+    windows.retain(|_, (_, answer)| !matches!(answer, Some(None) | Some(Some(craft_anything_ai::ServerWindow { window: None, .. }))));
+}
+
+#[cfg(test)]
+mod context_budget_tests {
+    use super::{budget_label, context_budget, token_count};
+
+    #[test]
+    fn budgets_are_named_plainly() {
+        assert_eq!(
+            [token_count(0), token_count(999), token_count(1000), token_count(393_216), token_count(1_048_576)],
+            ["0", "999", "1,000", "393,216", "1,048,576"]
+        );
+        let presets: Vec<String> = craft_anything_ai::CONTEXT_PRESETS.iter().map(|n| budget_label(*n)).collect();
+        assert_eq!(presets, ["8k", "16k", "32k", "64k", "128k", "256k", "512k", "1M"]);
+        assert_eq!(budget_label(390_000), "390,000");
+    }
+
+    #[test]
+    fn the_field_reads_auto_numbers_and_nothing_else() {
+        assert_eq!(context_budget(""), Some(None));
+        assert_eq!(context_budget("  "), Some(None));
+        assert_eq!(context_budget("390000"), Some(Some(390_000)));
+        assert_eq!(context_budget("390,000"), Some(Some(390_000)));
+        assert_eq!(context_budget("390_000"), Some(Some(390_000)));
+        for bad in ["0", "-5", "12k", "1.5", "lots", "99999999999999999999999"] {
+            assert_eq!(context_budget(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn opening_settings_forgets_only_the_answers_without_a_window() {
+        use craft_anything_ai::{ServerWindow, window::Window};
+        let known = ServerWindow { window: Some(Window { tokens: 524_288, source: "llama.cpp" }), local: true };
+        let unknown = ServerWindow { window: None, local: true };
+        let mut windows: std::collections::BTreeMap<String, (String, Option<Option<ServerWindow>>)> =
+            [("known", Some(Some(known))), ("unknown", Some(Some(unknown))), ("unreachable", Some(None)), ("asking", None)]
+                .into_iter()
+                .map(|(name, answer)| (name.to_string(), ("m".to_string(), answer)))
+                .collect();
+        super::forget_windowless(&mut windows);
+        assert_eq!(windows.keys().map(String::as_str).collect::<Vec<_>>(), ["asking", "known"]);
+    }
 }

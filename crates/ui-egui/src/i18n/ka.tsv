@@ -1488,3 +1488,14 @@ Updated to {version}.	განახლდა {version} ვერსიამ�
 Use Releases or your package manager to update this installation.	ამ ინსტალაციის გასაახლებლად გამოიყენეთ გამოშვებები ან პაკეტების მმართველი.
 You're up to date.	უახლეს ვერსიას იყენებთ.
 {version} is available.	ხელმისაწვდომია {version}.
+Context budget (tokens)	კონტექსტის ბიუჯეტი (ტოკენები)
+Auto	ავტომატური
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	საუბრის რა ნაწილი იგზავნება, სანამ ძველი ნაწილები შემოიკვეცება. ავტომატური: რამდენ ადგილსაც ამბობს მოდელის სერვერი, ან უსაფრთხო ნაგულისხმევი, თუ არ ამბობს.
+Set an AI's context budget	AI-ის კონტექსტის ბიუჯეტის დაყენება
+Custom…	საკუთარი…
+Asking the server…	სერვერს ვეკითხები…
+Auto: {budget} tokens of the server's {window}	ავტომატური: {budget} ტოკენი სერვერის {window}-დან
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	ავტომატური: {budget} ტოკენი, ჩვეული რაოდენობა (სერვერი არ ამბობს, რამდენს იტევს)
+{budget} will be used: the server holds {window}	გამოყენებული იქნება {budget}: სერვერი იტევს {window}-ს
+The server holds {window}	სერვერი იტევს {window}-ს
+Ask an AI's server how much it holds	ჰკითხე AI-ის სერვერს, რამდენს იტევს
