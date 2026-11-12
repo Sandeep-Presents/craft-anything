@@ -1488,3 +1488,22 @@ Updated to {version}.	อัปเดตเป็น {version} แล้ว
 Use Releases or your package manager to update this installation.	ใช้รุ่นที่เผยแพร่หรือตัวจัดการแพ็กเกจเพื่ออัปเดตการติดตั้งนี้
 You're up to date.	คุณใช้เวอร์ชันล่าสุดแล้ว
 {version} is available.	มี {version} พร้อมใช้งานแล้ว
+Context budget (tokens)	งบบริบท (โทเค็น)
+Auto	อัตโนมัติ
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	ปริมาณบทสนทนาที่ส่งก่อนตัดส่วนเก่าออก อัตโนมัติ: เท่าที่เซิร์ฟเวอร์ของโมเดลบอกว่ารับได้ หรือค่าเริ่มต้นที่ปลอดภัยเมื่อไม่บอก
+Set an AI's context budget	ตั้งงบบริบทของ AI
+Custom…	กำหนดเอง…
+Asking the server…	กำลังถามเซิร์ฟเวอร์…
+Auto: {budget} tokens of the server's {window}	อัตโนมัติ: {budget} โทเค็น จาก {window} ของเซิร์ฟเวอร์
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	อัตโนมัติ: {budget} โทเค็น ค่าปกติ (เซิร์ฟเวอร์ไม่บอกว่ารับได้เท่าไร)
+{budget} will be used: the server holds {window}	จะใช้ {budget}: เซิร์ฟเวอร์รับได้ {window}
+The server holds {window}	เซิร์ฟเวอร์รับได้ {window}
+Ask an AI's server how much it holds	ถามเซิร์ฟเวอร์ของ AI ว่ารับได้เท่าไร
+Tools for building	เครื่องมือสำหรับสร้าง
+Lean	แบบย่อ
+Full	ทั้งหมด
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	เครื่องมือที่ผู้สร้างบน AI นี้ได้รับ แบบย่อ: เฉพาะเครื่องมือสำหรับสร้าง สำหรับโมเดลในเครื่องขนาดเล็ก ทั้งหมด: ทุกเครื่องมือ อัตโนมัติ: ทุกเครื่องมือเมื่อบทสนทนามีที่ว่างตั้งแต่ 64k โทเค็นขึ้นไป
+(every tool)	(ทุกเครื่องมือ)
+(the lean list)	(รายการแบบย่อ)
+(the lean list until its server says it holds more)	(รายการแบบย่อ จนกว่าเซิร์ฟเวอร์จะบอกว่ารองรับได้มากกว่านี้)
+Set which tools an AI is offered	ตั้งเครื่องมือที่ AI ได้รับ

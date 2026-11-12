@@ -1488,3 +1488,22 @@ Updated to {version}.	Обновлено до {version}.
 Use Releases or your package manager to update this installation.	Обновите эту установку через выпуски или менеджер пакетов.
 You're up to date.	Установлена последняя версия.
 {version} is available.	Доступна версия {version}.
+Context budget (tokens)	Бюджет контекста (токены)
+Auto	Авто
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Сколько разговора отправляется, прежде чем старые части сокращаются. Авто: столько, сколько, по словам сервера модели, в него помещается, или безопасное значение, если он не говорит.
+Set an AI's context budget	Задать бюджет контекста ИИ
+Custom…	Своё…
+Asking the server…	Спрашиваю сервер…
+Auto: {budget} tokens of the server's {window}	Авто: {budget} токенов из {window} у сервера
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Авто: {budget} токенов, обычный объём (сервер не сообщает, сколько вмещает)
+{budget} will be used: the server holds {window}	Будет использовано {budget}: сервер вмещает {window}
+The server holds {window}	Сервер вмещает {window}
+Ask an AI's server how much it holds	Спросить сервер ИИ, сколько он вмещает
+Tools for building	Инструменты для сборки
+Lean	Сокращённый
+Full	Полный
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Какие инструменты получает сборщик на этом ИИ. Сокращённый: только инструменты для сборки, для небольших локальных моделей. Полный: все инструменты. Авто: все инструменты, когда в разговоре есть место для 64k токенов или больше.
+(every tool)	(все инструменты)
+(the lean list)	(сокращённый список)
+(the lean list until its server says it holds more)	(сокращённый список, пока его сервер не скажет, что вмещает больше)
+Set which tools an AI is offered	Задать, какие инструменты получает ИИ

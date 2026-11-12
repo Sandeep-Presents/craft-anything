@@ -1488,3 +1488,22 @@ Updated to {version}.	Atualizado para {version}.
 Use Releases or your package manager to update this installation.	Use Versões ou seu gerenciador de pacotes para atualizar esta instalação.
 You're up to date.	Você está usando a versão mais recente.
 {version} is available.	{version} está disponível.
+Context budget (tokens)	Orçamento de contexto (tokens)
+Auto	Automático
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	Quanto da conversa é enviado antes de as partes mais antigas serem cortadas. Automático: o espaço que o servidor do modelo diz ter, ou um padrão seguro quando ele não diz.
+Set an AI's context budget	Definir o orçamento de contexto de uma IA
+Custom…	Personalizado…
+Asking the server…	Perguntando ao servidor…
+Auto: {budget} tokens of the server's {window}	Automático: {budget} tokens dos {window} do servidor
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	Automático: {budget} tokens, a quantidade usual (o servidor não diz quanto comporta)
+{budget} will be used: the server holds {window}	Serão usados {budget}: o servidor comporta {window}
+The server holds {window}	O servidor comporta {window}
+Ask an AI's server how much it holds	Perguntar ao servidor de uma IA quanto ele comporta
+Tools for building	Ferramentas para construir
+Lean	Enxuta
+Full	Completa
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	Quais ferramentas quem constrói com esta IA recebe. Enxuta: só as ferramentas para construir, para modelos locais pequenos. Completa: todas as ferramentas. Automático: todas quando a conversa tem espaço para 64k tokens ou mais.
+(every tool)	(todas as ferramentas)
+(the lean list)	(a lista enxuta)
+(the lean list until its server says it holds more)	(a lista enxuta até o servidor dizer que comporta mais)
+Set which tools an AI is offered	Definir quais ferramentas uma IA recebe
