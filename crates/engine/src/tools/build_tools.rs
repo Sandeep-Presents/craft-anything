@@ -51,7 +51,7 @@ pub fn specs() -> Vec<ToolSpec> {
         spec(
             "build_file_read",
             "Read a project file",
-            "Read a text file in the project (app/, capture/, reference/…), paged by lines with offset/limit for big files.",
+            "Read a text file in the project (app/, capture/, reference/…), paged by lines with offset/limit for big files. A picture (PNG, JPEG, GIF or WebP) isn't read as text: the result says it's one, and the built-in builder shows it to a model that sees.",
             "Reads one of the project's files.",
             Effects::READ_ONLY,
             schema_of::<ReadParams>,
@@ -266,6 +266,17 @@ fn build_file_read(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput, ToolE
     let ws = workspace(ctx)?;
     let path = in_project(&ws, &p.path)?;
     let bytes = std::fs::read(&path).map_err(|e| ToolError::io(path.display(), e))?;
+    // A picture is named by its typed `picture` field, so the agent loop can show it to a model
+    // that sees; an agent app opens it with its own Read tool.
+    if let Some(media_type) = super::web_common::picture_media_type(&bytes) {
+        return Ok(ToolOutput::Value(json!({
+            "path": p.path,
+            "picture": shown(&ws, &path),
+            "media_type": media_type,
+            "bytes": bytes.len(),
+            "note": "It's a picture, so it isn't read as text. A model that sees is shown it after this result.",
+        })));
+    }
     if bytes.iter().take(8000).any(|b| *b == 0) {
         return Err(ToolError::invalid(format!("{} is a binary file.", p.path)).with_remediation("Read text files; look at pictures with your own viewer."));
     }
@@ -422,6 +433,12 @@ mod tests {
         // Not found, ambiguous, outside the project.
         assert!(call(&e, "build_file_edit", json!({"path": "app/src/main.rs", "old_text": "nope", "new_text": "x"})).is_err());
         assert!(call(&e, "build_file_read", json!({"path": "../../etc/passwd"})).is_err());
+        // A picture isn't read as text: it's named, with its kind, by the path shown in the project.
+        std::fs::write(ws.app_dir().join("shot.png"), b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR").unwrap();
+        let shot = call(&e, "build_file_read", json!({"path": "/app/shot.png"})).unwrap();
+        assert_eq!((shot["picture"].as_str(), shot["media_type"].as_str(), shot.get("text")), (Some("app/shot.png"), Some("image/png"), None), "{shot}");
+        std::fs::write(ws.app_dir().join("data.bin"), b"\0\x01\x02").unwrap();
+        assert!(call(&e, "build_file_read", json!({"path": "app/data.bin"})).is_err(), "other binary files are still refused");
         assert!(call(&e, "build_file_write", json!({"path": "../outside.txt", "content": "x"})).is_err());
     }
 
