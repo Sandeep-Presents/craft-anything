@@ -2370,7 +2370,7 @@ fn the_builders_open_questions_show_beside_the_project() {
     h.run_steps(3);
     h.get_by_label("Open questions");
     h.get_by_label("May the original's logo and text be reused, or must they be placeholders?");
-    h.get_by_label("Answer any of them in a message below.");
+    h.get_by_label("To answer one, write your answer in the message box at the bottom and send it.");
 }
 
 #[test]

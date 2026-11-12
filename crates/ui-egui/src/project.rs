@@ -1071,7 +1071,7 @@ fn open_questions(app: &CraftApp, ui: &mut Ui) {
             ui.label(RichText::new(more).size(theme::SMALL).color(t.text_dim));
         }
         ui.add_space(4.0);
-        ui.label(RichText::new(tr("Answer any of them in a message below.")).size(theme::SMALL).color(t.text_dim));
+        ui.label(RichText::new(tr("To answer one, write your answer in the message box at the bottom and send it.")).size(theme::SMALL).color(t.text_dim));
     });
     ui.add_space(14.0);
 }
