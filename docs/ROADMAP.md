@@ -260,8 +260,13 @@ only when it's green and a maintainer has fully reviewed it, code as well as wor
       keys) when rsa 0.10 lands, and unmaintained `zbus_names`/`zvariant` (Linux-only via keyring
       and accesskit) when those move on. `deny.toml`'s comments pointed at R0.3, which never held
       them; they name this line now — claimed: kuseidos, branch docs/r5.2-deny-points-at-its-own-roadmap-line
-- [ ] Check whether the release workflows still run actions that target Node.js 20. None is named
-      here any more: every job calls `storytold/craft-common-actions@main`, so a fix belongs there
+- [x] Check the Node.js runtimes used by the release workflow. At
+      [craft-common-actions 3e2ac19](https://github.com/storytold/craft-common-actions/blob/3e2ac193fdf93009ef6e88ae34fe1c32340ae039/.github/workflows/release.yml),
+      the release workflow and its 15 shared composite actions reach eight external action manifests.
+      Checkout, artifact upload and download, cache restore and save, Rust cache and the FreeBSD VM
+      all declare `node24`. The Rust toolchain installer is a shell composite. Recheck the shared
+      workflow and its action pins if a future release reports a Node.js runtime warning.
+      — claimed: Afloat16, branch docs/r5.2-release-actions-runtime-audit
 - [x] Correct STATUS.md's obsolete GUI-only limit: document the shared project feed, engine
       setup, launch and preview tools, with their consent and lifetime limits — PR #1014
       — claimed: Codex, branch docs/r5.2-headless-status
