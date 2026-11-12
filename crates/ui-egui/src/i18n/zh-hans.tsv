@@ -1488,3 +1488,32 @@ Updated to {version}.	已更新至 {version}。
 Use Releases or your package manager to update this installation.	请通过“发行版本”或软件包管理器更新此安装。
 You're up to date.	已是最新版本。
 {version} is available.	{version} 已可用。
+Context budget (tokens)	上下文预算（令牌）
+Auto	自动
+How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say.	在截短较早内容之前发送多少对话。自动：模型服务器所说的容量，若它不说则用安全的默认值。
+Set an AI's context budget	设置 AI 的上下文预算
+Custom…	自定义…
+Asking the server…	正在询问服务器…
+Auto: {budget} tokens of the server's {window}	自动：服务器 {window} 中的 {budget} 个令牌
+Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)	自动：{budget} 个令牌，常规用量（服务器未说明能容纳多少）
+{budget} will be used: the server holds {window}	将使用 {budget}：服务器可容纳 {window}
+The server holds {window}	服务器可容纳 {window}
+Ask an AI's server how much it holds	询问 AI 的服务器能容纳多少
+Tools for building	构建用的工具
+Lean	精简
+Full	完整
+Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more.	在这个 AI 上构建时提供哪些工具。精简：只有构建用的工具，适合小型本地模型。完整：所有工具。自动：对话有 64k 令牌或更多空间时提供所有工具。
+(every tool)	（所有工具）
+(the lean list)	（精简列表）
+(the lean list until its server says it holds more)	（精简列表，直到它的服务器说能容纳更多）
+Set which tools an AI is offered	设置 AI 可用的工具
+Sees pictures	能看图片
+Yes	是
+No	否
+Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any.	是否给在这个 AI 上构建的助手看图片：原版的截图、你提供的原版图片，以及检查时给构建拍的图片。自动：按它的服务器所说；服务器什么都没说的模型不给看。
+(its server says it sees)	（服务器说它能看）
+(its server says it doesn't)	（服务器说它不能看）
+(its server doesn't say: not shown pictures)	（服务器没说：不给看图片）
+(asked when a build starts: it's reached over SSH)	（构建开始时再问：它通过 SSH 连接）
+Auto (asked when a build starts: it's reached over SSH)	自动（构建开始时再问：它通过 SSH 连接）
+Set whether an AI sees pictures	设置 AI 是否能看图片

@@ -12,8 +12,14 @@ use std::path::PathBuf;
 
 /// Draws the Settings modal and the content for its selected tab.
 pub fn show(app: &mut CraftApp, ctx: &egui::Context) {
+    let shown = egui::Id::new("settings-shown");
     if !app.state.settings_open {
+        ctx.data_mut(|d| d.remove::<bool>(shown));
         return;
+    }
+    if ctx.data(|d| d.get_temp::<bool>(shown)).is_none() {
+        ctx.data_mut(|d| d.insert_temp(shown, true));
+        crate::builders::forget_windowless(&mut app.server_windows);
     }
     let t = Tokens::get(ctx);
     let mut open = true;
@@ -338,7 +344,9 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     let mut folder_drafts = std::mem::take(&mut app.folder_inputs);
     let mut key_drafts = std::mem::take(&mut app.backend_key_inputs);
     let (mut pick_model, mut chosen_model, mut close_picker) = (None, None, false);
-    let mut chosen_effort = None;
+    let (mut chosen_effort, mut save_context, mut save_tools, mut save_vision) = (None, None, None, None);
+    // AIs whose server is to be asked how much it holds (Settings → AI's context budget line).
+    let mut ask_window: Vec<(String, String)> = Vec::new();
     let (mut pick_agent_model, mut chosen_agent_model, mut remote_program) = (None, None, None);
     let (mut tune_models, mut save_tuning) = (Vec::new(), None);
     // A saved API key being replaced or forgotten (the keychain work happens off this frame).
@@ -524,6 +532,157 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
                                 });
                             }
                         });
+                        // How much of the conversation an API backend is sent before older
+                        // parts are trimmed: Auto, a preset, or a number of your own. Beside it,
+                        // what that works out to with the window the AI's server says it holds.
+                        if b.kind != BackendKind::AgentCli {
+                            let saved = app.backend_options.get(&b.name).and_then(|o| o.context_tokens).filter(|n| *n > 0);
+                            let server = app.server_windows.get(&b.name).filter(|(model, _)| *model == current).map(|(_, s)| *s);
+                            if server.is_none() {
+                                ask_window.push((b.name.clone(), current.clone()));
+                            }
+                            ui.horizontal(|ui| {
+                                ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
+                                let custom_id = egui::Id::new(("context-custom", &b.name));
+                                let custom = saved.is_some_and(|n| !craft_anything_ai::CONTEXT_PRESETS.contains(&n)) || ui.data(|d| d.get_temp::<bool>(custom_id)).unwrap_or(false);
+                                let label = ui.label(RichText::new(tr("Context budget (tokens)")).color(t.text_faint).size(theme::CAPTION));
+                                let shown = if custom { tr("Custom…") } else { saved.map_or_else(|| tr("Auto"), crate::builders::budget_label) };
+                                let mut pick = None;
+                                let combo = egui::ComboBox::from_id_salt(("context-budget", &b.name)).icon(widgets::combo_icon).selected_text(shown).show_ui(ui, |ui| {
+                                    if ui.selectable_label(!custom && saved.is_none(), tr("Auto")).clicked() {
+                                        pick = Some(None);
+                                    }
+                                    for &n in craft_anything_ai::CONTEXT_PRESETS {
+                                        if ui.selectable_label(!custom && saved == Some(n), crate::builders::budget_label(n)).clicked() {
+                                            pick = Some(Some(n));
+                                        }
+                                    }
+                                    if ui.selectable_label(custom, tr("Custom…")).clicked() {
+                                        ui.data_mut(|d| d.insert_temp(custom_id, true));
+                                    }
+                                });
+                                combo.response.labelled_by(label.id).on_hover_text(tr("How much of the conversation is sent before older parts are trimmed. Auto: what the model's server says it has room for, or a safe default when it doesn't say."));
+                                if let Some(budget) = pick {
+                                    ui.data_mut(|d| d.remove::<bool>(custom_id));
+                                    if budget != saved {
+                                        save_context = Some((b.name.clone(), budget));
+                                    }
+                                }
+                                // A number of your own: saved when the field is left; text that
+                                // isn't a number reverts.
+                                if custom && pick.is_none() {
+                                    let saved_text = saved.map(|n| n.to_string()).unwrap_or_default();
+                                    let id = egui::Id::new(("context-budget-text", &b.name));
+                                    let mut text = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_else(|| saved_text.clone());
+                                    let r = ui
+                                        .add(egui::TextEdit::singleline(&mut text).desired_width(90.0).frame(widgets::text_field_frame(&t).inner_margin(egui::Margin::symmetric(6, 2))))
+                                        .labelled_by(label.id);
+                                    if r.changed() {
+                                        ui.data_mut(|d| d.insert_temp(id, text.clone()));
+                                    }
+                                    if r.lost_focus() {
+                                        if let Some(budget) = crate::builders::context_budget(&text).filter(|new| new.map(|n| n.to_string()).unwrap_or_default() != saved_text) {
+                                            save_context = Some((b.name.clone(), budget));
+                                        }
+                                        ui.data_mut(|d| d.remove::<String>(id));
+                                    }
+                                }
+                            });
+                            // What the setting works out to, under it, where a long note can wrap;
+                            // no line at all when there's nothing to say.
+                            let note = match server {
+                                None | Some(None) => Some((true, tr("Asking the server…"))),
+                                Some(Some(None)) => None,
+                                Some(Some(Some(server))) => {
+                                    let used = server.budget(saved);
+                                    let budget = crate::builders::token_count(used);
+                                    let window = server.window.map(|w| crate::builders::token_count(w.tokens));
+                                    match (saved, window) {
+                                        (None, Some(window)) => Some(trf("Auto: {budget} tokens of the server's {window}", &[("budget", &budget), ("window", &window)])),
+                                        // Over SSH the server isn't asked here (a tunnel would be opened just for this).
+                                        (None, None) if b.over_ssh() => Some(tr("Auto (asked when a build starts: it's reached over SSH)")),
+                                        (None, None) => Some(trf("Auto: {budget} tokens, the usual amount (its server doesn't say how much it holds)", &[("budget", &budget)])),
+                                        (Some(n), Some(window)) if used < n => Some(trf("{budget} will be used: the server holds {window}", &[("budget", &budget), ("window", &window)])),
+                                        (Some(_), Some(window)) => Some(trf("The server holds {window}", &[("window", &window)])),
+                                        (Some(_), None) => None,
+                                    }
+                                    .map(|text| (false, text))
+                                }
+                            };
+                            if let Some((asking, text)) = note {
+                                ui.horizontal_wrapped(|ui| {
+                                    if asking {
+                                        ui.add(crate::widgets::Spinner::new().size(theme::CAPTION).color(t.accent));
+                                    }
+                                    ui.label(RichText::new(text).color(t.text_faint).size(theme::CAPTION));
+                                });
+                            }
+                            // Which tools a builder on it is offered; beside Auto, the list that
+                            // works out to with the budget above (as the build will decide it).
+                            use craft_anything_ai::ToolList;
+                            let tools = app.backend_options.get(&b.name).and_then(|o| o.tools).unwrap_or_default();
+                            ui.horizontal_wrapped(|ui| {
+                                ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
+                                let label = ui.label(RichText::new(tr("Tools for building")).color(t.text_faint).size(theme::CAPTION));
+                                let named = |l: ToolList| match l {
+                                    ToolList::Auto => tr("Auto"),
+                                    ToolList::Lean => tr("Lean"),
+                                    ToolList::Full => tr("Full"),
+                                };
+                                let combo = egui::ComboBox::from_id_salt(("tool-list", &b.name)).icon(widgets::combo_icon).selected_text(named(tools)).show_ui(ui, |ui| {
+                                    for l in ToolList::ALL {
+                                        if ui.selectable_label(l == tools, named(l)).clicked() && l != tools {
+                                            save_tools = Some((b.name.clone(), l));
+                                        }
+                                    }
+                                });
+                                combo.response.labelled_by(label.id).on_hover_text(tr("Which tools a builder on this AI is offered. Lean: only the tools for building, for small local models. Full: every tool. Auto: every tool when the conversation has room for 64k tokens or more."));
+                                if tools == ToolList::Auto
+                                    && let Some(Some(Some(server))) = server
+                                {
+                                    let works_out = match (server.lean_tools(tools, saved), server.lean_until_told(tools, saved)) {
+                                        (false, _) => tr("(every tool)"),
+                                        (true, false) => tr("(the lean list)"),
+                                        (true, true) if b.over_ssh() => tr("(asked when a build starts: it's reached over SSH)"),
+                                        (true, true) => tr("(the lean list until its server says it holds more)"),
+                                    };
+                                    ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
+                                }
+                            });
+                            // Whether its model is shown pictures (the check's screenshots, the
+                            // person's pictures); beside Auto, what its server says.
+                            use craft_anything_ai::Vision;
+                            let vision = app.backend_options.get(&b.name).and_then(|o| o.vision).unwrap_or_default();
+                            ui.horizontal_wrapped(|ui| {
+                                ui.style_mut().override_font_id = Some(egui::FontId::proportional(theme::CAPTION));
+                                let label = ui.label(RichText::new(tr("Sees pictures")).color(t.text_faint).size(theme::CAPTION));
+                                let named = |v: Vision| match v {
+                                    Vision::Auto => tr("Auto"),
+                                    Vision::Yes => tr("Yes"),
+                                    Vision::No => tr("No"),
+                                };
+                                let combo = egui::ComboBox::from_id_salt(("vision", &b.name)).icon(widgets::combo_icon).selected_text(named(vision)).show_ui(ui, |ui| {
+                                    for v in Vision::ALL {
+                                        if ui.selectable_label(v == vision, named(v)).clicked() && v != vision {
+                                            save_vision = Some((b.name.clone(), v));
+                                        }
+                                    }
+                                });
+                                combo.response.labelled_by(label.id).on_hover_text(tr("Whether a builder on this AI is shown pictures: the original's screenshots, your pictures of it, and the check's pictures of the build. Auto: what its server says; a model it says nothing about isn't shown any."));
+                                if vision == Vision::Auto
+                                    && let Some(Some(Some(server))) = server
+                                {
+                                    let works_out = match server.sight {
+                                        Some(s) if s.sees => tr("(its server says it sees)"),
+                                        Some(_) => tr("(its server says it doesn't)"),
+                                        // Not asked here; a build asks through its own tunnel.
+                                        None if b.over_ssh() => tr("(asked when a build starts: it's reached over SSH)"),
+                                        None => tr("(its server doesn't say: not shown pictures)"),
+                                    };
+                                    ui.label(RichText::new(works_out).color(t.text_faint).size(theme::CAPTION));
+                                }
+                            });
+                        }
                     }
                     if craft_anything_ai::model_options::supported(b) {
                         if let Some(draft) = app.model_tuning.get_mut(&b.name) {
@@ -725,6 +884,18 @@ fn ai(app: &mut CraftApp, ui: &mut Ui) {
     }
     if let Some((name, effort)) = chosen_effort {
         app.set_effort(&name, effort);
+    }
+    for (name, model) in ask_window {
+        app.ask_server_window(&name, &model);
+    }
+    if let Some((name, budget)) = save_context {
+        app.set_context_tokens(&name, budget);
+    }
+    if let Some((name, tools)) = save_tools {
+        app.set_tools(&name, tools);
+    }
+    if let Some((name, vision)) = save_vision {
+        app.set_vision(&name, vision);
     }
     if close_picker {
         app.model_picker = None;

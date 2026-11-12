@@ -33,6 +33,81 @@ fn opencode_cli_lists_supported_depths_and_rejects_unsupported_choices() {
     assert_eq!(cli(&["ai", "model", "OpenCode", "test/model", "--default"], cfg.path()).code, Some(2));
 }
 
+/// `ai context` shows, sets and clears an API backend's context budget, and refuses what isn't one.
+#[test]
+fn an_ais_context_budget_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "context", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // Nothing answers at that address, so no window is known: Auto is the local default.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["auto"].clone(), auto["window"].clone(), auto["budget"].clone()), (json!(true), Value::Null, json!(24_000)));
+    assert!(cli(&["ai", "context", "Box", "390,000"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["context_tokens"], 390_000);
+    assert_eq!(shown(cfg.path())["budget"], 390_000);
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("context_tokens = 390000"));
+    assert!(!cli(&["ai", "context", "Box", "lots"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["context_tokens"], 390_000, "a refused value changes nothing");
+    assert!(cli(&["ai", "context", "Box", "auto"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["auto"], true);
+    assert!(!cli(&["ai", "context", "Nobody"], cfg.path()).success);
+}
+
+/// `ai tools` shows and sets which tools a builder is offered, and what Auto works out to.
+#[test]
+fn an_ais_tool_list_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "tools", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // No window is known, so Auto works out to the lean list on the local default budget.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["tools"].clone(), auto["auto"].clone(), auto["list"].clone()), (json!("auto"), json!(true), json!("lean")));
+    // A budget of 64k or more is room for every tool.
+    assert!(cli(&["ai", "context", "Box", "65536"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["list"], "full");
+    assert!(cli(&["ai", "tools", "Box", "lean"], cfg.path()).success);
+    assert_eq!((shown(cfg.path())["tools"].clone(), shown(cfg.path())["list"].clone()), (json!("lean"), json!("lean")));
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("tools = \"lean\""));
+    assert!(!cli(&["ai", "tools", "Box", "everything"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["tools"], "lean", "a refused value changes nothing");
+    assert!(cli(&["ai", "tools", "Box", "auto"], cfg.path()).success);
+    assert!(!std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("tools = \"lean\""), "Auto is the default and isn't written");
+    assert!(!cli(&["ai", "tools", "Nobody"], cfg.path()).success);
+}
+
+/// `ai vision` shows and sets whether a model sees pictures, and what its server says.
+#[test]
+fn whether_an_ai_sees_pictures_is_set_from_the_cli() {
+    let cfg = tempfile::tempdir().unwrap();
+    let add = ["ai", "add", "Box", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1"];
+    assert!(cli(&add, cfg.path()).success);
+    let shown = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "vision", "Box", "--format", "json"], cfg).stdout).unwrap() };
+    // Nothing answers at that address, so Auto knows nothing and the model isn't shown pictures.
+    let auto = shown(cfg.path());
+    assert_eq!((auto["vision"].clone(), auto["sees"].clone(), auto["server_says"].clone()), (json!("auto"), json!(false), Value::Null));
+    assert!(cli(&["ai", "vision", "Box", "yes"], cfg.path()).success);
+    assert_eq!((shown(cfg.path())["vision"].clone(), shown(cfg.path())["sees"].clone()), (json!("yes"), json!(true)));
+    assert!(std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("vision = \"yes\""));
+    assert!(!cli(&["ai", "vision", "Box", "maybe"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["vision"], "yes", "a refused value changes nothing");
+    assert!(cli(&["ai", "vision", "Box", "no"], cfg.path()).success);
+    assert_eq!(shown(cfg.path())["sees"], false);
+    assert!(cli(&["ai", "vision", "Box", "auto"], cfg.path()).success);
+    assert!(!std::fs::read_to_string(cfg.path().join("config.toml")).unwrap().contains("vision ="), "Auto is the default and isn't written");
+    assert!(!cli(&["ai", "vision", "Nobody"], cfg.path()).success);
+    // A server reached over ssh isn't asked here (no tunnel is opened for it), and a build asks
+    // through its own, so Auto can't say yet; a set answer still can.
+    let remote = ["ai", "add", "Remote", "--kind", "openai_compatible", "--model", "qwen", "--base-url", "http://127.0.0.1:9/v1", "--ssh-host", "gpu-box"];
+    assert!(cli(&remote, cfg.path()).success);
+    let over = |cfg: &std::path::Path| -> Value { serde_json::from_slice(&cli(&["ai", "vision", "Remote", "--format", "json"], cfg).stdout).unwrap() };
+    let auto = over(cfg.path());
+    assert_eq!((auto["sees"].clone(), auto["over_ssh"].clone(), auto["server_says"].clone()), (Value::Null, json!(true), Value::Null));
+    assert!(cli(&["ai", "vision", "Remote", "no"], cfg.path()).success);
+    assert_eq!(over(cfg.path())["sees"], false);
+}
+
 #[test]
 fn commands_and_exit_codes() {
     let cfg = tempfile::tempdir().unwrap();
