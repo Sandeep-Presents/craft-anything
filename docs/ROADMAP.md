@@ -1612,7 +1612,7 @@ Owner: open · Status: in progress
       — claimed: muraa-p, branch bugfix/r3.11-publisher-hash-sections
 - [x] Preserve source registers and link-register writes for AArch64 returns and authenticated control transfers.
       — claimed: Afloat16, branch bugfix/r3.11-a64-control-registers-20261110
-- [ ] AArch64 move-wide immediates lose their value: `movk w9, #0x9249, lsl #16` lifts to
+- [x] AArch64 move-wide immediates lose their value: `movk w9, #0x9249, lsl #16` lifts to
       `w9 = 0x92490000;`, dropping the low half set just before, and `mov w0, #-1` (MOVN) to
       `w0 = 0;`. Keep MOVK's other bits and invert MOVN's immediate
       — claimed: htcom-code, branch bugfix/r3.11-a64-move-wide-immediates

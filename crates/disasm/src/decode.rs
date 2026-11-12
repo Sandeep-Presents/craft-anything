@@ -186,6 +186,9 @@ pub enum Op {
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     Mov,
+    /// Writes an immediate into some bits of a register and keeps the rest (A64 MOVK). The operands
+    /// are the register, the immediate already shifted into place, and the mask of the bits kept.
+    Insert,
     MovSx,
     MovZx,
     Lea,
@@ -707,6 +710,24 @@ fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
             _ => ops.push(Op::Imm(0)),
         }
     }
+    // Move-wide immediates: MOVN moves the inverted value, MOVK replaces only its 16 bits.
+    if let (Some(Operand::Register(size, _)), Some(Operand::ImmShift(v, s))) = (inst.operands.first(), inst.operands.get(1))
+        && matches!(inst.opcode, Opcode::MOVN | Opcode::MOVK)
+    {
+        let word = *size == yaxpeax_arm::armv8::a64::SizeCode::W;
+        let field = u64::from(*v).checked_shl(u32::from(*s)).unwrap_or(0);
+        let ones = if word { u64::from(u32::MAX) } else { u64::MAX };
+        let value = if inst.opcode == Opcode::MOVN { !field & ones } else { field };
+        // A W result reads as the 32-bit signed value the assembler shows (`mov w0, #-1`).
+        let shown = if word && inst.opcode == Opcode::MOVN { i64::from(value as u32 as i32) } else { value as i64 };
+        let field_mask = 0xffffu64.checked_shl(u32::from(*s)).unwrap_or(0);
+        if let Some(imm) = ops.get_mut(1) {
+            *imm = Op::Imm(shown);
+        }
+        if inst.opcode == Opcode::MOVK {
+            ops.push(Op::Imm((!field_mask & ones) as i64));
+        }
+    }
     let (flow, cond) = match inst.opcode {
         Opcode::B => (Flow::Jump { target: target.unwrap_or(addr) }, None),
         Opcode::Bcc(c) => {
@@ -753,7 +774,8 @@ fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
         Opcode::AND | Opcode::ANDS => Kind::And,
         Opcode::ORR => Kind::Or,
         Opcode::EOR => Kind::Xor,
-        Opcode::MOVZ | Opcode::MOVN | Opcode::MOVK => Kind::Mov,
+        Opcode::MOVZ | Opcode::MOVN => Kind::Mov,
+        Opcode::MOVK => Kind::Insert,
         Opcode::MADD | Opcode::MSUB | Opcode::SMULL | Opcode::UMULL => Kind::Mul,
         Opcode::SDIV | Opcode::UDIV => Kind::Div,
         Opcode::LDAXR | Opcode::LDAXRB | Opcode::LDAXRH => Kind::Load,
@@ -1368,5 +1390,33 @@ mod tests {
         assert_eq!(absolutize("$+0x20", 0x1000), "0x1020");
         assert_eq!(absolutize("x0, $-0x8", 0x1000), "x0, 0xff8");
         assert_eq!(absolutize("$zz", 0), "$zz");
+    }
+
+    /// MOVN's immediate was taken as the value (`mov w0, #-1` as 0), and MOVK as a whole move.
+    #[test]
+    fn a64_move_wide_immediates_invert_and_keep_bits() {
+        // Words and values from clang, disassembled by otool.
+        let cases: &[(u32, &str, Kind, Vec<Op>)] = &[
+            (0x5284_9269, "mov w9, #0x2493", Kind::Mov, vec![Op::Reg("w9".into()), Op::Imm(0x2493)]),
+            (0x1280_0000, "mov w0, #-0x1", Kind::Mov, vec![Op::Reg("w0".into()), Op::Imm(-1)]),
+            (0x12a2_4685, "mov w5, #-0x12340001", Kind::Mov, vec![Op::Reg("w5".into()), Op::Imm(-0x1234_0001)]),
+            (0x92a0_0020, "mov x0, #-0x10001", Kind::Mov, vec![Op::Reg("x0".into()), Op::Imm(-0x10001)]),
+            (0x72b2_4929, "movk w9, #0x9249, lsl #16", Kind::Insert, vec![Op::Reg("w9".into()), Op::Imm(0x9249_0000), Op::Imm(0xffff)]),
+            (
+                0xf2f7_dde3,
+                "movk x3, #0xbeef, lsl #48",
+                Kind::Insert,
+                vec![Op::Reg("x3".into()), Op::Imm(0xbeef_0000_0000_0000u64 as i64), Op::Imm(0x0000_ffff_ffff_ffff)],
+            ),
+        ];
+        for (word, name, kind, ops) in cases {
+            for fmt in [false, true] {
+                let i = decode(Mode::A64, &word.to_le_bytes(), 0x1000, fmt).unwrap();
+                assert_eq!((i.kind, &i.ops), (*kind, ops), "{name} fmt={fmt}");
+            }
+        }
+        // MOVK keeps the other bits, so it reads its register as well as writing it.
+        let i = decode(Mode::A64, &0x72b2_4929u32.to_le_bytes(), 0x1000, true).unwrap();
+        assert!(i.reads == ["x9"] && i.writes == ["x9"], "{i:?}");
     }
 }

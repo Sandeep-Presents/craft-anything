@@ -409,6 +409,16 @@ impl Lifter<'_> {
                         stmt = Some(format!("{dd} = {ss};"));
                     }
                 }
+                (Kind::Insert, _) => match (i.ops.get(1), i.ops.get(2)) {
+                    (Some(Op::Imm(v)), Some(Op::Imm(keep))) => {
+                        let dd = d.clone().unwrap_or_default();
+                        stmt = Some(format!("{dd} = ({dd} & {:#x}) | {:#x};", *keep as u64, *v as u64));
+                    }
+                    _ => {
+                        self.asm_fallbacks += 1;
+                        stmt = Some(format!("__asm(\"{}\");", escape(&i.text())));
+                    }
+                },
                 (Kind::Lea, _) => {
                     let e = match i.ops.get(1) {
                         Some(Op::Mem(m)) => match m.addr {
@@ -1392,5 +1402,20 @@ mod tests {
         assert!(p.text.contains("__asm(") && !p.text.contains("r0 = 0;") && p.asm_fallbacks == 1, "{}", p.text);
         let i = crate::decode::decode(Mode::A32, &0xe591_0004u32.to_le_bytes(), 0x1000, false).unwrap();
         assert!(i.reads.contains(&"r1".to_string()) && i.writes == ["r0"], "{i:?}");
+    }
+
+    /// `movk w9, #0x9249, lsl #16` came out as `w9 = 0x92490000;`, losing the low half set just
+    /// before, and `mov w0, #-1` (MOVN) as `w0 = 0;`.
+    #[test]
+    fn aarch64_move_wide_immediates_keep_their_value() {
+        // mov w9, #0x2493; movk w9, #0x9249, lsl #16; mov w0, #-1; ret
+        let bytes: Vec<u8> = [0x5284_9269u32, 0x72b2_4929, 0x1280_0000, 0xd65f_03c0].iter().flat_map(|w| w.to_le_bytes()).collect();
+        let image = Image::raw(Arc::from(bytes), craft_anything_formats::Arch::Aarch64, 0x1000);
+        let program = Program::analyze(&image, &Limits::default(), &NoControl).unwrap();
+        let p = lift(&image, &program, program.functions.get(&0x1000).unwrap(), &|_| None);
+        assert!(p.text.contains("w9 = 0x2493;"), "{}", p.text);
+        assert!(p.text.contains("w9 = (w9 & 0xffff) | 0x92490000;"), "{}", p.text);
+        assert!(p.text.contains("w0 = -1;") && !p.text.contains("w0 = 0;"), "{}", p.text);
+        assert_eq!(p.asm_fallbacks, 0, "{}", p.text);
     }
 }
