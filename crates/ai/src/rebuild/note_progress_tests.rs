@@ -301,3 +301,69 @@ fn what_a_tool_waits_on_joins_the_feed_once_per_change() {
     queued.say("Waiting for Ghidra to finish decompiling another function (1 min so far)");
     assert_eq!(newly_said(d.path(), &mut said).len(), 2, "each wait's new line");
 }
+
+/// #1722 review: with an API builder, the next tool (a decompile) can hold the session when the
+/// last one finishes. The feed still gets what that tool says while it waits.
+#[test]
+fn what_a_tool_says_reaches_the_feed_while_it_holds_the_session() {
+    struct WhileHeld {
+        polls: usize,
+        events: std::sync::mpsc::Receiver<RunEvent>,
+        release: Option<std::sync::mpsc::Sender<()>>,
+        inbox: PathBuf,
+        waiting: Option<craft_anything_engine::inbox::Activity>,
+        seen: bool,
+    }
+
+    impl Conversation for WhileHeld {
+        fn send(&mut self, _: &str) {}
+        fn poll(&mut self) -> Vec<AgentEvent> {
+            self.polls += 1;
+            if self.polls == 1 {
+                let waiting = craft_anything_engine::inbox::Activity::start(&self.inbox);
+                waiting.say("Ghidra is decompiling this function (1 min so far; it gives up at 15 min)");
+                self.waiting = Some(waiting);
+                return vec![AgentEvent::ToolFinished {
+                    call_id: "1".into(),
+                    tool: "build_file_write".into(),
+                    ok: true,
+                    summary: String::new(),
+                    evidence_id: None,
+                }];
+            }
+            self.seen |= self.events.try_iter().any(|e| matches!(e, RunEvent::Step { text, .. } if text.starts_with("Ghidra is decompiling")));
+            if self.seen || self.polls > 100 {
+                self.release.take().map(|r| r.send(()));
+                return vec![AgentEvent::TurnDone { backend: "scripted".into(), input_tokens: 0, output_tokens: 0, cost_usd: None, cost_is_estimate: false }];
+            }
+            Vec::new()
+        }
+        fn answer_consent(&mut self, _: &str, _: bool) {}
+        fn stop(&mut self) {}
+        fn is_busy(&self) -> bool {
+            !self.seen && self.polls <= 100
+        }
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(dir.path(), "Held session", "Build an app", TargetRef::None).unwrap();
+    let mut worker = check_worker(&ws, false);
+    let (tx, rx) = std::sync::mpsc::channel();
+    worker.tx = tx;
+    // The decompile: holds the session until the turn ends, or for a few seconds at most.
+    let (release, released) = std::sync::mpsc::channel::<()>();
+    let (held, holding) = std::sync::mpsc::channel::<()>();
+    let engine = worker.engine.clone();
+    let holder = std::thread::spawn(move || {
+        let _session = engine.session();
+        held.send(()).unwrap();
+        // Told to let go: the line reached the feed while the session was held.
+        released.recv_timeout(Duration::from_secs(5)).is_ok()
+    });
+    holding.recv().unwrap();
+    let mut agent = WhileHeld { polls: 0, events: rx, release: Some(release), inbox: ws.inbox_dir(), waiting: None, seen: false };
+    let result = worker.turn_with_wait(&mut ws, &mut agent, "Carry on", true, None, |_, _| panic!("no retry"));
+    let in_time = holder.join().unwrap();
+    assert!(result.is_ok(), "{result:?}");
+    assert!(agent.seen && in_time, "the waiting line reached the feed while the tool held the session");
+}
