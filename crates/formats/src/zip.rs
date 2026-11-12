@@ -387,6 +387,14 @@ pub fn raw_entry_data<'a>(data: &'a [u8], e: &ZipEntry) -> Result<&'a [u8], ZipE
     }
     let n = usize::from(r.u16_le(off + 26).ok_or(ZipError::Truncated("local header"))?);
     let x = usize::from(r.u16_le(off + 28).ok_or(ZipError::Truncated("local header"))?);
+    let flags = r.u16_le(off + 6).ok_or(ZipError::Truncated("local header"))?;
+    if (flags ^ e.flags) & 1 != 0 || r.u16_le(off + 8) != Some(e.method) {
+        return Err(ZipError::Corrupt(format!("local decoding fields disagree for {}", e.name)));
+    }
+    let local_name = r.slice(off + 30, n).ok_or(ZipError::Truncated("local entry name"))?;
+    if decode_name(local_name, flags).replace('\\', "/") != e.name {
+        return Err(ZipError::Corrupt(format!("local name disagrees with {}", e.name)));
+    }
     let start = off.checked_add(30 + n + x).ok_or(ZipError::Truncated("local header"))?;
     let len = usize::try_from(e.compressed_size).map_err(|_| ZipError::TooLarge(e.compressed_size))?;
     r.slice(start, len).ok_or(ZipError::Truncated("entry data"))
@@ -751,6 +759,9 @@ mod tests {
         frame.extend(body);
         let mut file = vec![0u8; 30];
         file[..4].copy_from_slice(b"PK\x03\x04");
+        file[8..10].copy_from_slice(&93u16.to_le_bytes());
+        file[26] = 1;
+        file.push(b'x');
         file.extend(&frame);
         let mut e = ZipEntry {
             name: "x".into(),
@@ -771,6 +782,18 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_local_entries_do_not_supply_bytes() {
+        let bytes = build(&[("ab", b"payload")]);
+        let entry = &parse(&bytes, 1).unwrap().entries[0];
+        assert_eq!(read_entry(&bytes, entry, 7).unwrap(), b"payload");
+        for (off, value) in [(6, 1), (8, 8), (31, b'c')] {
+            let mut bad = bytes.clone();
+            bad[off] = value;
+            assert!(matches!(read_entry_unverified(&bad, entry, 7), Err(ZipError::Corrupt(_))));
+        }
+    }
+
+    #[test]
     fn deflate_round_trip_and_crc_check() {
         let body = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".repeat(20);
         let comp = miniz_oxide::deflate::compress_to_vec(&body, 6);
@@ -788,6 +811,9 @@ mod tests {
         };
         let mut z = b"PK\x03\x04".to_vec();
         z.extend_from_slice(&[0; 26]);
+        z[8..10].copy_from_slice(&8u16.to_le_bytes());
+        z[26] = 1;
+        z.push(b'x');
         z.extend_from_slice(&comp);
         assert_eq!(read_entry(&z, &e, 1 << 20).unwrap(), body);
         // A lying uncompressed size can't make us exceed the cap.

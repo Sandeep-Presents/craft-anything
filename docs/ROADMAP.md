@@ -1839,6 +1839,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-macos-vfat-directory-attributes
 - [x] Keep ZIP directory entries within the declared directory.
       — claimed: Afloat16, branch bugfix/r3.12-zip-directory-bounds-20261105
+- [x] Match ZIP local and central names, compression methods and encryption flags before decoding an entry.
+      — claimed: Afloat16, branch bugfix/r3.12-zip-local-identity
 - [x] Refuse split ZIP archives without their other volumes.
       — claimed: Afloat16, branch bugfix/r3.12-zip-multidisk-20261105
 - [x] Check Unity bundle blocks against their declared output lengths.
