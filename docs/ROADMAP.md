@@ -1556,7 +1556,7 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.11-value-flow-budget-20261110
 - [x] Resolve AArch64 address evidence only from known operands, with the right arithmetic width and retained writeback effects.
       — claimed: Afloat16, branch bugfix/r3.11-a64-address-proofs-20261110
-- [ ] AArch64 shifted and extended register operands lose their shift: `sub w9, w9, w9, lsl #3` lifts
+- [x] AArch64 shifted and extended register operands lose their shift: `sub w9, w9, w9, lsl #3` lifts
       to `w9 -= w9;` and `add w9, w10, w9, lsr #31` to `w9 = w10 + w9;`. Keep the shift or extension
       on the operand and show it in pseudo-C
       — claimed: htcom-code, branch bugfix/r3.11-a64-shifted-operands

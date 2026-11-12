@@ -179,6 +179,31 @@ pub enum Op {
     Mem(MemOp),
     /// A branch target.
     Addr(u64),
+    /// A register shifted or extended before use (A64 `w9, lsr #31`, `w2, sxtw #2`).
+    Shifted {
+        reg: String,
+        shift: Shift,
+        amount: u8,
+    },
+}
+
+/// How an [`Op::Shifted`] register is changed before use: a shift, or an extension from the width
+/// the name gives (`Sxtw` sign-extends the low 32 bits), then a left shift by the amount.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Shift {
+    Lsl,
+    Lsr,
+    Asr,
+    Ror,
+    Uxtb,
+    Uxth,
+    Uxtw,
+    Uxtx,
+    Sxtb,
+    Sxth,
+    Sxtw,
+    Sxtx,
 }
 
 /// What an instruction does, coarsely (for the lifter and heuristics).
@@ -608,6 +633,26 @@ fn a64_canon(n: u16, sp: bool) -> Option<String> {
     Some(format!("x{n}"))
 }
 
+use yaxpeax_arm::armv8::a64::{ShiftStyle as A64Shift, SizeCode as A64Size};
+
+fn a64_shift(style: A64Shift) -> Shift {
+    use A64Shift as S;
+    match style {
+        S::LSL => Shift::Lsl,
+        S::LSR => Shift::Lsr,
+        S::ASR => Shift::Asr,
+        S::ROR => Shift::Ror,
+        S::UXTB => Shift::Uxtb,
+        S::UXTH => Shift::Uxth,
+        S::UXTW => Shift::Uxtw,
+        S::UXTX => Shift::Uxtx,
+        S::SXTB => Shift::Sxtb,
+        S::SXTH => Shift::Sxth,
+        S::SXTW => Shift::Sxtw,
+        S::SXTX => Shift::Sxtx,
+    }
+}
+
 fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
     use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand};
     let word = bytes.get(..4)?;
@@ -621,6 +666,7 @@ fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
     let mut target = None;
     let mut first_reg: Option<String> = None;
     let mut regs_in_order: Vec<String> = Vec::new();
+    let wide = matches!(inst.operands.first(), Some(Operand::Register(A64Size::X, _) | Operand::RegisterOrSP(A64Size::X, _)));
     let is_store =
         op_name.starts_with("ST") && !op_name.starts_with("STR") || op_name.starts_with("STR") || op_name.starts_with("STP") || op_name.starts_with("STUR");
     for o in inst.operands.iter() {
@@ -652,8 +698,15 @@ fn decode_a64(bytes: &[u8], addr: u64, fmt: bool) -> Option<Insn> {
                     regs_in_order.push(c);
                 }
             }
-            Operand::RegShift(_, _, s, n) => {
-                ops.push(Op::Reg(a64_reg(s, n, false)));
+            Operand::RegShift(style, amount, s, n) => {
+                let reg = a64_reg(s, n, false);
+                // A W register under LSL in a 64-bit operation is the extended form: zero-extended first.
+                let style = if style == A64Shift::LSL && s == A64Size::W && wide { A64Shift::UXTW } else { style };
+                ops.push(match a64_shift(style) {
+                    // Shifting by nothing, or extending a register to its own width, changes nothing.
+                    Shift::Lsl | Shift::Uxtx | Shift::Sxtx if amount == 0 => Op::Reg(reg),
+                    shift => Op::Shifted { reg, shift, amount },
+                });
                 if let Some(c) = a64_canon(n, false) {
                     push_unique(&mut reads, c);
                 }
@@ -1271,6 +1324,35 @@ mod tests {
             let i = decode(Mode::T32, &[0xff, 0xf7, 0xf7, 0xff], 0x1010, fmt).unwrap();
             assert_eq!(i.flow, Flow::Call { target: 0x1002 });
         }
+    }
+
+    /// A shifted or extended register operand lost its shift: `w9, lsr #31` read as plain `w9`.
+    #[test]
+    fn a64_shifted_and_extended_registers_keep_their_shift() {
+        let reg = |r: &str| Op::Reg(r.into());
+        let sh = |r: &str, shift, amount| Op::Shifted { reg: r.into(), shift, amount };
+        // Words from clang, disassembled by otool.
+        let cases: &[(u32, &str, Vec<Op>)] = &[
+            (0x0b49_7d49, "add w9, w10, w9, lsr #31", vec![reg("w9"), reg("w10"), sh("w9", Shift::Lsr, 31)]),
+            (0x4b09_0d29, "sub w9, w9, w9, lsl #3", vec![reg("w9"), reg("w9"), sh("w9", Shift::Lsl, 3)]),
+            (0x8b82_1020, "add x0, x1, x2, asr #4", vec![reg("x0"), reg("x1"), sh("x2", Shift::Asr, 4)]),
+            (0xaac2_2020, "orr x0, x1, x2, ror #8", vec![reg("x0"), reg("x1"), sh("x2", Shift::Ror, 8)]),
+            (0x6b01_081f, "cmp w0, w1, lsl #2", vec![reg("wzr"), reg("w0"), sh("w1", Shift::Lsl, 2)]),
+            (0x8b22_4020, "add x0, x1, w2, uxtw", vec![reg("x0"), reg("x1"), sh("w2", Shift::Uxtw, 0)]),
+            (0x8b22_4820, "add x0, x1, w2, uxtw #2", vec![reg("x0"), reg("x1"), sh("w2", Shift::Uxtw, 2)]),
+            (0x8b22_c820, "add x0, x1, w2, sxtw #2", vec![reg("x0"), reg("x1"), sh("w2", Shift::Sxtw, 2)]),
+            (0xcb21_03e0, "sub x0, sp, w1, uxtb", vec![reg("x0"), reg("sp"), sh("w1", Shift::Uxtb, 0)]),
+            // An unshifted register stays a plain register.
+            (0xaa02_0020, "orr x0, x1, x2", vec![reg("x0"), reg("x1"), reg("x2")]),
+            (0x0b22_4020, "add w0, w1, w2, uxtw", vec![reg("w0"), reg("w1"), reg("w2")]),
+        ];
+        for (word, name, ops) in cases {
+            let i = decode(Mode::A64, &word.to_le_bytes(), 0x1000, true).unwrap();
+            assert_eq!(&i.ops, ops, "{name}");
+        }
+        // The shifted register is still read.
+        let i = decode(Mode::A64, &0x0b49_7d49u32.to_le_bytes(), 0x1000, true).unwrap();
+        assert!(i.reads.contains(&"x9".to_string()) && i.reads.contains(&"x10".to_string()), "{i:?}");
     }
 
     #[test]

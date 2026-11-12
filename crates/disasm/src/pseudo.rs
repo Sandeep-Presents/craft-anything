@@ -4,7 +4,7 @@
 //! graph isn't structured. Calls get resolved names and arguments from the calling convention;
 //! string literals are inlined.
 
-use crate::decode::{ArmConsts, Cond, Flow, Insn, Kind, MemOp, Mode, Op, canonical_reg};
+use crate::decode::{ArmConsts, Cond, Flow, Insn, Kind, MemOp, Mode, Op, Shift, canonical_reg};
 use crate::image::Image;
 use crate::program::{Function, Program};
 use craft_anything_formats::Format;
@@ -90,6 +90,38 @@ fn ty(size: u8) -> &'static str {
         8 => "uint64_t",
         16 => "uint128_t",
         _ => "void",
+    }
+}
+
+/// A shifted or extended register as C: the shift's signedness and width are spelled out, since
+/// registers have no types here.
+fn shifted(reg: &str, shift: Shift, n: u8) -> String {
+    let bits: u8 = if reg.starts_with('w') { 32 } else { 64 };
+    // (the extension, the 64-bit type it widens to before a shift)
+    let (cast, wide) = match shift {
+        Shift::Lsl => return format!("({reg} << {n})"),
+        Shift::Lsr => return format!("((uint{bits}_t){reg} >> {n})"),
+        Shift::Asr => return format!("((int{bits}_t){reg} >> {n})"),
+        Shift::Ror => {
+            return match bits.checked_sub(n) {
+                Some(back) if n > 0 && back > 0 => format!("((uint{bits}_t){reg} >> {n} | (uint{bits}_t){reg} << {back})"),
+                _ => reg.to_string(),
+            };
+        }
+        Shift::Uxtb => ("uint8_t", "uint64_t"),
+        Shift::Uxth => ("uint16_t", "uint64_t"),
+        Shift::Uxtw => ("uint32_t", "uint64_t"),
+        Shift::Uxtx => ("uint64_t", "uint64_t"),
+        Shift::Sxtb => ("int8_t", "int64_t"),
+        Shift::Sxth => ("int16_t", "int64_t"),
+        Shift::Sxtw => ("int32_t", "int64_t"),
+        Shift::Sxtx => ("int64_t", "int64_t"),
+    };
+    // Extend, then widen before shifting, so the shift can't lose the bits C's narrower type would drop.
+    match n {
+        0 => format!("({cast}){reg}"),
+        _ if cast == wide => format!("(({wide}){reg} << {n})"),
+        _ => format!("(({wide})({cast}){reg} << {n})"),
     }
 }
 
@@ -188,6 +220,7 @@ impl Lifter<'_> {
             Op::Imm(v) => imm(*v),
             Op::Mem(m) => self.mem(m),
             Op::Addr(a) => self.address_of(*a),
+            Op::Shifted { reg, shift, amount } => shifted(reg, *shift, *amount),
         }
     }
 
@@ -1240,6 +1273,29 @@ mod tests {
         let text = lift(&img, &p, f, &none).text;
         assert!(text.contains("puts(rcx)"), "{text}");
         assert!(!text.contains("puts()"), "{text}");
+    }
+
+    /// `sub w9, w9, w9, lsl #3` came out as `w9 -= w9;`: the shift of a register operand was dropped.
+    #[test]
+    fn aarch64_shifted_operands_keep_their_shift() {
+        // add w9, w10, w9, lsr #31; sub w9, w9, w9, lsl #3; add x0, x1, x2, asr #4;
+        // add x3, x1, w2, sxtw #2; add x4, x1, w2, uxtw; orr x5, x1, x2, ror #8; ret
+        let words = [0x0b49_7d49u32, 0x4b09_0d29, 0x8b82_1020, 0x8b22_c823, 0x8b22_4024, 0xaac2_2025, 0xd65f_03c0];
+        let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
+        let image = Image::raw(Arc::from(bytes), craft_anything_formats::Arch::Aarch64, 0x1000);
+        let program = Program::analyze(&image, &Limits::default(), &NoControl).unwrap();
+        let p = lift(&image, &program, program.functions.get(&0x1000).unwrap(), &|_| None);
+        for want in [
+            "w9 = w10 + ((uint32_t)w9 >> 31);",
+            "w9 -= (w9 << 3);",
+            "x0 = x1 + ((int64_t)x2 >> 4);",
+            "x3 = x1 + ((int64_t)(int32_t)w2 << 2);",
+            "x4 = x1 + (uint32_t)w2;",
+            "x5 = x1 | ((uint64_t)x2 >> 8 | (uint64_t)x2 << 56);",
+        ] {
+            assert!(p.text.contains(want), "{want}\n{}", p.text);
+        }
+        assert!(!p.text.contains("w9 -= w9;"), "{}", p.text);
     }
 
     #[test]
