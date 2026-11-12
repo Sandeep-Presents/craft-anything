@@ -101,12 +101,24 @@ fn mock(responses: Vec<(u16, &'static str, String)>) -> (String, Arc<Mutex<Vec<S
     let seen = Arc::new(Mutex::new(Vec::new()));
     let s2 = seen.clone();
     std::thread::spawn(move || {
-        for (status, ctype, reply) in responses {
+        let mut responses = responses.into_iter().peekable();
+        while let Some((next_status, next_type, _)) = responses.peek() {
+            let lists_next = *next_status == 200 && *next_type == "application/json";
             let Ok((stream, _)) = l.accept() else { return };
             let mut r = BufReader::new(stream.try_clone().unwrap());
             let mut line = String::new();
             r.read_line(&mut line).unwrap();
             let path = line.split_whitespace().nth(1).unwrap_or_default().to_string();
+            // Scripted questions are model lists answered with a list. Any other question is a
+            // window probe (crate::window) the test didn't script: say nothing, as a server that
+            // doesn't report its window does, and keep the scripted answer for the request after.
+            if line.starts_with("GET ") && !(lists_next && path.ends_with("/models")) {
+                let mut w = stream;
+                write!(w, "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n").unwrap();
+                w.flush().unwrap();
+                continue;
+            }
+            let Some((status, ctype, reply)) = responses.next() else { return };
             let mut headers = Vec::new();
             let mut len = 0usize;
             loop {
@@ -357,10 +369,10 @@ fn an_api_transcript_is_resumed_only_in_its_mode() {
     let path = dir.path().join("transcript.json");
     let history = vec![crate::model::Msg::user_text("a Deep conversation")];
     crate::context::save(&path, &history, true).unwrap();
-    assert!(h.start_builder(&entry, false, Some(path.clone()), true).unwrap().resumed(), "Deep continues a Deep transcript");
-    assert!(!h.start_builder(&entry, false, Some(path.clone()), false).unwrap().resumed(), "Clean room starts fresh");
+    assert!(h.start_builder(&entry, false, Some(path.clone()), true, None).unwrap().resumed(), "Deep continues a Deep transcript");
+    assert!(!h.start_builder(&entry, false, Some(path.clone()), false, None).unwrap().resumed(), "Clean room starts fresh");
     crate::context::save(&path, &history, false).unwrap();
-    assert!(!h.start_builder(&entry, false, Some(path), true).unwrap().resumed(), "Deep doesn't continue a Clean room transcript");
+    assert!(!h.start_builder(&entry, false, Some(path), true, None).unwrap().resumed(), "Deep doesn't continue a Clean room transcript");
 }
 
 /// Compare checks either position; enabled named and automatic chat choices still work.
@@ -644,6 +656,77 @@ fn an_ais_model_is_changed() {
     assert_eq!(h.backends().into_iter().find(|b| b.name == "Claude Code").unwrap().model, "claude-code");
     assert!(!h.set_model("Nobody", "m").unwrap());
     assert!(h.set_model("Box", " ").is_err());
+}
+
+/// An API backend's context budget is set and cleared; an agent app keeps its own conversation.
+#[test]
+fn an_ais_context_budget_is_set_and_cleared() {
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Box", BackendKind::OpenaiCompatible, "qwen"), None).unwrap();
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    let budget = |h: &AiHub| h.options().get("Box").and_then(|o| o.context_tokens);
+    assert!(h.set_context_tokens("Box", Some(390_000)).unwrap());
+    assert_eq!(budget(&h), Some(390_000));
+    assert!(h.set_context_tokens("Box", None).unwrap());
+    assert_eq!(budget(&h), None, "Auto again");
+    assert!(h.set_context_tokens("Box", Some(0)).unwrap());
+    assert_eq!(budget(&h), None, "zero is Auto, not a budget of nothing");
+    assert!(h.set_context_tokens("Codex", Some(1000)).is_err());
+    assert!(!h.set_context_tokens("Nobody", Some(1000)).unwrap());
+}
+
+/// What a budget works out to: Auto fills three quarters of a local window, a setting is held to
+/// it, and with no window the defaults apply.
+#[test]
+fn a_budget_is_worked_out_from_the_servers_window() {
+    let w = |tokens: Option<u64>, local| crate::ServerWindow {
+        window: tokens.map(|tokens| crate::window::Window { tokens, source: "model list" }),
+        local,
+        sight: None,
+    };
+    assert_eq!(w(Some(524_288), true).budget(None), 393_216);
+    assert_eq!(w(Some(524_288), true).budget(Some(131_072)), 131_072);
+    assert_eq!(w(Some(262_144), true).budget(Some(1_048_576)), 196_608, "held to what the server holds");
+    assert_eq!(w(None, true).budget(None), crate::context::LOCAL_CONTEXT_TOKENS);
+    assert_eq!(w(None, false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS);
+    assert_eq!(w(Some(1_000_000), false).budget(None), crate::context::CLOUD_CONTEXT_TOKENS, "a paid service isn't raised");
+    // The lean list is only for now when a server naming a large window would lift it.
+    let auto = crate::ToolList::Auto;
+    assert!(w(None, true).lean_until_told(auto, None), "Auto budget, no window yet");
+    assert!(!w(None, true).lean_until_told(auto, Some(10_000)), "a small budget stays lean");
+    assert!(w(None, true).lean_tools(auto, Some(10_000)));
+    assert!(!w(Some(16_384), true).lean_until_told(auto, None), "the server named a small window");
+    assert!(!w(None, true).lean_until_told(crate::ToolList::Lean, None), "a chosen list");
+    assert!(!w(None, false).lean_until_told(auto, None), "a paid service isn't lean");
+    let (h, _d) = hub();
+    let b = |name: &str, kind, model: &str| BackendConfig { name: name.into(), kind, model: model.into(), base_url: None, ssh_host: None, enabled: true };
+    h.add_backend(b("Codex", BackendKind::AgentCli, "codex"), None).unwrap();
+    assert!(h.server_window("Codex").is_err());
+    assert!(h.server_window("Nobody").is_err());
+}
+
+/// A server reached over ssh isn't asked here (no tunnel is opened just for it), and a build asks
+/// through its own, so Auto can't say yet whether its model is shown pictures; a set answer can.
+#[test]
+fn a_server_over_ssh_isnt_asked_whether_its_model_sees_until_a_build() {
+    let (h, _d) = hub();
+    let remote = BackendConfig {
+        name: "Remote".into(),
+        kind: BackendKind::OpenaiCompatible,
+        model: "qwen".into(),
+        base_url: Some("http://127.0.0.1:9/v1".into()),
+        ssh_host: Some("gpu-box".into()),
+        enabled: true,
+    };
+    assert!(remote.over_ssh());
+    assert!(!BackendConfig { ssh_host: Some("  ".into()), ..remote.clone() }.over_ssh(), "a blank host is no host");
+    h.add_backend(remote, None).unwrap();
+    let auto = h.vision("Remote").unwrap();
+    assert_eq!((auto.read, auto.over_ssh, auto.sees()), (None, true, None));
+    assert_eq!(h.server_window("Remote").unwrap().sight, None);
+    assert!(h.set_vision("Remote", Some(crate::Vision::Yes)).unwrap());
+    assert_eq!(h.vision("Remote").unwrap().sees(), Some(true));
 }
 
 /// Every Claude effort level can be chosen for the Claude API and Claude Code, and only for them.
@@ -1451,6 +1534,87 @@ fn a_qwen_markup_call_to_a_missing_tool_is_answered_and_the_build_goes_on() {
     // The call that ran is paired with its result in the next request.
     let last = seen[2].body["messages"].as_array().unwrap().last().unwrap();
     assert_eq!(last["role"], "tool", "{last}");
+}
+
+#[test]
+fn a_picture_reaches_each_api_the_way_it_expects() {
+    use crate::model::{Block, Effort, Msg, Speaker, Stop, TurnRequest};
+    let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+    let data = "iVBORw0KGgoAAAANSUhEUg==";
+    let message = |picture: Block| Msg {
+        role: Speaker::User,
+        blocks: vec![Block::Text { text: "Here's how it looks now. ".into() }, picture, Block::Text { text: "Close the gap.".into() }],
+    };
+    let shown = message(Block::image("now.png", png).unwrap());
+    let resumed = message(Block::Image { media_type: "image/png".into(), name: "now.png".into(), data: String::new() });
+    let note = Block::image_note("now.png");
+
+    // OpenAI-style servers (llama.cpp, LM Studio, Ollama, OpenRouter): the content becomes parts.
+    for react in [false, true] {
+        let reply = chat_sse(&[json!({"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]})]);
+        let (url, seen) = mock(vec![(200, "text/event-stream", reply.clone()), (200, "text/event-stream", reply)]);
+        let mut model = openai::OpenAi::compatible("Local", &url, None, "scripted");
+        model.react = react;
+        for messages in [std::slice::from_ref(&shown), std::slice::from_ref(&resumed)] {
+            let request = TurnRequest { system: "S", messages, tools: &[], effort: Effort::Low, max_tokens: 100 };
+            model.turn(&request, &mut |_| {}, &Stop::default()).unwrap();
+        }
+        let seen = seen.lock().unwrap();
+        let sent = |i: usize| seen[i].body["messages"].as_array().unwrap().last().unwrap().clone();
+        assert_eq!(
+            sent(0),
+            json!({"role": "user", "content": [
+                {"type": "text", "text": "Here's how it looks now. "},
+                {"type": "image_url", "image_url": {"url": format!("data:image/png;base64,{data}")}},
+                {"type": "text", "text": "Close the gap."},
+            ]}),
+            "react={react}"
+        );
+        // Once its bytes are gone, the note goes in its place, and the content is a string again.
+        assert_eq!(sent(1), json!({"role": "user", "content": format!("Here's how it looks now. {note}Close the gap.")}), "react={react}");
+    }
+
+    // Anthropic: an image block with a base64 source.
+    let reply = sse(&[
+        json!({"type":"message_start","message":{"model":"claude-opus-5-5","usage":{"input_tokens":10,"output_tokens":1}}}),
+        json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}),
+        json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Done."}}),
+        json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}),
+        json!({"type":"message_stop"}),
+    ]);
+    let (url, seen) = mock(vec![(200, "text/event-stream", reply.clone()), (200, "text/event-stream", reply)]);
+    let mut model = anthropic::Anthropic::new(Some(&url), "sk-test-123".into(), "claude-opus-5-5");
+    for messages in [std::slice::from_ref(&shown), std::slice::from_ref(&resumed)] {
+        let request = TurnRequest { system: "S", messages, tools: &[], effort: Effort::Low, max_tokens: 100 };
+        model.turn(&request, &mut |_| {}, &Stop::default()).unwrap();
+    }
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].body["messages"][0]["content"][1], json!({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}));
+    assert_eq!(seen[1].body["messages"][0]["content"][1], json!({"type": "text", "text": note}));
+}
+
+#[test]
+fn a_message_without_a_picture_is_sent_as_before() {
+    use crate::model::{Block, Msg, Speaker};
+    // Every request that has no picture keeps its plain-string content.
+    let user = Msg { role: Speaker::User, blocks: vec![Block::Text { text: "Hi".into() }] };
+    assert_eq!(openai::messages_json(&user, false), [json!({"role": "user", "content": "Hi"})]);
+    let results = Msg {
+        role: Speaker::User,
+        blocks: vec![Block::ToolResult { tool_use_id: "c1".into(), content: "ok".into(), is_error: false }, Block::Text { text: "Next.".into() }],
+    };
+    assert_eq!(
+        openai::messages_json(&results, false),
+        [json!({"role": "tool", "tool_call_id": "c1", "content": "ok"}), json!({"role": "user", "content": "Next."})]
+    );
+    // A picture after tool results goes in the person's message that follows them.
+    let mut with_picture = results.clone();
+    with_picture.blocks.push(Block::image("now.png", b"\x89PNG\r\n\x1a\n").unwrap());
+    let sent = openai::messages_json(&with_picture, false);
+    assert_eq!(sent.len(), 2);
+    assert_eq!(sent[0]["role"], "tool");
+    assert_eq!(sent[1]["content"][0], json!({"type": "text", "text": "Next."}));
+    assert_eq!(sent[1]["content"][1]["type"], "image_url");
 }
 
 #[test]

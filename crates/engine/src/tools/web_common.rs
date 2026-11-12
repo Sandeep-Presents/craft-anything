@@ -661,6 +661,22 @@ pub fn b64_decode(s: &str) -> Result<Vec<u8>, ToolError> {
     base64::engine::general_purpose::STANDARD.decode(s.trim()).map_err(|e| ToolError::new(ErrorCode::GarbledOutput, format!("invalid base64: {e}")))
 }
 
+/// The kind of picture `bytes` hold (a media type models take: PNG, JPEG, GIF or WebP), read
+/// from their first bytes, or `None` for anything else.
+pub fn picture_media_type(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("image/jpeg")
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("image/gif")
+    } else if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP".as_slice()) {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
 pub fn b64_encode(data: &[u8]) -> String {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.encode(data)
@@ -679,6 +695,16 @@ pub fn png_dimensions(bytes: &[u8]) -> Result<(u32, u32), ToolError> {
     let reader = decoder.read_info().map_err(|e| ToolError::new(ErrorCode::GarbledOutput, format!("not a readable PNG: {e}")))?;
     let info = reader.info();
     Ok((info.width, info.height))
+}
+
+/// Read a picture's declared dimensions (PNG, JPEG, WebP or GIF) without decoding the pixels.
+pub fn picture_dimensions(bytes: &[u8]) -> Result<(u32, u32), ToolError> {
+    if bytes.starts_with(b"\x89PNG") {
+        return png_dimensions(bytes);
+    }
+    let unreadable = |e: image::ImageError| ToolError::new(ErrorCode::GarbledOutput, format!("not a readable PNG, JPEG, WebP or GIF picture: {e}"));
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| unreadable(e.into()))?;
+    reader.into_dimensions().map_err(unreadable)
 }
 
 /// Decode a picture (PNG, JPEG, WebP, or a GIF's first frame) to 8-bit RGBA, within the same
