@@ -681,6 +681,16 @@ pub fn png_dimensions(bytes: &[u8]) -> Result<(u32, u32), ToolError> {
     Ok((info.width, info.height))
 }
 
+/// Read a picture's declared dimensions (PNG, JPEG, WebP or GIF) without decoding the pixels.
+pub fn picture_dimensions(bytes: &[u8]) -> Result<(u32, u32), ToolError> {
+    if bytes.starts_with(b"\x89PNG") {
+        return png_dimensions(bytes);
+    }
+    let unreadable = |e: image::ImageError| ToolError::new(ErrorCode::GarbledOutput, format!("not a readable PNG, JPEG, WebP or GIF picture: {e}"));
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format().map_err(|e| unreadable(e.into()))?;
+    reader.into_dimensions().map_err(unreadable)
+}
+
 /// Decode a picture (PNG, JPEG, WebP, or a GIF's first frame) to 8-bit RGBA, within the same
 /// memory budget as [`decode_png`].
 pub fn decode_picture(bytes: &[u8]) -> Result<Image, ToolError> {

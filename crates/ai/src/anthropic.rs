@@ -26,8 +26,14 @@ pub const EFFORT_LEVELS: &[(&str, &[Effort])] = &[
 /// The effort level `model` is sent: `effort`, or the nearest level below it the model has.
 pub fn effort_for(model: &str, effort: Effort) -> Effort {
     let effort = effort.within(&Effort::ALL);
-    let model = model.trim().trim_start_matches("anthropic/").trim_start_matches("anthropic.");
+    let model = model_id(model);
     EFFORT_LEVELS.iter().find(|(prefix, _)| model.starts_with(prefix)).map_or(effort, |(_, levels)| effort.within(levels))
+}
+
+/// A model id without what a gateway puts in front of it (`anthropic/claude-…`,
+/// `anthropic.claude-…`), so every check by model family reads `claude-…`.
+fn model_id(model: &str) -> &str {
+    model.trim().trim_start_matches("anthropic/").trim_start_matches("anthropic.")
 }
 pub const API_VERSION: &str = "2023-06-01";
 pub const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
@@ -139,6 +145,10 @@ pub fn message_json(m: &Msg) -> Value {
                 Block::ToolExtra { .. } => return None,
                 Block::ToolResult { tool_use_id, content, is_error } => {
                     json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": content, "is_error": is_error})
+                }
+                Block::Image { name, data, .. } if data.is_empty() => json!({"type": "text", "text": Block::image_note(name)}),
+                Block::Image { media_type, data, .. } => {
+                    json!({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}})
                 }
             })
         })
@@ -334,6 +344,12 @@ impl ChatModel for Anthropic {
     fn model(&self) -> String {
         self.model.clone()
     }
+
+    /// Every Claude model reads pictures. Another model behind an Anthropic-style endpoint says
+    /// nothing, and is treated as one that can't unless the person says it can.
+    fn sees_pictures(&self) -> Option<crate::sight::Sight> {
+        model_id(&self.model).starts_with("claude-").then_some(crate::sight::Sight { sees: true, source: "Claude" })
+    }
 }
 
 /// Marker for tool input that wasn't valid JSON.
@@ -388,6 +404,20 @@ mod tests {
         off.fallbacks = false;
         assert!(off.body(&TurnRequest { system: "s", messages: &msgs, tools: &[], effort: Effort::Low, max_tokens: 10 }).get("fallbacks").is_none());
         assert!(off.headers().iter().all(|(k, _)| *k != "anthropic-beta"));
+    }
+
+    /// A gateway names Claude `anthropic/claude-…` or `anthropic.claude-…`; it still sees pictures,
+    /// and another model behind an Anthropic-style endpoint still says nothing.
+    #[test]
+    fn claude_behind_a_gateway_still_sees_pictures() {
+        use crate::model::ChatModel;
+        for model in ["claude-sonnet-4-6", " claude-opus-5-5", "anthropic/claude-sonnet-4-6", "anthropic.claude-opus-4-6"] {
+            let sight = Anthropic::new(None, "sk-test".into(), model).sees_pictures();
+            assert_eq!(sight.map(|s| (s.sees, s.source)), Some((true, "Claude")), "{model}");
+        }
+        for model in ["glm-4.6", "anthropic/glm-4.6", "minimax-m2", "my-claude-"] {
+            assert!(Anthropic::new(None, "sk-test".into(), model).sees_pictures().is_none(), "{model}");
+        }
     }
 
     /// Every level goes to a model that has it; one that lacks it gets the nearest level below.
